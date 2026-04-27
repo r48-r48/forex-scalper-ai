@@ -97,12 +97,14 @@
     - `docs/dev-setup.md`
     - `docs/test-matrix.md`
     - `docs/interfaces.md`
-  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `109 passed`
+  - MT5 safe submit chain was hardened so `Mt5TerminalClient.submit_order()` runs `order_check` before `order_send` and returns structured rejections when checks fail or are unavailable
+  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `113 passed`
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
-- The repository now has research, validation, execution, deployment, and early reconciliation hardening layers, and the next work should focus on true Python 3.11+ validation, live adapter refinement, and operational stabilization.
+- The repository now has research, validation, execution, deployment, early reconciliation hardening, and MT5 pre-send safety layers.
+- The next work should focus on the unified event journal, true Python 3.11+ validation, live adapter refinement, and operational stabilization.
 
 ## Important Constraints
 
@@ -119,9 +121,10 @@
 - The available `python3` in this thread is still Python 3.9.6 even though the project target remains Python 3.11+.
 - `python3 -m compileall src tests scripts` passed.
 - `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` passed on 2026-04-27.
-- `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings.
+- `python3 -m pytest` passed on 2026-04-27 with `113 passed` after P0.2 MT5 safe-submit hardening.
 - `make compile` passed on 2026-04-27.
-- `make test` passed on 2026-04-27 with `109 passed`.
+- `make test` passed on 2026-04-27 with `113 passed`.
+- `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py` passed on 2026-04-27 with `12 passed`.
 - `make run-paper` passed on 2026-04-27.
 - `make health-paper` passed on 2026-04-27 with overall `pass`.
 - `make mt5-preflight` passed on 2026-04-27 with structured missing-dependency diagnostics.
@@ -150,7 +153,7 @@
 ## Exact Next Step
 
 Move to post-phase hardening:
-- implement P0.2 MT5 Safe Submit Chain from `docs/post-phase-roadmap.md`
+- implement P0.3 Unified Event Journal Contract from `docs/post-phase-roadmap.md`
 - provision a real Python 3.11+ environment and re-run repository-wide validation there
 - install the `MetaTrader5` Python package plus real `SCALPER_AI_BROKER_MT5_*` credentials, then run `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` followed by `python3 scripts/mt5_smoke.py --config-name mt5`
 - validate the new MT5 terminal client against an actual installed terminal, especially broker-side polling, history/deal normalization, and partial-fill behavior

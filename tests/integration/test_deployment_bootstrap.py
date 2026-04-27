@@ -167,6 +167,9 @@ class _BootstrapFakeMetaTrader5Module:
     def symbol_info_tick(self, symbol: str) -> SimpleNamespace:
         return SimpleNamespace(bid=1.1000, ask=1.1002)
 
+    def order_check(self, request: dict[str, object]) -> SimpleNamespace:
+        return SimpleNamespace(retcode=0, comment="check passed", time=int(datetime.now(timezone.utc).timestamp()))
+
     def order_send(self, request: dict[str, object]) -> SimpleNamespace:
         order_id = 9101
         current_epoch = int(datetime.now(timezone.utc).timestamp())

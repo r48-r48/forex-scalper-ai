@@ -7,7 +7,12 @@ from scalper_ai.execution.interfaces import (
     ExecutionAdapter,
 )
 from scalper_ai.execution.live_stub import LiveExecutionStubAdapter, LiveExecutionStubConfig
-from scalper_ai.execution.mt5_client import Mt5AccountSnapshot, Mt5TerminalClient, Mt5TerminalClientConfig
+from scalper_ai.execution.mt5_client import (
+    Mt5AccountSnapshot,
+    Mt5OrderCheckResult,
+    Mt5TerminalClient,
+    Mt5TerminalClientConfig,
+)
 from scalper_ai.execution.mt5_live import (
     Mt5ExecutionAdapter,
     Mt5ExecutionClientProtocol,
@@ -56,6 +61,7 @@ __all__ = [
     "Mt5AccountSnapshot",
     "Mt5ExecutionClientProtocol",
     "Mt5ExecutionConfig",
+    "Mt5OrderCheckResult",
     "Mt5OrderRequest",
     "Mt5OrderState",
     "Mt5PositionState",

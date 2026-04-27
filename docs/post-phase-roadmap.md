@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `109 passed` on 2026-04-27 in the available Python 3.9.6 host environment.
+- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `113 passed` on 2026-04-27 in the available Python 3.9.6 host environment.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -44,7 +44,6 @@ Already implemented:
 Known gaps:
 - no validated Python 3.11+ run yet
 - no real MT5 terminal/package/credentials validation yet
-- no `order_check -> order_send -> journal -> reconciliation` safe MT5 submit chain yet
 - no unified event journal for market/signal/order/fill/risk/latency events yet
 - no standalone OMS/RiskEngine state machine yet
 - no baseline strategy suite yet
@@ -53,7 +52,8 @@ Known gaps:
 ## Roadmap Status
 
 - P0.1 Sprint A+ Operational Foundation: completed on 2026-04-27.
-- Current next task: P0.2 MT5 Safe Submit Chain.
+- P0.2 MT5 Safe Submit Chain: completed on 2026-04-27.
+- Current next task: P0.3 Unified Event Journal Contract.
 
 ## P0 Workstream
 
@@ -97,6 +97,8 @@ Definition of done:
 
 ### P0.2 — MT5 Safe Submit Chain
 
+Status: completed on 2026-04-27.
+
 Goal: harden live-order submission before real-terminal validation.
 
 Tasks:
@@ -119,6 +121,13 @@ Definition of done:
 - MT5 client can be tested with fake module for check/send paths.
 - No unchecked live order is sent through the MT5 client path.
 - Existing MT5 adapter tests still pass.
+
+Completed implementation notes:
+- `MetaTrader5ModuleProtocol` now includes `order_check`.
+- `Mt5TerminalClient.submit_order()` builds one normalized payload, runs `order_check`, and refuses `order_send` when the check is rejected or unavailable.
+- `Mt5OrderCheckResult` normalizes accepted/rejected status, retcode, broker comment, timestamp, and margin/account fields.
+- Unit and integration fakes cover check success, check rejection, unavailable check result, and send failure after a successful check.
+- Full journal persistence and cross-event correlation continue in P0.3, using this safe client path as the broker-order boundary.
 
 ### P0.3 — Unified Event Journal Contract
 
@@ -322,13 +331,14 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with `P0.2 — MT5 Safe Submit Chain`.
+Start with `P0.3 — Unified Event Journal Contract`.
 
 Recommended first implementation slice:
-1. Add `order_check` to the MT5 module protocol and fake MT5 test modules.
-2. Add a normalized MT5 check-result model.
-3. Update `Mt5TerminalClient.submit_order()` so a failed check prevents `order_send`.
-4. Add tests for check success, check rejection, unavailable check, and send failure after check success.
+1. Add journal event contracts for market, signal, order request/response, fill, position, risk, and latency events.
+2. Add a JSONL audit writer with UTC-aware timestamps and deterministic record export.
+3. Add Parquet-friendly record conversion that reuses existing raw writer patterns where practical.
+4. Create `docs/event-schema.md`.
+5. Add write/read round-trip smoke tests.
 
 Then run:
 

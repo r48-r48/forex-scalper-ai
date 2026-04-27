@@ -63,6 +63,33 @@ class Mt5AccountSnapshot:
     currency: str | None
 
 
+@dataclass(frozen=True)
+class Mt5OrderCheckResult:
+    """Normalized result of an MT5 pre-trade order_check call."""
+
+    accepted: bool
+    retcode: int | None
+    checked_at: datetime
+    comment: str | None = None
+    balance: float | None = None
+    equity: float | None = None
+    margin: float | None = None
+    margin_free: float | None = None
+    margin_level: float | None = None
+
+    @property
+    def rejection_reason(self) -> str | None:
+        """Return a stable rejection reason when the check was not accepted."""
+
+        if self.accepted:
+            return None
+        if self.comment is not None:
+            return self.comment
+        if self.retcode is not None:
+            return f"MT5 order_check rejected request with retcode={self.retcode}."
+        return "MT5 order_check returned no result."
+
+
 class MetaTrader5ModuleProtocol(Protocol):
     """Minimal dynamic surface expected from the MetaTrader5 Python package."""
 
@@ -86,6 +113,9 @@ class MetaTrader5ModuleProtocol(Protocol):
 
     def symbol_info_tick(self, symbol: str) -> Any:
         """Return the latest top-of-book snapshot for one symbol."""
+
+    def order_check(self, request: Mapping[str, Any]) -> Any:
+        """Validate one trading request without sending it."""
 
     def order_send(self, request: Mapping[str, Any]) -> Any:
         """Submit one trading request."""
@@ -242,7 +272,17 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         self._ensure_initialized()
         self._ensure_symbol_selected(request.broker_symbol)
         sent_at = request.submitted_at
-        result = self._module.order_send(self._build_order_payload(request))
+        payload = self._build_order_payload(request)
+        check = self.check_order(request, payload=payload)
+        if not check.accepted:
+            return self._build_rejected_state(
+                request,
+                broker_order_id=f"mt5-check-rejected-{request.client_order_id}",
+                updated_at=check.checked_at,
+                reason=check.rejection_reason or "MT5 order_check rejected request.",
+            )
+
+        result = self._module.order_send(payload)
         if result is None:
             return self._build_rejected_state(
                 request,
@@ -270,6 +310,41 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             broker_order_id=broker_order_id,
             result=result,
             updated_at=self._result_timestamp(result, fallback=sent_at),
+        )
+
+    def check_order(
+        self,
+        request: Mt5OrderRequest,
+        *,
+        payload: Mapping[str, Any] | None = None,
+    ) -> Mt5OrderCheckResult:
+        """Run MT5 order_check for one request and normalize the broker response."""
+
+        self._ensure_initialized()
+        self._ensure_symbol_selected(request.broker_symbol)
+        checked_at = request.submitted_at
+        order_payload = dict(payload or self._build_order_payload(request))
+        raw_result = self._module.order_check(order_payload)
+        if raw_result is None:
+            return Mt5OrderCheckResult(
+                accepted=False,
+                retcode=None,
+                checked_at=checked_at,
+                comment=self._last_error_message(),
+            )
+
+        result_payload = self._coerce_mapping(raw_result)
+        retcode = self._coerce_int(result_payload.get("retcode"))
+        return Mt5OrderCheckResult(
+            accepted=self._check_retcode_is_success(retcode),
+            retcode=retcode,
+            checked_at=self._result_timestamp(raw_result, fallback=checked_at),
+            comment=self._coerce_optional_str(result_payload.get("comment")),
+            balance=self._coerce_float(result_payload.get("balance")),
+            equity=self._coerce_float(result_payload.get("equity")),
+            margin=self._coerce_float(result_payload.get("margin")),
+            margin_free=self._coerce_float(result_payload.get("margin_free")),
+            margin_level=self._coerce_float(result_payload.get("margin_level")),
         )
 
     def cancel_order(self, broker_order_id: str, *, timestamp: datetime) -> Mt5OrderState:
@@ -655,6 +730,11 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             getattr(self._module, "TRADE_RETCODE_PLACED", 10008),
         }
         return retcode in success_codes
+
+    def _check_retcode_is_success(self, retcode: int | None) -> bool:
+        if retcode is None:
+            return False
+        return retcode == 0 or self._retcode_is_success(retcode)
 
     def _retcode_to_status(self, retcode: Any) -> ExecutionOrderStatus:
         if retcode == getattr(self._module, "TRADE_RETCODE_DONE", 10009):

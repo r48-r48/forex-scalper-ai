@@ -33,6 +33,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/dev-setup.md`
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/test-matrix.md`
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/interfaces.md`
+- 2026-04-27 completed P0.2 MT5 Safe Submit Chain:
+  - added normalized `Mt5OrderCheckResult`
+  - added `order_check` to the MT5 module protocol
+  - updated `Mt5TerminalClient.submit_order()` so failed or unavailable checks return structured rejected states and never call `order_send`
+  - added fake-module tests for check success, check rejection, unavailable check result, and send failure after a successful check
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -41,9 +46,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - Fixed a date-sensitive MT5 deployment runtime test in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_deployment_runtime.py`
   - The test now uses the current UTC timestamp instead of a stale fixed `2026-03-28` timestamp, so broker connectivity health is not downgraded to `WARN` only because time has passed.
-- Full repository-wide `python3 -m pytest` passes again in the available host environment with `109 passed`.
+- Full repository-wide `python3 -m pytest` passed again in the available host environment with `109 passed` before P0.2.
 - PHASE 12 deployment/runtime layer is implemented.
-- Full repository-wide `python3 -m pytest` now passes in the available host environment with `109 passed`.
+- Full repository-wide `python3 -m pytest` now passes in the available host environment with `113 passed`.
 - Added pure execution reconciliation helpers in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
 - Wired reconciliation into deployment/runtime health and metrics in:
@@ -92,17 +97,18 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 - 2026-04-27: `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` -> passed
 - 2026-04-27: `python3 -m pytest tests/unit/test_deployment_runtime.py::test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provider` -> `1 passed`
-- 2026-04-27: `python3 -m pytest` -> `109 passed`, no Pydantic warnings
+- 2026-04-27: `python3 -m pytest` -> `113 passed` after P0.2 MT5 safe-submit hardening
 - 2026-04-27: `python3 scripts/run_runtime.py describe --config-name paper` -> passed
 - 2026-04-27: `python3 scripts/run_runtime.py health --config-name paper` -> overall `pass`
 - 2026-04-27: `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` -> structured preflight diagnostics; not ready for connection because `MetaTrader5` package, terminal discovery, credentials, and live confirmation are missing in this environment
 - 2026-04-27: `make compile` -> passed
-- 2026-04-27: `make test` -> `109 passed`
+- 2026-04-27: `make test` -> `113 passed`
 - 2026-04-27: `make run-paper` -> passed
 - 2026-04-27: `make health-paper` -> overall `pass`
 - 2026-04-27: `make mt5-preflight` -> structured missing-dependency diagnostics
 - 2026-04-27: `make lint` -> not run to completion because `ruff` is not installed in the local Python 3.9.6 environment; `make lint` remains available for dev/CI environments with dev dependencies installed
-- `python3 -m pytest` -> `109 passed`
+- 2026-04-27: `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py` -> `12 passed`
+- `python3 -m pytest` -> `113 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -120,14 +126,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Start with `P0.2 — MT5 Safe Submit Chain` in `docs/post-phase-roadmap.md`:
-- add `order_check` to the MT5 module protocol and fake MT5 modules
-- add a normalized MT5 check-result model
-- update `Mt5TerminalClient.submit_order()` so failed checks prevent `order_send`
-- add tests for check success, check rejection, unavailable check, and send failure after check success
+Start with `P0.3 — Unified Event Journal Contract` in `docs/post-phase-roadmap.md`:
+- add journal event contracts for market/signal/order/fill/position/risk/latency events
+- add JSONL audit writer and deterministic record export
+- add Parquet-friendly export helpers where practical
+- create `docs/event-schema.md`
+- add write/read round-trip smoke tests
 
-After P0.2, continue with:
-- `P0.3` unified event journal contract
+After P0.3, continue with:
 - `P0.4` OMS/RiskEngine state machine
 - `P0.5` Python 3.11+ target validation
 

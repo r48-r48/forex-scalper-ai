@@ -39,6 +39,7 @@ def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission(
     assert module.initialize_kwargs["login"] == 123456
     assert module.initialize_kwargs["password"] == "secret"
     assert module.initialize_kwargs["server"] == "MetaQuotes-Demo"
+    assert module.last_order_check_payload["symbol"] == "EURUSD.a"
     assert module.last_order_send_payload["action"] == module.TRADE_ACTION_DEAL
     assert module.last_order_send_payload["symbol"] == "EURUSD.a"
     assert module.last_order_send_payload["price"] == 1.1002
@@ -46,6 +47,110 @@ def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission(
     assert state.status is ExecutionOrderStatus.FILLED
     assert state.filled_volume_lots == 1.0
     assert state.average_fill_price == 1.1002
+
+
+def test_mt5_terminal_client_exposes_normalized_order_check_result() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    check = client.check_order(
+        Mt5OrderRequest(
+            client_order_id="intent-check",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc),
+            volume_lots=1.0,
+        )
+    )
+
+    assert check.accepted is True
+    assert check.retcode == 0
+    assert check.margin == 100.0
+    assert check.margin_free == 249900.0
+
+
+def test_mt5_terminal_client_rejects_order_when_order_check_rejects_without_sending() -> None:
+    module = _FakeMetaTrader5Module()
+    module.order_check_result = SimpleNamespace(
+        retcode=10013,
+        comment="invalid volume",
+        time=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-rejected",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.REJECTED
+    assert state.broker_order_id == "mt5-check-rejected-intent-rejected"
+    assert state.rejection_reason == "invalid volume"
+    assert module.order_send_call_count == 0
+
+
+def test_mt5_terminal_client_rejects_order_when_order_check_returns_none() -> None:
+    module = _FakeMetaTrader5Module()
+    module.order_check_result = None
+    module.last_error_payload = (10030, "check unavailable")
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-check-none",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.REJECTED
+    assert state.rejection_reason == "10030:check unavailable"
+    assert module.order_send_call_count == 0
+
+
+def test_mt5_terminal_client_keeps_send_failure_after_successful_check_as_rejection() -> None:
+    module = _FakeMetaTrader5Module()
+    module.use_default_order_send = False
+    module.order_send_result = None
+    module.last_error_payload = (10031, "send failed")
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-send-none",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.REJECTED
+    assert state.rejection_reason == "10031:send failed"
+    assert module.order_send_call_count == 1
 
 
 def test_mt5_terminal_client_describes_account_positions_and_closes_cleanly() -> None:
@@ -110,8 +215,23 @@ class _FakeMetaTrader5Module:
 
     def __init__(self) -> None:
         self.initialize_kwargs: dict[str, object] = {}
+        self.last_order_check_payload: dict[str, object] = {}
         self.last_order_send_payload: dict[str, object] = {}
+        self.order_send_call_count = 0
         self.shutdown_called = False
+        self.last_error_payload: tuple[int, str] = (0, "ok")
+        self.order_check_result: SimpleNamespace | None = SimpleNamespace(
+            retcode=0,
+            comment="check passed",
+            balance=250000.0,
+            equity=250100.0,
+            margin=100.0,
+            margin_free=249900.0,
+            margin_level=2500.0,
+            time=1_774_670_400,
+        )
+        self.use_default_order_send = True
+        self.order_send_result: SimpleNamespace | None = None
         self._history_orders: dict[int, SimpleNamespace] = {}
         self._deals: dict[int, list[SimpleNamespace]] = {}
         self._positions: dict[str, SimpleNamespace] = {
@@ -132,7 +252,7 @@ class _FakeMetaTrader5Module:
         self.shutdown_called = True
 
     def last_error(self) -> tuple[int, str]:
-        return (0, "ok")
+        return self.last_error_payload
 
     def terminal_info(self) -> SimpleNamespace:
         return SimpleNamespace(name="MT5")
@@ -154,8 +274,15 @@ class _FakeMetaTrader5Module:
     def symbol_info_tick(self, symbol: str) -> SimpleNamespace:
         return SimpleNamespace(bid=1.1000, ask=1.1002)
 
-    def order_send(self, request: dict[str, object]) -> SimpleNamespace:
+    def order_check(self, request: dict[str, object]) -> SimpleNamespace | None:
+        self.last_order_check_payload = dict(request)
+        return self.order_check_result
+
+    def order_send(self, request: dict[str, object]) -> SimpleNamespace | None:
+        self.order_send_call_count += 1
         self.last_order_send_payload = dict(request)
+        if not self.use_default_order_send:
+            return self.order_send_result
         order_id = 9001
         self._history_orders[order_id] = SimpleNamespace(
             ticket=order_id,

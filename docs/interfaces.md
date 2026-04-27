@@ -89,7 +89,7 @@ Current contracts:
 
 Target direction:
 
-- MT5 live submission must be hardened with `order_check -> order_send -> journal -> reconciliation`
+- MT5 live submission now runs `order_check` before `order_send`; full journal correlation and reconciliation flow continue through the journal/OMS work
 - broker adapters should remain separated from domain logic and OMS/risk decisions
 
 ### Journal
@@ -188,6 +188,5 @@ Target direction:
 Do next:
 
 1. Build the unified event journal contract.
-2. Harden MT5 submit around `order_check`.
-3. Promote OMS/RiskEngine from target contracts into code.
-4. Reuse existing domain, execution, deployment, and validation surfaces wherever possible.
+2. Promote OMS/RiskEngine from target contracts into code.
+3. Reuse existing domain, execution, deployment, and validation surfaces wherever possible.
