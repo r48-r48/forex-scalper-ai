@@ -48,12 +48,18 @@ Known gaps:
 - no unified event journal for market/signal/order/fill/risk/latency events yet
 - no standalone OMS/RiskEngine state machine yet
 - no baseline strategy suite yet
-- no Makefile/GitHub Actions CI yet
 - no first-class release runbooks or production checklist yet
+
+## Roadmap Status
+
+- P0.1 Sprint A+ Operational Foundation: completed on 2026-04-27.
+- Current next task: P0.2 MT5 Safe Submit Chain.
 
 ## P0 Workstream
 
 ### P0.1 — Sprint A+ Operational Foundation
+
+Status: completed on 2026-04-27.
 
 Goal: make the repository reproducible and easy to resume before deeper execution changes.
 
@@ -316,19 +322,18 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with `P0.1 — Sprint A+ Operational Foundation`.
+Start with `P0.2 — MT5 Safe Submit Chain`.
 
 Recommended first implementation slice:
-1. Add `Makefile`.
-2. Add `docs/repo-tree.md`.
-3. Add `docs/dev-setup.md`.
-4. Add `docs/test-matrix.md`.
-5. Add safe GitHub Actions Python 3.11 workflow.
+1. Add `order_check` to the MT5 module protocol and fake MT5 test modules.
+2. Add a normalized MT5 check-result model.
+3. Update `Mt5TerminalClient.submit_order()` so a failed check prevents `order_send`.
+4. Add tests for check success, check rejection, unavailable check, and send failure after check success.
 
 Then run:
 
 ```bash
 make compile
 make test
+make mt5-preflight
 ```
-

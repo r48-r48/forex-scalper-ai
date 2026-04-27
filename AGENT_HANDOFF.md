@@ -300,6 +300,7 @@ Current repository status:
 - persistent session continuity workflow added via `scripts/handoff.py`
 - persistent same-window checkpoint added via `SESSION_CHECKPOINT.md`
 - post-phase roadmap added via `docs/post-phase-roadmap.md`
+- P0.1 Sprint A+ operational foundation completed on 2026-04-27 with Makefile, safe GitHub Actions, repo tree, dev setup, test matrix, and interface map docs
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
@@ -352,9 +353,9 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - start with `P0.1 — Sprint A+ Operational Foundation` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
-  - add `Makefile`, `docs/repo-tree.md`, `docs/dev-setup.md`, `docs/test-matrix.md`, and safe GitHub Actions Python 3.11 workflow
-  - then continue with MT5 safe submit chain, unified event journal, OMS/RiskEngine state machine, and Python 3.11+ validation
+  - start with `P0.2 — MT5 Safe Submit Chain` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
+  - add MT5 `order_check` support, normalized check results, safe submit behavior, and fake-module tests
+  - then continue with unified event journal, OMS/RiskEngine state machine, and Python 3.11+ validation
 
 ## Constraints To Preserve
 

@@ -1,0 +1,193 @@
+# Interface Map
+
+This document records the current contracts and the target POST-PHASE contracts. It is intentionally descriptive first: the project already has useful protocols and domain contracts, so the next work should extend them rather than rewrite completed phases.
+
+## Existing Contracts
+
+### Domain Models
+
+Location: `src/scalper_ai/domain`
+
+Current canonical models:
+
+- `TickEvent`
+- `BookLevel`
+- `BookSnapshot`
+- `BarEvent`
+- `FeatureSnapshot`
+- `OrderIntent`
+- `FillEvent`
+- `PositionState`
+
+Current rules:
+
+- timestamps must be timezone-aware UTC
+- internal position and fill quantities are base units, not broker lots
+- models are immutable and serialization-ready
+- feature snapshots use stable metadata plus flat `values`
+
+### Market Data Adapter
+
+Current locations:
+
+- `src/scalper_ai/data/interfaces.py`
+- `src/scalper_ai/data/replay.py`
+- `src/scalper_ai/data/mt5.py`
+
+Current contracts:
+
+- `TickStreamSource`
+- `BookStreamSource`
+- `BatchWriter`
+- replay JSONL/Parquet sources
+- MT5 tick/book ingestion adapters
+
+Target direction:
+
+- keep adapters at the boundary
+- normalize broker/vendor payloads into domain models
+- connect future event journal writers without changing feature/model code
+
+### Strategy
+
+Current locations:
+
+- `src/scalper_ai/backtesting/engine.py`
+- `src/scalper_ai/rl/environment.py`
+- `src/scalper_ai/models/transformer.py`
+
+Current contracts:
+
+- `TargetPositionStrategy` protocol for backtesting
+- RL action policy helpers for offline environment
+- supervised predictor wrapper for signal inference
+
+Target direction:
+
+- introduce a common strategy/policy surface after P0 journal and OMS contracts are in place
+- support decisions such as do nothing, passive entry, aggressive entry, cancel, reduce, and quote skew
+- keep baseline strategies separate from model internals
+
+### Broker Adapter
+
+Current locations:
+
+- `src/scalper_ai/execution/interfaces.py`
+- `src/scalper_ai/execution/paper.py`
+- `src/scalper_ai/execution/live_stub.py`
+- `src/scalper_ai/execution/mt5_live.py`
+- `src/scalper_ai/execution/mt5_client.py`
+
+Current contracts:
+
+- `ExecutionAdapter`
+- `BrokerSnapshotProvider`
+- `BrokerConnectivityProvider`
+- paper execution adapter
+- live stub adapter
+- MT5 live adapter and terminal client wrapper
+
+Target direction:
+
+- MT5 live submission must be hardened with `order_check -> order_send -> journal -> reconciliation`
+- broker adapters should remain separated from domain logic and OMS/risk decisions
+
+### Journal
+
+Current locations:
+
+- `src/scalper_ai/data/raw_writer.py`
+- domain `to_record()` helpers
+- execution/reconciliation snapshots
+
+Current status:
+
+- raw market persistence exists
+- domain records serialize cleanly
+- a unified market/signal/order/fill/risk/latency journal does not exist yet
+
+Target contract:
+
+- `market_data_event`
+- `signal_event`
+- `order_request_event`
+- `order_response_event`
+- `fill_event`
+- `position_snapshot`
+- `risk_event`
+- `latency_event`
+
+The journal must be usable in replay, paper, shadow, and live-safe paths.
+
+### RiskEngine
+
+Current locations:
+
+- `src/scalper_ai/config/models.py`
+- `src/scalper_ai/deployment/runtime.py`
+- `src/scalper_ai/execution/reconciliation.py`
+
+Current status:
+
+- risk configuration exists
+- live startup refuses unsafe kill-switch configuration
+- reconciliation detects broker/internal drift
+- a standalone pre-trade RiskEngine does not exist yet
+
+Target contract:
+
+- approve/reject order intents before broker submission
+- emit journalable risk events
+- enforce max position, max daily loss, max order rate, duplicate detection, stale data kill, reject-burst kill, symbol kill, and session kill
+
+### OMS
+
+Current locations:
+
+- `src/scalper_ai/execution/models.py`
+- `src/scalper_ai/execution/router.py`
+- `src/scalper_ai/execution/paper.py`
+- `src/scalper_ai/execution/mt5_live.py`
+
+Current status:
+
+- execution order lifecycle exists inside adapters
+- router separates paper and live paths
+- no standalone OMS state machine exists yet
+
+Target lifecycle:
+
+```text
+NEW -> CHECKED -> SENT -> ACK -> PARTIAL/FILLED/REJECTED/CANCELLED -> RECONCILED
+```
+
+The OMS should own idempotency, duplicate detection, correlation IDs, emergency flatten orchestration, and transition validation.
+
+### PortfolioService
+
+Current locations:
+
+- `src/scalper_ai/backtesting/accounting.py`
+- `src/scalper_ai/execution/paper.py`
+- `src/scalper_ai/execution/mt5_live.py`
+
+Current status:
+
+- netting accounting exists
+- paper and MT5 adapters reuse accounting math for position/equity updates
+- no standalone portfolio service exists yet
+
+Target direction:
+
+- expose account/position/equity snapshots consistently across backtest, paper, and live-safe runtime
+- keep broker lots conversion inside adapters
+- keep base-unit portfolio accounting in domain/backtesting/execution core
+
+## Immediate Interface Work
+
+Do next:
+
+1. Build the unified event journal contract.
+2. Harden MT5 submit around `order_check`.
+3. Promote OMS/RiskEngine from target contracts into code.
+4. Reuse existing domain, execution, deployment, and validation surfaces wherever possible.

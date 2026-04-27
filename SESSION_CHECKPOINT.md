@@ -26,6 +26,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
   - `/Users/dzhabrailtalkanov/Downloads/мм.md`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
+- 2026-04-27 completed P0.1 Sprint A+ Operational Foundation:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/Makefile`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/.github/workflows/ci.yml`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/repo-tree.md`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/dev-setup.md`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/test-matrix.md`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/interfaces.md`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -89,6 +96,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-27: `python3 scripts/run_runtime.py describe --config-name paper` -> passed
 - 2026-04-27: `python3 scripts/run_runtime.py health --config-name paper` -> overall `pass`
 - 2026-04-27: `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` -> structured preflight diagnostics; not ready for connection because `MetaTrader5` package, terminal discovery, credentials, and live confirmation are missing in this environment
+- 2026-04-27: `make compile` -> passed
+- 2026-04-27: `make test` -> `109 passed`
+- 2026-04-27: `make run-paper` -> passed
+- 2026-04-27: `make health-paper` -> overall `pass`
+- 2026-04-27: `make mt5-preflight` -> structured missing-dependency diagnostics
+- 2026-04-27: `make lint` -> not run to completion because `ruff` is not installed in the local Python 3.9.6 environment; `make lint` remains available for dev/CI environments with dev dependencies installed
 - `python3 -m pytest` -> `109 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
@@ -107,16 +120,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Start with `P0.1 — Sprint A+ Operational Foundation` in `docs/post-phase-roadmap.md`:
-- add `Makefile`
-- add `docs/repo-tree.md`
-- add `docs/dev-setup.md`
-- add `docs/test-matrix.md`
-- add safe GitHub Actions Python 3.11 workflow
-- run `make compile` and `make test`
+Start with `P0.2 — MT5 Safe Submit Chain` in `docs/post-phase-roadmap.md`:
+- add `order_check` to the MT5 module protocol and fake MT5 modules
+- add a normalized MT5 check-result model
+- update `Mt5TerminalClient.submit_order()` so failed checks prevent `order_send`
+- add tests for check success, check rejection, unavailable check, and send failure after check success
 
-After P0.1, continue with:
-- `P0.2` MT5 safe submit chain with `order_check -> order_send -> journal -> reconciliation`
+After P0.2, continue with:
 - `P0.3` unified event journal contract
 - `P0.4` OMS/RiskEngine state machine
 - `P0.5` Python 3.11+ target validation

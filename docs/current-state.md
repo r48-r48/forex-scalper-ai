@@ -90,6 +90,13 @@
   - runtime can now auto-reuse a live adapter itself as the broker snapshot provider when the adapter exposes the reconciliation contract
   - stale workspace paths in project memory/docs were updated to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
   - Pydantic warning cleanup was completed for logging config field naming and domain model JSON config
+  - Sprint A+ operational foundation was added:
+    - `Makefile`
+    - `.github/workflows/ci.yml`
+    - `docs/repo-tree.md`
+    - `docs/dev-setup.md`
+    - `docs/test-matrix.md`
+    - `docs/interfaces.md`
   - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `109 passed`
 
 ## Current Problem / Current Focus
@@ -113,6 +120,11 @@
 - `python3 -m compileall src tests scripts` passed.
 - `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` passed on 2026-04-27.
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings.
+- `make compile` passed on 2026-04-27.
+- `make test` passed on 2026-04-27 with `109 passed`.
+- `make run-paper` passed on 2026-04-27.
+- `make health-paper` passed on 2026-04-27 with overall `pass`.
+- `make mt5-preflight` passed on 2026-04-27 with structured missing-dependency diagnostics.
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed.
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed.
 - `python3 -m pytest tests/unit/test_deployment_runtime.py tests/unit/test_deployment_mt5_preflight.py` passed.
@@ -138,6 +150,7 @@
 ## Exact Next Step
 
 Move to post-phase hardening:
+- implement P0.2 MT5 Safe Submit Chain from `docs/post-phase-roadmap.md`
 - provision a real Python 3.11+ environment and re-run repository-wide validation there
 - install the `MetaTrader5` Python package plus real `SCALPER_AI_BROKER_MT5_*` credentials, then run `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` followed by `python3 scripts/mt5_smoke.py --config-name mt5`
 - validate the new MT5 terminal client against an actual installed terminal, especially broker-side polling, history/deal normalization, and partial-fill behavior
