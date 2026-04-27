@@ -16,7 +16,7 @@ Result:
 136 passed
 ```
 
-The local desktop Python is 3.9.6. The declared project runtime is Python 3.11+, so Python 3.11+ CI and target-environment validation remain required.
+The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created with bundled Python 3.12.13 for target-runtime validation.
 
 ## Test Groups
 
@@ -41,7 +41,7 @@ The local desktop Python is 3.9.6. The declared project runtime is Python 3.11+,
 |---|---|---|
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
-| Python 3.11+ full suite | pending | Required by `pyproject.toml` |
+| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `136 passed` |
 | Real MT5 terminal smoke | pending | Requires package, terminal, account/session credentials, and explicit live confirmation |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
 
@@ -51,4 +51,4 @@ The local desktop Python is 3.9.6. The declared project runtime is Python 3.11+,
 - Backtesting V1 models immediate market fills with explicit costs, but latency, queue position, partial fills, and cancel/replace races are future P1 work.
 - Current test suite includes the unified event journal and OMS/RiskEngine contracts, but the baseline strategy suite remains a future POST-PHASE roadmap item.
 - Linting is exposed through `make lint`, but ruff is not installed in the current local Python 3.9.6 environment.
-- Full type checking is exposed through `make typecheck`, but mypy is not yet part of the GitHub Actions gate until the codebase has been validated under Python 3.11+ with all dev dependencies.
+- Full type checking is exposed through `make typecheck`, but mypy is not yet part of the GitHub Actions gate until a dedicated mypy baseline pass is reviewed.

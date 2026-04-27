@@ -6,7 +6,7 @@
 
 ## Current Next Step
 
-- P0.5 — Python 3.11+ Target Validation from `docs/post-phase-roadmap.md`
+- Real MT5 terminal validation when package, terminal, credentials, and live confirmation are available; otherwise P1.1 — Execution-Aware Simulator V2 from `docs/post-phase-roadmap.md`
 
 ## Deliverables
 
@@ -14,7 +14,7 @@
 - MT5 safe submit chain with `order_check -> order_send` guardrails — completed on 2026-04-27
 - unified event journal contracts for market/signal/order/fill/risk/latency events — completed on 2026-04-27
 - standalone OMS/RiskEngine state machine with kill switches and emergency flatten workflow — completed on 2026-04-27
-- full Python 3.11+ environment validation, including repo-wide test execution in the actual target interpreter
+- full Python 3.11+ environment validation, including repo-wide test execution in the actual target interpreter — completed on 2026-04-27 with Python 3.12.13
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for long-running services, alerting, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup around packaging and startup ergonomics
@@ -29,7 +29,7 @@
 ## Implementation Guidance
 
 - use `docs/post-phase-roadmap.md` as the canonical post-phase backlog
-- continue with P0.5 unless a blocking live-integration bug appears
+- continue with real MT5 terminal validation when dependencies are available; if they remain unavailable, continue with P1.1 execution-aware simulator work
 - keep deployment and hardening work separate from domain, model, and execution math
 - reuse the PHASE 12 runtime, health, and metrics surfaces instead of duplicating startup logic
 - favor explicit safety checks, reconciliation, and observability over implicit automation
@@ -37,7 +37,7 @@
 
 ## Validation Goal
 
-- run repository-wide `pytest` in Python 3.11+ with the full dependency set installed
+- keep repository-wide `pytest` green in Python 3.12.13 and future Python 3.11+ CI/target environments
 - add targeted validation around the MT5-backed live adapter, real terminal behavior, preflight diagnostics, reconciliation, and long-running runtime behavior
 - keep deployment CLI and paper-safe runtime wiring working while hardening the live path
 

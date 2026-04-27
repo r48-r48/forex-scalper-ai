@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `136 passed` on 2026-04-27 in the available Python 3.9.6 host environment.
+- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `136 passed` on 2026-04-27 in both the local Python 3.9.6 compatibility environment and the Python 3.12.13 target-validation `.venv`.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -44,7 +44,6 @@ Already implemented:
 - standalone OMS lifecycle helpers and deterministic pre-trade RiskEngine contracts
 
 Known gaps:
-- no validated Python 3.11+ run yet
 - no real MT5 terminal/package/credentials validation yet
 - no baseline strategy suite yet
 - no first-class release runbooks or production checklist yet
@@ -55,7 +54,8 @@ Known gaps:
 - P0.2 MT5 Safe Submit Chain: completed on 2026-04-27.
 - P0.3 Unified Event Journal Contract: completed on 2026-04-27.
 - P0.4 OMS/RiskEngine State Machine: completed on 2026-04-27.
-- Current next task: P0.5 Python 3.11+ Target Validation.
+- P0.5 Python 3.11+ Target Validation: completed on 2026-04-27 with Python 3.12.13.
+- Current next task: real MT5 terminal validation when package/terminal/credentials are available; otherwise continue with P1.1 Execution-Aware Simulator V2.
 
 ## P0 Workstream
 
@@ -209,6 +209,8 @@ Completed implementation notes:
 
 ### P0.5 — Python 3.11+ Target Validation
 
+Status: completed on 2026-04-27 with Python 3.12.13.
+
 Goal: validate the project in the declared runtime, not only the local Python 3.9.6 host.
 
 Tasks:
@@ -222,6 +224,14 @@ Tasks:
 
 Definition of done:
 - Full suite passes in Python 3.11+ or failures are classified as environment, genuine bug, flaky, or missing fixture.
+
+Completed validation notes:
+- Created a local `.venv` from the bundled Python 3.12.13 runtime.
+- Installed `pip install -e ".[dev,ml]"`.
+- `make PYTHON=.venv/bin/python compile` passed.
+- `make PYTHON=.venv/bin/python test` passed with `136 passed`.
+- `make PYTHON=.venv/bin/python mt5-preflight` passed with structured missing-dependency diagnostics for the absent `MetaTrader5` package, terminal credentials, and live confirmation.
+- Fixed a target-env config loader bug so `SCALPER_AI_*` env overrides behave the same with and without `pydantic-settings` installed.
 
 ## P1 Workstream
 
@@ -351,14 +361,14 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with `P0.5 — Python 3.11+ Target Validation`.
+Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available. If those remain unavailable, continue with `P1.1 — Execution-Aware Simulator V2`.
 
 Recommended first implementation slice:
-1. Provision or select a Python 3.11+ interpreter.
-2. Install `pip install -e ".[dev,ml]"`.
-3. Run `python -m compileall src tests scripts`.
-4. Run `python -m pytest`.
-5. Record results in `docs/current-state.md` and `SESSION_CHECKPOINT.md`.
+1. Install the `MetaTrader5` Python package in the target runtime.
+2. Configure terminal path or validate auto-discovery.
+3. Configure `SCALPER_AI_BROKER_MT5_*` credentials or intentionally use a saved terminal session.
+4. Set explicit live confirmation before any true live startup.
+5. Run MT5 preflight and smoke checks against the real terminal.
 
 Then run:
 

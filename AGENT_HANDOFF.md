@@ -306,11 +306,13 @@ Current repository status:
 - P0.2 MT5 Safe Submit Chain completed on 2026-04-27 with normalized `order_check` results and guarded `order_send`
 - P0.3 Unified Event Journal Contract completed on 2026-04-27 with audit event envelope, JSONL writer, flat export, schema docs, and round-trip tests
 - P0.4 OMS/RiskEngine State Machine completed on 2026-04-27 with lifecycle transitions, emergency flatten intent, deterministic risk blocks, and journalable risk decisions
+- P0.5 Python 3.11+ Target Validation completed on 2026-04-27 using a local Python 3.12.13 `.venv`
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
 - `python3 -m pytest` passed on 2026-04-27 with `119 passed` after unified journal hardening
 - `python3 -m pytest` passed on 2026-04-27 with `136 passed` after OMS/RiskEngine hardening
+- `make PYTHON=.venv/bin/python test` passed on 2026-04-27 with `136 passed` in Python 3.12.13
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -332,13 +334,14 @@ Current repository status:
 - `python3 scripts/mt5_smoke.py --help` passed on 2026-03-28
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed on 2026-03-28 and auto-discovered the local MT5 terminal path
 - `python3 scripts/mt5_smoke.py --config-name mt5` now fails with structured JSON preflight diagnostics on 2026-03-28 when dependencies are missing
-- repository-wide `pytest` now passes in the available Python 3.9.6 environment, but true target-environment validation in Python 3.11+ still remains pending because this host does not provide a 3.11 interpreter or a local install toolchain
+- repository-wide `pytest` now passes in the available Python 3.9.6 compatibility environment and in the Python 3.12.13 target-validation `.venv`
 
 ## Last Session Snapshot
 
 - Session closed on: 2026-03-28
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and pytest passes with `136 passed`
   - P0.4 OMS/RiskEngine State Machine is complete: `scalper_ai.services.oms` now provides lifecycle transition validation and emergency flatten intents, while `scalper_ai.risk.engine` provides deterministic pre-trade risk checks and journalable risk decisions
   - P0.3 Unified Event Journal Contract is complete: `scalper_ai.journal` now provides `JournalEvent`, `JournalEventType`, JSONL writer/reader, flat record export, and `docs/event-schema.md`
   - P0.2 MT5 Safe Submit Chain is complete: `Mt5TerminalClient.submit_order()` now runs `order_check` before `order_send`, failed or unavailable checks return structured rejections, and fake-module tests cover check/send paths
@@ -364,9 +367,8 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - start with `P0.5 — Python 3.11+ Target Validation` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
-  - provision or select Python 3.11+, install `pip install -e ".[dev,ml]"`, run compile/test, and record target-runtime results
-  - then continue with real MT5 terminal/package/credentials validation
+  - start real MT5 terminal validation when the `MetaTrader5` package, terminal, credentials, and explicit live confirmation are available
+  - if MT5 validation remains unavailable, continue with `P1.1 — Execution-Aware Simulator V2` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
 
 ## Constraints To Preserve
 
@@ -382,8 +384,7 @@ Current repository status:
 
 ## Post-Phase Focus
 
-Next priorities:
-- validate the complete repository in Python 3.11+ with all declared dependencies installed
+- validate the MT5-backed client against a real installed terminal and credentials
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
 - add deeper broker reconciliation, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface
@@ -425,7 +426,7 @@ python3 scripts/run_runtime.py describe --config-name paper
 python3 scripts/run_runtime.py health --config-name paper
 ```
 
-The `python3` available in this thread is still Python 3.9.6, while the project requires Python 3.11+. Repository-wide `pytest` now passes here, but true target-environment validation in Python 3.11+ still remains pending because this host does not provide a 3.11 interpreter or a local install toolchain.
+The system `python3` available in this thread is still Python 3.9.6, while the project requires Python 3.11+. A local `.venv` now uses bundled Python 3.12.13, has `.[dev,ml]` installed, and passes the full suite.
 
 ## Handoff Rule
 

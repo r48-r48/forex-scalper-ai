@@ -64,6 +64,15 @@ _ENV_FIELD_ALIASES = {
 }
 
 
+def _load_env_override_payload() -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for alias in _ENV_FIELD_ALIASES.values():
+        env_key = f"SCALPER_AI_{alias}"
+        if env_key in os.environ:
+            payload[alias] = os.environ[env_key]
+    return payload
+
+
 class _EnvOverridesMixin:
     env: Optional[str] = Field(default=None, alias="ENV")
     config_dir: Optional[Path] = Field(default=None, alias="CONFIG_DIR")
@@ -247,6 +256,10 @@ if BaseSettings is not None:
             extra="ignore",
         )
 
+        @classmethod
+        def load(cls) -> "EnvOverrides":
+            return cls.model_validate(_load_env_override_payload())
+
 else:
 
     class EnvOverrides(_EnvOverridesMixin, BaseModel):
@@ -256,12 +269,7 @@ else:
 
         @classmethod
         def load(cls) -> "EnvOverrides":
-            payload: dict[str, Any] = {}
-            for field_name, alias in _ENV_FIELD_ALIASES.items():
-                env_key = f"SCALPER_AI_{alias}"
-                if env_key in os.environ:
-                    payload[alias] = os.environ[env_key]
-            return cls.model_validate(payload)
+            return cls.model_validate(_load_env_override_payload())
 
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:

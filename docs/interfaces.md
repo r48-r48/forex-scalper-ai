@@ -197,5 +197,6 @@ Target direction:
 
 Do next:
 
-1. Validate the full suite in Python 3.11+ with declared dev dependencies.
-2. Reuse existing domain, execution, deployment, journal, OMS/risk, and validation surfaces wherever possible.
+1. Validate the MT5 path against a real terminal when package, credentials, and live confirmation are available.
+2. If MT5 remains unavailable, continue with P1.1 execution-aware simulator work.
+3. Reuse existing domain, execution, deployment, journal, OMS/risk, and validation surfaces wherever possible.

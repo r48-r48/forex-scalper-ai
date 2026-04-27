@@ -6,7 +6,9 @@
 - Current local desktop host observed on 2026-04-27: Python 3.9.6
 - CI target: Python 3.11
 
-The local Python 3.9.6 environment can run the current tests, but release validation must happen on Python 3.11+ because `pyproject.toml` declares `requires-python = ">=3.11"`.
+The system Python 3.9.6 environment can run the current tests as a compatibility signal, but the
+project target is Python 3.11+. A local `.venv` was created from bundled Python 3.12.13 for target
+validation.
 
 ## Install
 
@@ -14,6 +16,15 @@ Create and activate a Python 3.11+ virtual environment, then install:
 
 ```bash
 pip install -e ".[dev,ml]"
+```
+
+Current local target-validation environment:
+
+```bash
+.venv/bin/python --version
+make PYTHON=.venv/bin/python compile
+make PYTHON=.venv/bin/python test
+make PYTHON=.venv/bin/python mt5-preflight
 ```
 
 The `ml` extra is needed for the current Torch-based model and RL tests.
@@ -96,5 +107,5 @@ Real MT5 validation remains pending until:
 ## Docker
 
 The repository currently ships `docker-compose.yml` with Redis for development infrastructure.
-Docker/Kubernetes production packaging remains deferred until Python 3.11+ target validation and
-real MT5 terminal validation are complete.
+Docker/Kubernetes production packaging remains deferred until real MT5 terminal validation is
+complete.

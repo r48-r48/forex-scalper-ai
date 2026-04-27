@@ -51,6 +51,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - OMS transition validation now covers `NEW` through `RECONCILED`
   - RiskEngine now covers kill switches, duplicate detection, stale data, reject burst, order rate, daily loss/drawdown, max position, and reduce-only exposure growth
   - emergency flatten intent generation is covered by tests
+- 2026-04-27 completed P0.5 Python 3.11+ Target Validation:
+  - created `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/.venv` with bundled Python 3.12.13
+  - installed `pip install -e ".[dev,ml]"`
+  - fixed env override parity in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/config/loader.py`
+  - `make PYTHON=.venv/bin/python compile` passed
+  - `make PYTHON=.venv/bin/python test` passed with `136 passed`
+  - `make PYTHON=.venv/bin/python mt5-preflight` passed with structured missing-dependency diagnostics
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -101,8 +108,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Stable Facts To Reuse
 
-- The host still does not provide `python3.11`, `brew`, `pyenv`, `docker`, or another quick install path.
-- True target-environment validation in Python `3.11+` is therefore still pending for host/tooling reasons, not because the current suite is red.
+- The system host still does not provide `python3.11`, `brew`, `pyenv`, or `docker`.
+- Target-environment validation now uses the local `.venv` built from bundled Python 3.12.13.
 - `scripts/run_runtime.py` works from the repo without editable install because it now bootstraps `src/` into `sys.path`.
 - `scripts/handoff.py status` already reflects the post-phase roadmap.
 
@@ -111,6 +118,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-27: `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` -> passed
 - 2026-04-27: `python3 -m pytest tests/unit/test_deployment_runtime.py::test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provider` -> `1 passed`
 - 2026-04-27: `python3 -m pytest` -> `136 passed` after P0.4 OMS/RiskEngine hardening
+- 2026-04-27: `make PYTHON=.venv/bin/python compile` -> passed in Python 3.12.13
+- 2026-04-27: `make PYTHON=.venv/bin/python test` -> `136 passed` in Python 3.12.13
+- 2026-04-27: `make PYTHON=.venv/bin/python mt5-preflight` -> structured missing-dependency diagnostics
 - 2026-04-27: `python3 scripts/run_runtime.py describe --config-name paper` -> passed
 - 2026-04-27: `python3 scripts/run_runtime.py health --config-name paper` -> overall `pass`
 - 2026-04-27: `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` -> structured preflight diagnostics; not ready for connection because `MetaTrader5` package, terminal discovery, credentials, and live confirmation are missing in this environment
@@ -141,15 +151,15 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Start with `P0.5 — Python 3.11+ Target Validation` in `docs/post-phase-roadmap.md`:
-- provision or select a Python 3.11+ interpreter
-- install `pip install -e ".[dev,ml]"`
-- run `python -m compileall src tests scripts`
-- run `python -m pytest`
-- record target-runtime results in `docs/current-state.md` and `SESSION_CHECKPOINT.md`
+Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available:
+- install the `MetaTrader5` Python package in the target runtime
+- configure terminal path or validate auto-discovery
+- configure `SCALPER_AI_BROKER_MT5_*` credentials or intentionally use a saved terminal session
+- set explicit live confirmation before true live startup
+- run MT5 preflight and smoke checks against the real terminal
 
-After P0.5, continue with:
-- real MT5 terminal/package/credentials validation
+If real MT5 validation remains unavailable:
+- continue with P1.1 Execution-Aware Simulator V2
 
 ## If Context Gets Compressed
 

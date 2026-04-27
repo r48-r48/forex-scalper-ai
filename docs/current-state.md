@@ -100,13 +100,15 @@
   - MT5 safe submit chain was hardened so `Mt5TerminalClient.submit_order()` runs `order_check` before `order_send` and returns structured rejections when checks fail or are unavailable
   - unified event journal contracts were added with JSONL audit writing and flat Parquet-friendly export records
   - standalone OMS lifecycle helpers and deterministic pre-trade RiskEngine contracts were added
+  - Python 3.12.13 target-runtime validation was completed in a local `.venv` with full dev and ML extras installed
   - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `136 passed`
+  - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `136 passed`
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
 - The repository now has research, validation, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, and OMS/RiskEngine layers.
-- The next work should focus on true Python 3.11+ validation, live adapter refinement, and operational stabilization.
+- The next work should focus on real MT5 terminal validation, live adapter refinement, and operational stabilization.
 
 ## Important Constraints
 
@@ -120,10 +122,14 @@
 ## Current Environment Note
 
 - In this session, local project dependencies were not installed in the system Python.
-- The available `python3` in this thread is still Python 3.9.6 even though the project target remains Python 3.11+.
+- The available system `python3` in this thread is still Python 3.9.6.
+- A local `.venv` now exists with Python 3.12.13 from the bundled Codex runtime.
 - `python3 -m compileall src tests scripts` passed.
 - `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` passed on 2026-04-27.
 - `python3 -m pytest` passed on 2026-04-27 with `136 passed` after P0.4 OMS/RiskEngine hardening.
+- `make PYTHON=.venv/bin/python compile` passed on 2026-04-27 in Python 3.12.13.
+- `make PYTHON=.venv/bin/python test` passed on 2026-04-27 with `136 passed` in Python 3.12.13.
+- `make PYTHON=.venv/bin/python mt5-preflight` passed on 2026-04-27 with structured missing-dependency diagnostics.
 - `make compile` passed on 2026-04-27.
 - `make test` passed on 2026-04-27 with `136 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
@@ -152,13 +158,12 @@
 - `python3 scripts/mt5_smoke.py --help` passed.
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed and auto-discovered the local MT5 terminal bundle path.
 - `python3 scripts/mt5_smoke.py --config-name mt5` now exits with structured JSON preflight diagnostics instead of a raw traceback when dependencies are missing.
-- Full repository-wide `pytest` now passes in the available Python 3.9.6 environment, but the target-environment validation in Python 3.11+ is still pending because this host does not provide a 3.11 interpreter or a local toolchain to install one quickly.
+- Full repository-wide `pytest` now passes in both the available Python 3.9.6 compatibility environment and the Python 3.12.13 target-validation `.venv`.
 
 ## Exact Next Step
 
 Move to post-phase hardening:
-- implement P0.5 Python 3.11+ Target Validation from `docs/post-phase-roadmap.md`
-- provision a real Python 3.11+ environment and re-run repository-wide validation there
 - install the `MetaTrader5` Python package plus real `SCALPER_AI_BROKER_MT5_*` credentials, then run `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` followed by `python3 scripts/mt5_smoke.py --config-name mt5`
 - validate the new MT5 terminal client against an actual installed terminal, especially broker-side polling, history/deal normalization, and partial-fill behavior
 - add deeper operational hardening such as long-running service supervision, alerting, and dependency checks beyond the current connectivity layer
+- if real MT5 validation remains unavailable, continue with P1.1 Execution-Aware Simulator V2 from `docs/post-phase-roadmap.md`
