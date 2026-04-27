@@ -291,6 +291,7 @@ Already available building blocks:
 - deployment runtime bootstrap with paper-safe fallback
 - operational health snapshots and metrics surfaces
 - pure broker reconciliation helpers for orders and positions
+- canonical post-phase backlog in `docs/post-phase-roadmap.md`
 
 Current repository status:
 - phases 1-12 implemented
@@ -298,6 +299,7 @@ Current repository status:
 - tests were added for phases 1-12
 - persistent session continuity workflow added via `scripts/handoff.py`
 - persistent same-window checkpoint added via `SESSION_CHECKPOINT.md`
+- post-phase roadmap added via `docs/post-phase-roadmap.md`
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
@@ -350,10 +352,9 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - install the `MetaTrader5` Python package plus real `SCALPER_AI_BROKER_MT5_*` credentials and run the MT5 preflight/smoke flow against the installed terminal
-  - run repository-wide validation in Python 3.11+ with the full dependency set on a host that actually provides Python 3.11+
-  - validate the new MT5 terminal client against a real installed terminal, especially history/deal normalization and partial-fill behavior
-  - harden long-running operational behavior, alerting, and infrastructure checks beyond the current broker connectivity layer
+  - start with `P0.1 — Sprint A+ Operational Foundation` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
+  - add `Makefile`, `docs/repo-tree.md`, `docs/dev-setup.md`, `docs/test-matrix.md`, and safe GitHub Actions Python 3.11 workflow
+  - then continue with MT5 safe submit chain, unified event journal, OMS/RiskEngine state machine, and Python 3.11+ validation
 
 ## Constraints To Preserve
 
@@ -418,6 +419,7 @@ The `python3` available in this thread is still Python 3.9.6, while the project 
 
 The next agent should:
 - inspect this file first
+- inspect `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
 - inspect the current repo tree
 - continue from the post-phase roadmap only
 - avoid rewriting earlier phases unless a bug is found that blocks the current hardening task

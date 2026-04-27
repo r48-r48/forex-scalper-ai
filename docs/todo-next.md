@@ -6,8 +6,12 @@
 
 ## Deliverables
 
+- Sprint A+ operational foundation from `docs/post-phase-roadmap.md`
 - full Python 3.11+ environment validation, including repo-wide test execution in the actual target interpreter
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
+- MT5 safe submit chain with `order_check -> order_send -> journal -> reconciliation`
+- unified event journal contracts for market/signal/order/fill/risk/latency events
+- standalone OMS/RiskEngine state machine with kill switches and emergency flatten workflow
 - deeper operational hardening for long-running services, alerting, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup around packaging and startup ergonomics
 
@@ -20,6 +24,8 @@
 
 ## Implementation Guidance
 
+- use `docs/post-phase-roadmap.md` as the canonical post-phase backlog
+- start with P0.1 before deeper MT5/risk changes unless a blocking live-integration bug appears
 - keep deployment and hardening work separate from domain, model, and execution math
 - reuse the PHASE 12 runtime, health, and metrics surfaces instead of duplicating startup logic
 - favor explicit safety checks, reconciliation, and observability over implicit automation

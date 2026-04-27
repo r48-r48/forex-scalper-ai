@@ -10,6 +10,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/AGENT_HANDOFF.md`
 - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/current-state.md`
 - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/todo-next.md`
+- `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
 
 ## Current Snapshot
 
@@ -17,10 +18,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - Repo phase status: `PHASE 1-12 complete`
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
-- Current branch/worktree note: no Git repository was found from the current workspace or its parent, so local git status is unavailable in this copy.
+- Current branch/worktree note: local Git repository is initialized on `main`, tracking `origin/main` at `git@github.com:r48-r48/forex-scalper-ai.git`.
 
 ## What Was Just Finished
 
+- 2026-04-27 external research reports were reviewed and converted into the canonical post-phase backlog:
+  - `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
+  - `/Users/dzhabrailtalkanov/Downloads/мм.md`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -102,12 +107,25 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-- Install the `MetaTrader5` Python package and real `SCALPER_AI_BROKER_MT5_*` credentials, run the new MT5 preflight/smoke flow against the installed terminal, then provision Python 3.11+ and rerun the full suite there.
+Start with `P0.1 — Sprint A+ Operational Foundation` in `docs/post-phase-roadmap.md`:
+- add `Makefile`
+- add `docs/repo-tree.md`
+- add `docs/dev-setup.md`
+- add `docs/test-matrix.md`
+- add safe GitHub Actions Python 3.11 workflow
+- run `make compile` and `make test`
+
+After P0.1, continue with:
+- `P0.2` MT5 safe submit chain with `order_check -> order_send -> journal -> reconciliation`
+- `P0.3` unified event journal contract
+- `P0.4` OMS/RiskEngine state machine
+- `P0.5` Python 3.11+ target validation
 
 ## If Context Gets Compressed
 
 The next assistant turn should:
 - reread this file first
+- reread `docs/post-phase-roadmap.md`
 - trust it as the freshest compact state snapshot
 - then open the specific files referenced here before resuming code changes
 - update this file again after any substantial milestone, test sweep, or architectural change
