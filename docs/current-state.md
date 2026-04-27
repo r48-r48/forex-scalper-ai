@@ -99,13 +99,14 @@
     - `docs/interfaces.md`
   - MT5 safe submit chain was hardened so `Mt5TerminalClient.submit_order()` runs `order_check` before `order_send` and returns structured rejections when checks fail or are unavailable
   - unified event journal contracts were added with JSONL audit writing and flat Parquet-friendly export records
-  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `119 passed`
+  - standalone OMS lifecycle helpers and deterministic pre-trade RiskEngine contracts were added
+  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `136 passed`
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
-- The repository now has research, validation, execution, deployment, early reconciliation hardening, MT5 pre-send safety, and unified journal layers.
-- The next work should focus on OMS/RiskEngine state-machine hardening, true Python 3.11+ validation, live adapter refinement, and operational stabilization.
+- The repository now has research, validation, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, and OMS/RiskEngine layers.
+- The next work should focus on true Python 3.11+ validation, live adapter refinement, and operational stabilization.
 
 ## Important Constraints
 
@@ -122,10 +123,11 @@
 - The available `python3` in this thread is still Python 3.9.6 even though the project target remains Python 3.11+.
 - `python3 -m compileall src tests scripts` passed.
 - `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` passed on 2026-04-27.
-- `python3 -m pytest` passed on 2026-04-27 with `119 passed` after P0.3 unified journal hardening.
+- `python3 -m pytest` passed on 2026-04-27 with `136 passed` after P0.4 OMS/RiskEngine hardening.
 - `make compile` passed on 2026-04-27.
-- `make test` passed on 2026-04-27 with `119 passed`.
+- `make test` passed on 2026-04-27 with `136 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
+- `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py` passed on 2026-04-27 with `12 passed`.
 - `make run-paper` passed on 2026-04-27.
 - `make health-paper` passed on 2026-04-27 with overall `pass`.
@@ -155,7 +157,7 @@
 ## Exact Next Step
 
 Move to post-phase hardening:
-- implement P0.4 OMS/RiskEngine State Machine from `docs/post-phase-roadmap.md`
+- implement P0.5 Python 3.11+ Target Validation from `docs/post-phase-roadmap.md`
 - provision a real Python 3.11+ environment and re-run repository-wide validation there
 - install the `MetaTrader5` Python package plus real `SCALPER_AI_BROKER_MT5_*` credentials, then run `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` followed by `python3 scripts/mt5_smoke.py --config-name mt5`
 - validate the new MT5 terminal client against an actual installed terminal, especially broker-side polling, history/deal normalization, and partial-fill behavior

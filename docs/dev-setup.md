@@ -95,4 +95,6 @@ Real MT5 validation remains pending until:
 
 ## Docker
 
-The repository currently ships `docker-compose.yml` with Redis for development infrastructure. Docker/Kubernetes production packaging is intentionally deferred until the POST-PHASE hardening work has completed the MT5 safe submit chain, event journal, and OMS/RiskEngine state machine.
+The repository currently ships `docker-compose.yml` with Redis for development infrastructure.
+Docker/Kubernetes production packaging remains deferred until Python 3.11+ target validation and
+real MT5 terminal validation are complete.

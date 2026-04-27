@@ -130,6 +130,7 @@ The journal must be usable in replay, paper, shadow, and live-safe paths.
 
 Current locations:
 
+- `src/scalper_ai/risk/engine.py`
 - `src/scalper_ai/config/models.py`
 - `src/scalper_ai/deployment/runtime.py`
 - `src/scalper_ai/execution/reconciliation.py`
@@ -137,9 +138,9 @@ Current locations:
 Current status:
 
 - risk configuration exists
+- standalone pre-trade RiskEngine contract exists
 - live startup refuses unsafe kill-switch configuration
 - reconciliation detects broker/internal drift
-- a standalone pre-trade RiskEngine does not exist yet
 
 Target contract:
 
@@ -151,6 +152,7 @@ Target contract:
 
 Current locations:
 
+- `src/scalper_ai/services/oms.py`
 - `src/scalper_ai/execution/models.py`
 - `src/scalper_ai/execution/router.py`
 - `src/scalper_ai/execution/paper.py`
@@ -159,8 +161,9 @@ Current locations:
 Current status:
 
 - execution order lifecycle exists inside adapters
+- standalone OMS lifecycle transition contract exists
+- emergency flatten intent helper exists
 - router separates paper and live paths
-- no standalone OMS state machine exists yet
 
 Target lifecycle:
 
@@ -194,5 +197,5 @@ Target direction:
 
 Do next:
 
-1. Promote OMS/RiskEngine from target contracts into code.
-2. Reuse existing domain, execution, deployment, journal, and validation surfaces wherever possible.
+1. Validate the full suite in Python 3.11+ with declared dev dependencies.
+2. Reuse existing domain, execution, deployment, journal, OMS/risk, and validation surfaces wherever possible.

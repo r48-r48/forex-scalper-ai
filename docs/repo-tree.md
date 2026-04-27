@@ -36,6 +36,7 @@ forex-scalper-ai/
     dev-setup.md
     event-schema.md
     interfaces.md
+    oms-risk.md
     post-phase-roadmap.md
     repo-tree.md
     test-matrix.md
@@ -117,12 +118,18 @@ forex-scalper-ai/
         config.py
         tensorizer.py
         transformer.py
+      risk/
+        __init__.py
+        engine.py
       rl/
         __init__.py
         config.py
         environment.py
         policy.py
         training.py
+      services/
+        __init__.py
+        oms.py
       utils/
         __init__.py
         logging.py
@@ -170,7 +177,9 @@ forex-scalper-ai/
       test_logging.py
       test_models_tensorizer.py
       test_models_transformer.py
+      test_risk_engine.py
       test_rl_environment.py
       test_rl_policy_training.py
+      test_services_oms.py
       test_validation_metrics.py
 ```

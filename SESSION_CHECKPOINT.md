@@ -44,6 +44,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/event-schema.md`
   - journal categories now cover market data, signal, order request/response, fill, position snapshot, risk, and latency events
   - JSONL write/read and flat Parquet-friendly record export are covered by tests
+- 2026-04-27 completed P0.4 OMS/RiskEngine State Machine:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/services/oms.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/risk/engine.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/oms-risk.md`
+  - OMS transition validation now covers `NEW` through `RECONCILED`
+  - RiskEngine now covers kill switches, duplicate detection, stale data, reject burst, order rate, daily loss/drawdown, max position, and reduce-only exposure growth
+  - emergency flatten intent generation is covered by tests
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -54,7 +61,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - The test now uses the current UTC timestamp instead of a stale fixed `2026-03-28` timestamp, so broker connectivity health is not downgraded to `WARN` only because time has passed.
 - Full repository-wide `python3 -m pytest` passed again in the available host environment with `109 passed` before P0.2.
 - PHASE 12 deployment/runtime layer is implemented.
-- Full repository-wide `python3 -m pytest` now passes in the available host environment with `119 passed`.
+- Full repository-wide `python3 -m pytest` now passes in the available host environment with `136 passed`.
 - Added pure execution reconciliation helpers in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
 - Wired reconciliation into deployment/runtime health and metrics in:
@@ -103,19 +110,20 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 - 2026-04-27: `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` -> passed
 - 2026-04-27: `python3 -m pytest tests/unit/test_deployment_runtime.py::test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provider` -> `1 passed`
-- 2026-04-27: `python3 -m pytest` -> `119 passed` after P0.3 unified journal hardening
+- 2026-04-27: `python3 -m pytest` -> `136 passed` after P0.4 OMS/RiskEngine hardening
 - 2026-04-27: `python3 scripts/run_runtime.py describe --config-name paper` -> passed
 - 2026-04-27: `python3 scripts/run_runtime.py health --config-name paper` -> overall `pass`
 - 2026-04-27: `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` -> structured preflight diagnostics; not ready for connection because `MetaTrader5` package, terminal discovery, credentials, and live confirmation are missing in this environment
 - 2026-04-27: `make compile` -> passed
-- 2026-04-27: `make test` -> `119 passed`
+- 2026-04-27: `make test` -> `136 passed`
 - 2026-04-27: `make run-paper` -> passed
 - 2026-04-27: `make health-paper` -> overall `pass`
 - 2026-04-27: `make mt5-preflight` -> structured missing-dependency diagnostics
 - 2026-04-27: `make lint` -> not run to completion because `ruff` is not installed in the local Python 3.9.6 environment; `make lint` remains available for dev/CI environments with dev dependencies installed
 - 2026-04-27: `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py` -> `12 passed`
 - 2026-04-27: `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` -> `6 passed`
-- `python3 -m pytest` -> `119 passed`
+- 2026-04-27: `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` -> `17 passed`
+- `python3 -m pytest` -> `136 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -133,15 +141,15 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Start with `P0.4 — OMS/RiskEngine State Machine` in `docs/post-phase-roadmap.md`:
-- define order lifecycle transitions from `NEW` through `RECONCILED`
-- add deterministic risk controls for max position, max daily loss, order rate, duplicates, stale market data, reject burst, symbol/session kill switches
-- add emergency flatten workflow
-- add `docs/oms-risk.md`
-- add deterministic transition and risk-block tests
+Start with `P0.5 — Python 3.11+ Target Validation` in `docs/post-phase-roadmap.md`:
+- provision or select a Python 3.11+ interpreter
+- install `pip install -e ".[dev,ml]"`
+- run `python -m compileall src tests scripts`
+- run `python -m pytest`
+- record target-runtime results in `docs/current-state.md` and `SESSION_CHECKPOINT.md`
 
-After P0.4, continue with:
-- `P0.5` Python 3.11+ target validation
+After P0.5, continue with:
+- real MT5 terminal/package/credentials validation
 
 ## If Context Gets Compressed
 

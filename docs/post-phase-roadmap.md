@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `119 passed` on 2026-04-27 in the available Python 3.9.6 host environment.
+- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `136 passed` on 2026-04-27 in the available Python 3.9.6 host environment.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -41,11 +41,11 @@ Already implemented:
 - deployment runtime with paper-safe fallback, health checks, and Prometheus-style metrics
 - MT5 terminal client, live adapter skeleton, preflight checks, and smoke script
 - unified event journal envelope, JSONL audit writer, and flat Parquet-friendly export records
+- standalone OMS lifecycle helpers and deterministic pre-trade RiskEngine contracts
 
 Known gaps:
 - no validated Python 3.11+ run yet
 - no real MT5 terminal/package/credentials validation yet
-- no standalone OMS/RiskEngine state machine yet
 - no baseline strategy suite yet
 - no first-class release runbooks or production checklist yet
 
@@ -54,7 +54,8 @@ Known gaps:
 - P0.1 Sprint A+ Operational Foundation: completed on 2026-04-27.
 - P0.2 MT5 Safe Submit Chain: completed on 2026-04-27.
 - P0.3 Unified Event Journal Contract: completed on 2026-04-27.
-- Current next task: P0.4 OMS/RiskEngine State Machine.
+- P0.4 OMS/RiskEngine State Machine: completed on 2026-04-27.
+- Current next task: P0.5 Python 3.11+ Target Validation.
 
 ## P0 Workstream
 
@@ -166,6 +167,8 @@ Completed implementation notes:
 
 ### P0.4 — OMS/RiskEngine State Machine
 
+Status: completed on 2026-04-27.
+
 Goal: move from adapter-level safety to a real execution control layer.
 
 Tasks:
@@ -196,6 +199,13 @@ Definition of done:
 - Invalid state transitions are impossible or rejected.
 - Kill switch behavior is deterministic.
 - Risk decisions are logged as journalable events.
+
+Completed implementation notes:
+- Added `scalper_ai.services.oms` with immutable OMS order records, lifecycle transition validation, and emergency flatten intent generation.
+- Added `scalper_ai.risk.engine` with deterministic pre-trade risk limits, context, decisions, reject codes, and journalable risk-event rendering.
+- Implemented controls for session/symbol kill switches, duplicate intent/order detection, reject bursts, stale market data, order rate, daily loss/drawdown, max position, and reduce-only exposure growth.
+- Added `docs/oms-risk.md`.
+- Added deterministic unit tests for OMS transitions, emergency flattening, and required risk blocks.
 
 ### P0.5 — Python 3.11+ Target Validation
 
@@ -341,14 +351,14 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with `P0.4 — OMS/RiskEngine State Machine`.
+Start with `P0.5 — Python 3.11+ Target Validation`.
 
 Recommended first implementation slice:
-1. Define order lifecycle transition contracts from `NEW` through `RECONCILED`.
-2. Add deterministic risk controls for max position, max daily loss, order rate, duplicate intents, stale market data, reject burst, symbol kill, and session kill.
-3. Add an emergency flatten workflow contract.
-4. Create `docs/oms-risk.md`.
-5. Add deterministic tests for lifecycle transitions and risk blocks.
+1. Provision or select a Python 3.11+ interpreter.
+2. Install `pip install -e ".[dev,ml]"`.
+3. Run `python -m compileall src tests scripts`.
+4. Run `python -m pytest`.
+5. Record results in `docs/current-state.md` and `SESSION_CHECKPOINT.md`.
 
 Then run:
 
