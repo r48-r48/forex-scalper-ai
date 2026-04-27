@@ -13,7 +13,7 @@ python3 -m pytest
 Result:
 
 ```text
-109 passed
+119 passed
 ```
 
 The local desktop Python is 3.9.6. The declared project runtime is Python 3.11+, so Python 3.11+ CI and target-environment validation remain required.
@@ -31,6 +31,7 @@ The local desktop Python is 3.9.6. The declared project runtime is Python 3.11+,
 | Backtesting | `tests/unit/test_backtesting_accounting.py`, `tests/integration/test_backtesting_replay.py` | costs-aware market fills, netting accounting, replay engine V1 | pandas | passed locally |
 | Validation | `tests/unit/test_validation_metrics.py`, `tests/integration/test_validation_walk_forward.py` | fold metrics, walk-forward orchestration, backtest-frame conversion | pandas | passed locally |
 | Execution | `tests/unit/test_execution_*.py`, `tests/integration/test_execution_workflow.py` | paper adapter, router, live stub, MT5 adapter/client fakes, reconciliation | no real broker; fake MT5 modules | passed locally |
+| Journal | `tests/unit/test_journal_events.py`, `tests/integration/test_journal_jsonl.py` | audit event envelope, event categories, JSONL write/read, flat record export | local filesystem | passed locally |
 | Deployment | `tests/unit/test_deployment_*.py`, `tests/integration/test_deployment_bootstrap.py` | runtime safety, health, metrics, MT5 preflight, live factory fakes | no real broker; fake MT5 modules | passed locally |
 
 ## Environment Classification
@@ -47,6 +48,6 @@ The local desktop Python is 3.9.6. The declared project runtime is Python 3.11+,
 
 - MT5 tests currently use fake modules and do not prove broker behavior against a real terminal.
 - Backtesting V1 models immediate market fills with explicit costs, but latency, queue position, partial fills, and cancel/replace races are future P1 work.
-- Current test suite does not yet include a unified event journal, OMS/RiskEngine state machine, or baseline strategy suite because those are POST-PHASE roadmap items.
+- Current test suite includes the unified event journal contract, but OMS/RiskEngine state machine and baseline strategy suite remain future POST-PHASE roadmap items.
 - Linting is exposed through `make lint`, but ruff is not installed in the current local Python 3.9.6 environment.
 - Full type checking is exposed through `make typecheck`, but mypy is not yet part of the GitHub Actions gate until the codebase has been validated under Python 3.11+ with all dev dependencies.

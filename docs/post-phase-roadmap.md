@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `113 passed` on 2026-04-27 in the available Python 3.9.6 host environment.
+- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `119 passed` on 2026-04-27 in the available Python 3.9.6 host environment.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -40,11 +40,11 @@ Already implemented:
 - broker reconciliation helpers and snapshot contracts
 - deployment runtime with paper-safe fallback, health checks, and Prometheus-style metrics
 - MT5 terminal client, live adapter skeleton, preflight checks, and smoke script
+- unified event journal envelope, JSONL audit writer, and flat Parquet-friendly export records
 
 Known gaps:
 - no validated Python 3.11+ run yet
 - no real MT5 terminal/package/credentials validation yet
-- no unified event journal for market/signal/order/fill/risk/latency events yet
 - no standalone OMS/RiskEngine state machine yet
 - no baseline strategy suite yet
 - no first-class release runbooks or production checklist yet
@@ -53,7 +53,8 @@ Known gaps:
 
 - P0.1 Sprint A+ Operational Foundation: completed on 2026-04-27.
 - P0.2 MT5 Safe Submit Chain: completed on 2026-04-27.
-- Current next task: P0.3 Unified Event Journal Contract.
+- P0.3 Unified Event Journal Contract: completed on 2026-04-27.
+- Current next task: P0.4 OMS/RiskEngine State Machine.
 
 ## P0 Workstream
 
@@ -131,6 +132,8 @@ Completed implementation notes:
 
 ### P0.3 — Unified Event Journal Contract
 
+Status: completed on 2026-04-27.
+
 Goal: make every market decision and execution event replayable and auditable.
 
 Tasks:
@@ -153,6 +156,13 @@ Tasks:
 Definition of done:
 - A strategy decision can be tied to a market event, an order request, a broker response, fills, and resulting position state.
 - Journal writers do not require live broker access.
+
+Completed implementation notes:
+- Added `scalper_ai.journal` with `JournalEvent`, `JournalEventType`, JSONL writer/reader, and flat record export.
+- Journal categories cover market data, signal, order request/response, fill, position snapshot, risk, and latency events.
+- Journal payloads reuse existing domain `to_record()` output or normalized mappings instead of duplicating domain contracts.
+- Added `docs/event-schema.md`.
+- Added unit and integration round-trip tests for event contracts and JSONL persistence.
 
 ### P0.4 — OMS/RiskEngine State Machine
 
@@ -331,14 +341,14 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with `P0.3 — Unified Event Journal Contract`.
+Start with `P0.4 — OMS/RiskEngine State Machine`.
 
 Recommended first implementation slice:
-1. Add journal event contracts for market, signal, order request/response, fill, position, risk, and latency events.
-2. Add a JSONL audit writer with UTC-aware timestamps and deterministic record export.
-3. Add Parquet-friendly record conversion that reuses existing raw writer patterns where practical.
-4. Create `docs/event-schema.md`.
-5. Add write/read round-trip smoke tests.
+1. Define order lifecycle transition contracts from `NEW` through `RECONCILED`.
+2. Add deterministic risk controls for max position, max daily loss, order rate, duplicate intents, stale market data, reject burst, symbol kill, and session kill.
+3. Add an emergency flatten workflow contract.
+4. Create `docs/oms-risk.md`.
+5. Add deterministic tests for lifecycle transitions and risk blocks.
 
 Then run:
 

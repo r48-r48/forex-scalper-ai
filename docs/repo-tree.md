@@ -34,6 +34,7 @@ forex-scalper-ai/
     architecture-decisions.md
     current-state.md
     dev-setup.md
+    event-schema.md
     interfaces.md
     post-phase-roadmap.md
     repo-tree.md
@@ -107,6 +108,10 @@ forex-scalper-ai/
         primitives.py
         schema.py
         toxicity.py
+      journal/
+        __init__.py
+        events.py
+        writers.py
       models/
         __init__.py
         config.py
@@ -134,6 +139,7 @@ forex-scalper-ai/
       test_domain_roundtrip.py
       test_execution_workflow.py
       test_feature_offline_online_parity.py
+      test_journal_jsonl.py
       test_model_dataset_bridge.py
       test_raw_parquet_ingestion.py
       test_rl_episode_rollout.py
@@ -160,6 +166,7 @@ forex-scalper-ai/
       test_execution_reconciliation.py
       test_features_online.py
       test_features_primitives.py
+      test_journal_events.py
       test_logging.py
       test_models_tensorizer.py
       test_models_transformer.py

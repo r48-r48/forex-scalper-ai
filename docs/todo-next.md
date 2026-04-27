@@ -6,15 +6,15 @@
 
 ## Current Next Step
 
-- P0.3 — Unified Event Journal Contract from `docs/post-phase-roadmap.md`
+- P0.4 — OMS/RiskEngine State Machine from `docs/post-phase-roadmap.md`
 
 ## Deliverables
 
 - Sprint A+ operational foundation from `docs/post-phase-roadmap.md` — completed on 2026-04-27
 - MT5 safe submit chain with `order_check -> order_send` guardrails — completed on 2026-04-27
+- unified event journal contracts for market/signal/order/fill/risk/latency events — completed on 2026-04-27
 - full Python 3.11+ environment validation, including repo-wide test execution in the actual target interpreter
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
-- unified event journal contracts for market/signal/order/fill/risk/latency events
 - standalone OMS/RiskEngine state machine with kill switches and emergency flatten workflow
 - deeper operational hardening for long-running services, alerting, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup around packaging and startup ergonomics
@@ -29,7 +29,7 @@
 ## Implementation Guidance
 
 - use `docs/post-phase-roadmap.md` as the canonical post-phase backlog
-- continue with P0.3 before OMS/RiskEngine work unless a blocking live-integration bug appears
+- continue with P0.4 unless a blocking live-integration bug appears
 - keep deployment and hardening work separate from domain, model, and execution math
 - reuse the PHASE 12 runtime, health, and metrics surfaces instead of duplicating startup logic
 - favor explicit safety checks, reconciliation, and observability over implicit automation

@@ -46,7 +46,7 @@ Target direction:
 
 - keep adapters at the boundary
 - normalize broker/vendor payloads into domain models
-- connect future event journal writers without changing feature/model code
+- connect journal writers without changing feature/model code
 
 ### Strategy
 
@@ -96,6 +96,8 @@ Target direction:
 
 Current locations:
 
+- `src/scalper_ai/journal/events.py`
+- `src/scalper_ai/journal/writers.py`
 - `src/scalper_ai/data/raw_writer.py`
 - domain `to_record()` helpers
 - execution/reconciliation snapshots
@@ -104,7 +106,8 @@ Current status:
 
 - raw market persistence exists
 - domain records serialize cleanly
-- a unified market/signal/order/fill/risk/latency journal does not exist yet
+- unified journal event envelope exists for market/signal/order/fill/position/risk/latency audit events
+- JSONL journal writer and flat Parquet-friendly record export exist
 
 Target contract:
 
@@ -116,6 +119,10 @@ Target contract:
 - `position_snapshot`
 - `risk_event`
 - `latency_event`
+
+Schema doc:
+
+- `docs/event-schema.md`
 
 The journal must be usable in replay, paper, shadow, and live-safe paths.
 
@@ -187,6 +194,5 @@ Target direction:
 
 Do next:
 
-1. Build the unified event journal contract.
-2. Promote OMS/RiskEngine from target contracts into code.
-3. Reuse existing domain, execution, deployment, and validation surfaces wherever possible.
+1. Promote OMS/RiskEngine from target contracts into code.
+2. Reuse existing domain, execution, deployment, journal, and validation surfaces wherever possible.
