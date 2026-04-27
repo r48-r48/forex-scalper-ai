@@ -103,14 +103,17 @@
   - Python 3.12.13 target-runtime validation was completed in a local `.venv` with full dev and ML extras installed
   - execution-aware simulator V2 was added for latency, partial fills, queue-position proxy, stale/closed-market behavior, rejects, cancels, cancel/replace races, and execution-quality metrics
   - baseline strategy suite was added for spread/mean-reversion, OFI/imbalance, volatility breakout, explicit cost/risk sensitivity, and walk-forward reporting
-  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `148 passed`
-  - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `148 passed`
+  - unified validation gate reporting was added for backtest, walk-forward, execution stress, latency/slippage, risk flags, and regime breakdown
+  - paper/shadow champion-challenger decision reporting was added without broker order submission
+  - interpretable supervised baseline filter and leakage-safe walk-forward evaluation were added
+  - observability alert docs, platform roadmap, production checklist, incident/postmortem templates, and release/incident runbooks were added
+  - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `157 passed`
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
-- The repository now has research, validation, baseline strategies, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, and OMS/RiskEngine layers.
-- The next work should focus on real MT5 terminal validation, unified validation-gate reporting, live adapter refinement, and operational stabilization.
+- The repository now has research, validation, baseline strategies, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, OMS/RiskEngine layers, validation gates, shadow reports, supervised baseline filtering, and operational runbooks.
+- The next work should focus on real MT5 terminal validation, Docker/Compose runtime packaging, alert wiring, and full-repo lint/typecheck cleanup.
 
 ## Important Constraints
 
@@ -139,6 +142,9 @@
 - `make test` passed on 2026-04-28 with `148 passed`.
 - `make PYTHON=.venv/bin/python compile` passed on 2026-04-28.
 - `make PYTHON=.venv/bin/python test` passed on 2026-04-28 with `148 passed`.
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after P1.3-P2.3.
+- `.venv/bin/pytest` passed on 2026-04-28 with `157 passed` after P1.3-P2.3.
+- `.venv/bin/ruff check` passed on the new P1.3-P2.1 source/test files on 2026-04-28.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
@@ -167,12 +173,11 @@
 - `python3 scripts/mt5_smoke.py --help` passed.
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed and auto-discovered the local MT5 terminal bundle path.
 - `python3 scripts/mt5_smoke.py --config-name mt5` now exits with structured JSON preflight diagnostics instead of a raw traceback when dependencies are missing.
-- Full repository-wide `pytest` now passes in both the available Python 3.9.6 compatibility environment and the Python 3.12.13 target-validation `.venv`.
+- Full repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `157 passed`.
 
 ## Exact Next Step
 
 Move to post-phase hardening:
 - install the `MetaTrader5` Python package plus real `SCALPER_AI_BROKER_MT5_*` credentials, then run `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` followed by `python3 scripts/mt5_smoke.py --config-name mt5`
 - validate the new MT5 terminal client against an actual installed terminal, especially broker-side polling, history/deal normalization, and partial-fill behavior
-- add deeper operational hardening such as long-running service supervision, alerting, and dependency checks beyond the current connectivity layer
-- if real MT5 validation remains unavailable, continue with P1.3 Unified Validation Report from `docs/post-phase-roadmap.md`
+- if real MT5 validation remains unavailable, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`

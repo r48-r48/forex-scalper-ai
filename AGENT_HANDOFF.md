@@ -295,6 +295,10 @@ Already available building blocks:
 - standalone OMS lifecycle helpers and deterministic pre-trade risk engine contracts
 - execution-aware simulator V2 for latency, partial fills, queue proxy, rejects, cancels, stale/closed-market behavior, and execution-quality metrics
 - baseline strategy suite for spread/mean-reversion, OFI/imbalance, volatility breakout, explicit sensitivity scenarios, and walk-forward reports
+- unified validation gate reports for go/no-go promotion artifacts
+- paper/shadow champion-challenger decision reporting without broker order submission
+- interpretable supervised baseline filter with leakage-safe walk-forward evaluation
+- observability alert docs, platform roadmap, production checklist, incident/postmortem templates, and runbooks
 - canonical post-phase backlog in `docs/post-phase-roadmap.md`
 
 Current repository status:
@@ -311,6 +315,11 @@ Current repository status:
 - P0.5 Python 3.11+ Target Validation completed on 2026-04-27 using a local Python 3.12.13 `.venv`
 - P1.1 Execution-Aware Simulator V2 completed on 2026-04-27 with latency, partial-fill, queue, stale/closed-market, reject, cancel, cancel/replace race scenarios, and execution-quality metrics
 - P1.2 Baseline Strategy Suite completed on 2026-04-28 with deterministic baseline strategies, cost/risk sensitivity, and walk-forward reports
+- P1.3 Unified Validation Report completed on 2026-04-28 with validation gate reports, thresholds, regime breakdown, and JSON artifacts
+- P1.4 Paper And Shadow Mode completed on 2026-04-28 with champion/challenger decision drift reports
+- P2.1 Supervised Baseline Filter completed on 2026-04-28 with transparent centroid-difference model and walk-forward evaluation
+- P2.2 Observability Expansion completed on 2026-04-28 as alert-rule docs and platform roadmap
+- P2.3 Release Runbooks completed on 2026-04-28 as production checklist, incident/postmortem templates, and runbooks
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -321,6 +330,9 @@ Current repository status:
 - `make PYTHON=.venv/bin/python test` passed on 2026-04-27 with `141 passed` after execution-aware simulator V2
 - `make test` passed on 2026-04-28 with `148 passed` after baseline strategy suite
 - `make PYTHON=.venv/bin/python test` passed on 2026-04-28 with `148 passed` after baseline strategy suite
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after P1.3-P2.3
+- `.venv/bin/pytest` passed on 2026-04-28 with `157 passed` after P1.3-P2.3
+- `.venv/bin/ruff check` passed on the new P1.3-P2.1 source/test files on 2026-04-28
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -342,23 +354,28 @@ Current repository status:
 - `python3 scripts/mt5_smoke.py --help` passed on 2026-03-28
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed on 2026-03-28 and auto-discovered the local MT5 terminal path
 - `python3 scripts/mt5_smoke.py --config-name mt5` now fails with structured JSON preflight diagnostics on 2026-03-28 when dependencies are missing
-- repository-wide `pytest` now passes in the available Python 3.9.6 compatibility environment and in the Python 3.12.13 target-validation `.venv`
+- repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `157 passed`
 
 ## Last Session Snapshot
 
 - Session updated on: 2026-04-28
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - P2.3 Release Runbooks is complete: `docs/runbooks/`, `docs/production-checklist.md`, `docs/incident-template.md`, and `docs/postmortem-template.md` now provide normal and incident procedures
+  - P2.2 Observability Expansion is complete as docs: `docs/alert-rules.md` and `docs/platform-roadmap.md` define alert meanings, operator actions, and Compose-first platform sequencing
+  - P2.1 Supervised Baseline Filter is complete: `scalper_ai.models.baseline_filter` provides the transparent filter, while `scalper_ai.validation.supervised_filter` provides train-only fit and test-only walk-forward evaluation
+  - P1.4 Paper And Shadow Mode is complete: `scalper_ai.validation.shadow` provides decision-only champion/challenger reporting and JSON artifact persistence without broker orders
+  - P1.3 Unified Validation Report is complete: `scalper_ai.validation.gate` provides pass/warn/fail validation reports, thresholds, risk flags, latency/slippage summaries, regime breakdown, and JSON artifact persistence
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
-  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `148 passed`
+  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `157 passed`
   - P0.4 OMS/RiskEngine State Machine is complete: `scalper_ai.services.oms` now provides lifecycle transition validation and emergency flatten intents, while `scalper_ai.risk.engine` provides deterministic pre-trade risk checks and journalable risk decisions
   - P0.3 Unified Event Journal Contract is complete: `scalper_ai.journal` now provides `JournalEvent`, `JournalEventType`, JSONL writer/reader, flat record export, and `docs/event-schema.md`
   - P0.2 MT5 Safe Submit Chain is complete: `Mt5TerminalClient.submit_order()` now runs `order_check` before `order_send`, failed or unavailable checks return structured rejections, and fake-module tests cover check/send paths
   - stale project-memory paths were updated to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
   - Pydantic warning cleanup was completed for logging config field naming and domain model JSON config
   - repository-wide `pytest` passed in the available Python 3.9.6 environment with `109 passed` and no Pydantic warnings before P0.2
-  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `148 passed`
+  - repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `157 passed`
   - pure execution reconciliation helpers were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
   - reconciliation is now wired into `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/runtime.py` health and metrics surfaces
   - broker snapshot contract and internal execution state tracker were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/snapshots.py`
@@ -378,7 +395,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
   - start real MT5 terminal validation when the `MetaTrader5` package, terminal, credentials, and explicit live confirmation are available
-  - if MT5 validation remains unavailable, continue with `P1.3 — Unified Validation Report` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
+  - if MT5 remains unavailable, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup
 
 ## Constraints To Preserve
 
@@ -396,7 +413,7 @@ Current repository status:
 
 - validate the MT5-backed client against a real installed terminal and credentials
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
-- add deeper broker reconciliation, dependency supervision, and long-running runtime hardening
+- add Docker/Compose runtime packaging, alert transport wiring, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface
 
 ## Suggested Next Prompt For A New Chat
@@ -423,6 +440,9 @@ In this thread, the following checks passed:
 
 ```bash
 cd '/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai'
+.venv/bin/python -m compileall src tests scripts
+.venv/bin/pytest
+.venv/bin/ruff check src/scalper_ai/validation/gate.py src/scalper_ai/validation/shadow.py src/scalper_ai/models/baseline_filter.py src/scalper_ai/validation/supervised_filter.py tests/unit/test_validation_gate.py tests/unit/test_validation_shadow.py tests/unit/test_models_baseline_filter.py tests/integration/test_supervised_filter_walk_forward.py
 python3 -m compileall src tests scripts
 python3 -m pytest
 python3 -m pytest tests/unit/test_execution_reconciliation.py tests/unit/test_execution_paper.py tests/integration/test_execution_workflow.py tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py

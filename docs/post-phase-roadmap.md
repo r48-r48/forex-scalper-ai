@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `python3 -m pytest` / `make test` passed with `148 passed` on 2026-04-28 in both the local Python 3.9.6 compatibility environment and the Python 3.12.13 target-validation `.venv`.
+- Current repository state: PHASE 1-12 complete, `.venv/bin/pytest` passed with `157 passed` on 2026-04-28 in the Python 3.12.13 target-validation environment.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -44,11 +44,16 @@ Already implemented:
 - standalone OMS lifecycle helpers and deterministic pre-trade RiskEngine contracts
 - execution-aware simulator V2 with latency, partial-fill, queue, stale/closed-market, reject, cancel, and cancel/replace race scenarios
 - baseline strategy suite with spread/mean-reversion, OFI/imbalance, volatility-breakout, cost sensitivity, and walk-forward reports
+- unified validation gate reports for backtest, walk-forward, execution stress, latency/slippage, risk flags, and regime breakdown
+- paper/shadow champion-challenger decision reporting without broker order submission
+- interpretable supervised baseline filter with leakage-safe walk-forward evaluation
+- observability alert-rule docs, platform roadmap, production checklist, incident/postmortem templates, and release/incident runbooks
 
 Known gaps:
 - no real MT5 terminal/package/credentials validation yet
-- no unified validation gate artifact yet
-- no first-class release runbooks or production checklist yet
+- no Docker/Compose runtime image yet
+- no real alert transport or OpenTelemetry trace path yet
+- no dedicated full-repo Ruff/mypy cleanup baseline yet
 
 ## Roadmap Status
 
@@ -59,7 +64,12 @@ Known gaps:
 - P0.5 Python 3.11+ Target Validation: completed on 2026-04-27 with Python 3.12.13.
 - P1.1 Execution-Aware Simulator V2: completed on 2026-04-27.
 - P1.2 Baseline Strategy Suite: completed on 2026-04-28.
-- Current next task: real MT5 terminal validation when package/terminal/credentials are available; otherwise continue with P1.3 Unified Validation Report.
+- P1.3 Unified Validation Report: completed on 2026-04-28.
+- P1.4 Paper And Shadow Mode: completed on 2026-04-28.
+- P2.1 Supervised Baseline Filter: completed on 2026-04-28.
+- P2.2 Observability Expansion: completed on 2026-04-28 as documentation and roadmap.
+- P2.3 Release Runbooks: completed on 2026-04-28 as documented procedures and templates.
+- Current next task: real MT5 terminal validation when package/terminal/credentials are available.
 
 ## P0 Workstream
 
@@ -292,6 +302,8 @@ Completed implementation notes:
 
 ### P1.3 — Unified Validation Report
 
+Status: completed on 2026-04-28.
+
 Goal: create a go/no-go artifact before paper/live changes.
 
 Tasks:
@@ -308,7 +320,15 @@ Tasks:
 Definition of done:
 - New strategies cannot be promoted without a validation report.
 
+Completed implementation notes:
+- Added `scalper_ai.validation.gate` with `ValidationGateReport`, configurable thresholds, pass/warn/fail checks, risk flags, latency/slippage summary, and regime breakdown.
+- Added JSON artifact persistence through `write_validation_gate_report`.
+- Added `docs/validation-gate.md`.
+- Added unit tests for complete offline artifact bundles, risk-flag failures, timezone validation, and JSON persistence.
+
 ### P1.4 — Paper And Shadow Mode
+
+Status: completed on 2026-04-28.
 
 Goal: use the same signal/risk/OMS path in replay, paper, shadow, and live-safe modes.
 
@@ -321,9 +341,18 @@ Tasks:
 Definition of done:
 - Challenger can run without sending orders and produce decision deltas.
 
+Completed implementation notes:
+- Added `scalper_ai.validation.shadow` for champion/challenger decision-only replay.
+- Shadow reports record resolved targets, raw target output, current champion shadow position, absolute deltas, and direction-change ratios.
+- Shadow mode does not create orders and does not touch broker adapters.
+- Added `docs/shadow-mode.md`.
+- Added unit tests for decision drift summaries, JSON persistence, strategy-name validation, and UTC-aware generation time.
+
 ## P2 Workstream
 
 ### P2.1 — Supervised Baseline Filter
+
+Status: completed on 2026-04-28.
 
 Goal: add ML as a filter/challenger after baselines exist.
 
@@ -336,7 +365,15 @@ Tasks:
 Definition of done:
 - ML result is compared against baseline strategies and validation gates.
 
+Completed implementation notes:
+- Added `scalper_ai.models.baseline_filter` with a transparent centroid-difference directional model, score/predict methods, and feature-importance output.
+- Added `scalper_ai.validation.supervised_filter` for leakage-safe walk-forward fitting on train partitions and evaluation on test partitions.
+- Added `docs/supervised-baseline-filter.md`.
+- Added unit and integration tests for fitting, thresholds, directional-class validation, and out-of-sample walk-forward reporting.
+
 ### P2.2 — Observability Expansion
+
+Status: completed on 2026-04-28 as documentation and platform roadmap.
 
 Goal: grow from health/metrics surfaces to production operations.
 
@@ -353,7 +390,14 @@ Tasks:
 Definition of done:
 - Operators know what the metrics mean and what action to take.
 
+Completed implementation notes:
+- Added `docs/alert-rules.md` for broker disconnect, stale data, reconciliation drift, reject burst, and kill switch activation.
+- Added `docs/platform-roadmap.md` with Docker/Compose first, service boundaries later, and Kubernetes/Helm/Argo deferred.
+- Alert transport and OpenTelemetry remain intentionally deferred until service boundaries exist.
+
 ### P2.3 — Release Runbooks
+
+Status: completed on 2026-04-28.
 
 Goal: make operation procedural, not improvised.
 
@@ -373,6 +417,10 @@ Tasks:
 Definition of done:
 - A later operator or agent can follow documented steps in normal and incident modes.
 
+Completed implementation notes:
+- Added runbooks for market open, market close, broker disconnect, stale data, reject burst, emergency flatten, and rollback release under `docs/runbooks/`.
+- Added `docs/incident-template.md`, `docs/postmortem-template.md`, and `docs/production-checklist.md`.
+
 ## Do Not Do Yet
 
 - Do not make RL the first production trading brain.
@@ -384,7 +432,7 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available. If those remain unavailable, continue with `P1.3 — Unified Validation Report`.
+Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available.
 
 Recommended first implementation slice:
 1. Install the `MetaTrader5` Python package in the target runtime.
@@ -393,10 +441,10 @@ Recommended first implementation slice:
 4. Set explicit live confirmation before any true live startup.
 5. Run MT5 preflight and smoke checks against the real terminal.
 
-Fallback implementation slice:
-1. Build one validation report object that joins backtest, walk-forward, execution-stress, latency/slippage, risk flags, and regime breakdown.
-2. Save report artifacts under the existing ignored `data/artifacts` path.
-3. Add `docs/validation-gate.md` with go/no-go criteria.
+If real MT5 validation remains unavailable, the next non-MT5 work is platform cleanup:
+1. Add a Docker/Compose runtime image around the paper-safe default.
+2. Create a full-repo Ruff/mypy cleanup baseline.
+3. Wire alert-rule documents to an actual transport after the runtime topology is fixed.
 
 Then run:
 

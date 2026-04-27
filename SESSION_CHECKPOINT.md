@@ -71,6 +71,28 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/baseline-strategies.md`
   - added tests for baseline strategy behavior, cost/risk sensitivity reports, and walk-forward baseline reports
   - `make test` and `make PYTHON=.venv/bin/python test` both passed with `148 passed`
+- 2026-04-28 completed P1.3 Unified Validation Report:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/validation/gate.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/validation-gate.md`
+  - validation gate reports now cover backtest, walk-forward, execution stress, latency/slippage, risk flags, and regime breakdown
+  - JSON validation artifacts can be written under ignored `data/artifacts` paths
+- 2026-04-28 completed P1.4 Paper And Shadow Mode:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/validation/shadow.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/shadow-mode.md`
+  - champion/challenger decision reports produce deltas without creating orders or touching broker adapters
+- 2026-04-28 completed P2.1 Supervised Baseline Filter:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/models/baseline_filter.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/validation/supervised_filter.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/supervised-baseline-filter.md`
+  - train-only fit and test-only walk-forward evaluation are covered by unit/integration tests
+- 2026-04-28 completed P2.2 Observability Expansion as docs:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/alert-rules.md`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/platform-roadmap.md`
+- 2026-04-28 completed P2.3 Release Runbooks:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/runbooks/`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/production-checklist.md`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/incident-template.md`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/postmortem-template.md`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -81,7 +103,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - The test now uses the current UTC timestamp instead of a stale fixed `2026-03-28` timestamp, so broker connectivity health is not downgraded to `WARN` only because time has passed.
 - Full repository-wide `python3 -m pytest` passed again in the available host environment with `109 passed` before P0.2.
 - PHASE 12 deployment/runtime layer is implemented.
-- Full repository-wide `python3 -m pytest` now passes in the available host environment with `148 passed`.
+- Full repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `157 passed`.
 - Added pure execution reconciliation helpers in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
 - Wired reconciliation into deployment/runtime health and metrics in:
@@ -154,7 +176,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `make test` -> `148 passed`
 - 2026-04-28: `make PYTHON=.venv/bin/python compile` -> passed
 - 2026-04-28: `make PYTHON=.venv/bin/python test` -> `148 passed`
-- `python3 -m pytest` -> `148 passed`
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after P1.3-P2.3
+- 2026-04-28: `.venv/bin/pytest` -> `157 passed` after P1.3-P2.3
+- 2026-04-28: `.venv/bin/ruff check` on the new P1.3-P2.1 source/test files -> passed
+- `.venv/bin/pytest` -> `157 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -180,7 +205,7 @@ Start with real MT5 terminal validation when package, terminal, credentials, and
 - run MT5 preflight and smoke checks against the real terminal
 
 If real MT5 validation remains unavailable:
-- continue with P1.3 Unified Validation Report
+- continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup
 
 ## If Context Gets Compressed
 

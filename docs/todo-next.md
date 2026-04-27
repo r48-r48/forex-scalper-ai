@@ -6,7 +6,8 @@
 
 ## Current Next Step
 
-- Real MT5 terminal validation when package, terminal, credentials, and live confirmation are available; otherwise P1.3 — Unified Validation Report from `docs/post-phase-roadmap.md`
+- Real MT5 terminal validation when package, terminal, credentials, and live confirmation are available.
+- If MT5 remains unavailable, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
 
 ## Deliverables
 
@@ -17,10 +18,14 @@
 - full Python 3.11+ environment validation, including repo-wide test execution in the actual target interpreter — completed on 2026-04-27 with Python 3.12.13
 - execution-aware simulator V2 with latency, partial-fill, cancel/replace, stale/closed-market, queue-position, and execution-quality metrics — completed on 2026-04-27
 - baseline strategy suite with spread/mean-reversion, OFI/imbalance, volatility breakout, sensitivity scenarios, and walk-forward reports — completed on 2026-04-28
+- unified validation gate report for backtest, walk-forward, execution stress, latency/slippage, risk flags, and regime breakdown — completed on 2026-04-28
+- paper/shadow champion-challenger decision reporting — completed on 2026-04-28
+- interpretable supervised baseline filter with leakage-safe walk-forward evaluation — completed on 2026-04-28
+- observability alert-rule docs and platform roadmap — completed on 2026-04-28
+- production checklist, incident/postmortem templates, and release/incident runbooks — completed on 2026-04-28
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
-- unified validation gate report for backtest, walk-forward, execution stress, latency/slippage, risk flags, and regime breakdown
-- deeper operational hardening for long-running services, alerting, and dependency supervision beyond the current broker health checks
-- production-readiness cleanup around packaging and startup ergonomics
+- deeper operational hardening for Docker/Compose runtime packaging, alert transport wiring, and dependency supervision beyond the current broker health checks
+- production-readiness cleanup around full-repo lint/typecheck baselines and startup ergonomics
 
 ## Must-Have Capabilities
 
@@ -32,7 +37,7 @@
 ## Implementation Guidance
 
 - use `docs/post-phase-roadmap.md` as the canonical post-phase backlog
-- continue with real MT5 terminal validation when dependencies are available; if they remain unavailable, continue with P1.3 validation-gate reporting
+- continue with real MT5 terminal validation when dependencies are available; if they remain unavailable, continue with platform/runtime hardening that does not require a broker
 - keep deployment and hardening work separate from domain, model, and execution math
 - reuse the PHASE 12 runtime, health, and metrics surfaces instead of duplicating startup logic
 - favor explicit safety checks, reconciliation, and observability over implicit automation
@@ -43,6 +48,7 @@
 - keep repository-wide `pytest` green in Python 3.12.13 and future Python 3.11+ CI/target environments
 - add targeted validation around the MT5-backed live adapter, real terminal behavior, preflight diagnostics, reconciliation, and long-running runtime behavior
 - keep deployment CLI and paper-safe runtime wiring working while hardening the live path
+- keep validation gates and shadow reports as required promotion artifacts for new strategies
 
 ## After This Roadmap
 

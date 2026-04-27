@@ -33,17 +33,33 @@ forex-scalper-ai/
   docker-compose.yml
   docs/
     architecture-decisions.md
+    alert-rules.md
     baseline-strategies.md
     current-state.md
     dev-setup.md
     execution-simulator-v2.md
     event-schema.md
+    incident-template.md
     interfaces.md
     oms-risk.md
     post-phase-roadmap.md
+    postmortem-template.md
+    production-checklist.md
+    platform-roadmap.md
     repo-tree.md
+    runbooks/
+      broker-disconnect.md
+      emergency-flatten.md
+      market-close.md
+      market-open.md
+      reject-burst.md
+      rollback-release.md
+      stale-data.md
+    shadow-mode.md
+    supervised-baseline-filter.md
     test-matrix.md
     todo-next.md
+    validation-gate.md
   pyproject.toml
   scripts/
     collect_ticks.py
@@ -120,6 +136,7 @@ forex-scalper-ai/
         writers.py
       models/
         __init__.py
+        baseline_filter.py
         config.py
         tensorizer.py
         transformer.py
@@ -142,7 +159,10 @@ forex-scalper-ai/
       validation/
         __init__.py
         baseline_suite.py
+        gate.py
         metrics.py
+        shadow.py
+        supervised_filter.py
         walk_forward.py
   tests/
     integration/
@@ -157,6 +177,7 @@ forex-scalper-ai/
       test_model_dataset_bridge.py
       test_raw_parquet_ingestion.py
       test_rl_episode_rollout.py
+      test_supervised_filter_walk_forward.py
       test_validation_walk_forward.py
       test_walk_forward_splits.py
     unit/
@@ -184,6 +205,7 @@ forex-scalper-ai/
       test_features_primitives.py
       test_journal_events.py
       test_logging.py
+      test_models_baseline_filter.py
       test_models_tensorizer.py
       test_models_transformer.py
       test_risk_engine.py
@@ -191,5 +213,7 @@ forex-scalper-ai/
       test_rl_policy_training.py
       test_services_oms.py
       test_validation_baseline_suite.py
+      test_validation_gate.py
       test_validation_metrics.py
+      test_validation_shadow.py
 ```
