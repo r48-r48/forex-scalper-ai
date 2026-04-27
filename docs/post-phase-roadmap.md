@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `python3 -m pytest` / `make test` passed with `141 passed` on 2026-04-27 in both the local Python 3.9.6 compatibility environment and the Python 3.12.13 target-validation `.venv`.
+- Current repository state: PHASE 1-12 complete, `python3 -m pytest` / `make test` passed with `148 passed` on 2026-04-28 in both the local Python 3.9.6 compatibility environment and the Python 3.12.13 target-validation `.venv`.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -43,10 +43,11 @@ Already implemented:
 - unified event journal envelope, JSONL audit writer, and flat Parquet-friendly export records
 - standalone OMS lifecycle helpers and deterministic pre-trade RiskEngine contracts
 - execution-aware simulator V2 with latency, partial-fill, queue, stale/closed-market, reject, cancel, and cancel/replace race scenarios
+- baseline strategy suite with spread/mean-reversion, OFI/imbalance, volatility-breakout, cost sensitivity, and walk-forward reports
 
 Known gaps:
 - no real MT5 terminal/package/credentials validation yet
-- no baseline strategy suite yet
+- no unified validation gate artifact yet
 - no first-class release runbooks or production checklist yet
 
 ## Roadmap Status
@@ -57,7 +58,8 @@ Known gaps:
 - P0.4 OMS/RiskEngine State Machine: completed on 2026-04-27.
 - P0.5 Python 3.11+ Target Validation: completed on 2026-04-27 with Python 3.12.13.
 - P1.1 Execution-Aware Simulator V2: completed on 2026-04-27.
-- Current next task: real MT5 terminal validation when package/terminal/credentials are available; otherwise continue with P1.2 Baseline Strategy Suite.
+- P1.2 Baseline Strategy Suite: completed on 2026-04-28.
+- Current next task: real MT5 terminal validation when package/terminal/credentials are available; otherwise continue with P1.3 Unified Validation Report.
 
 ## P0 Workstream
 
@@ -265,6 +267,8 @@ Completed implementation notes:
 
 ### P1.2 — Baseline Strategy Suite
 
+Status: completed on 2026-04-28.
+
 Goal: compare ML/RL against real baselines.
 
 Tasks:
@@ -278,6 +282,13 @@ Tasks:
 
 Definition of done:
 - Every future ML model has a baseline suite to beat.
+
+Completed implementation notes:
+- Reused the existing `TargetPositionStrategy` protocol; no parallel strategy contract was added.
+- Added `scalper_ai.backtesting.baselines` with spread/mean-reversion, OFI/imbalance, and volatility-breakout strategies.
+- Added `scalper_ai.validation.baseline_suite` with backtest suite summaries, explicit cost/risk sensitivity scenarios, and walk-forward report frames.
+- Added `configs/baselines.yaml` and `docs/baseline-strategies.md`.
+- Added unit/integration tests for strategy behavior, report generation, sensitivity scenarios, and walk-forward baseline reports.
 
 ### P1.3 — Unified Validation Report
 
@@ -373,7 +384,7 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available. If those remain unavailable, continue with `P1.2 — Baseline Strategy Suite`.
+Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available. If those remain unavailable, continue with `P1.3 — Unified Validation Report`.
 
 Recommended first implementation slice:
 1. Install the `MetaTrader5` Python package in the target runtime.
@@ -383,10 +394,9 @@ Recommended first implementation slice:
 5. Run MT5 preflight and smoke checks against the real terminal.
 
 Fallback implementation slice:
-1. Add a strategy interface or adapter if the existing backtest protocol is not enough.
-2. Implement spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines.
-3. Add configs and walk-forward reports.
-4. Add sensitivity analysis for fees, slippage, and risk limits.
+1. Build one validation report object that joins backtest, walk-forward, execution-stress, latency/slippage, risk flags, and regime breakdown.
+2. Save report artifacts under the existing ignored `data/artifacts` path.
+3. Add `docs/validation-gate.md` with go/no-go criteria.
 
 Then run:
 

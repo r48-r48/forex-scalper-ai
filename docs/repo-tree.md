@@ -1,6 +1,6 @@
 # Repository Tree
 
-Snapshot date: 2026-04-27
+Snapshot date: 2026-04-28
 
 This tree lists the current tracked project structure to depth 4 and omits `.git`, caches, and ignored runtime artifacts.
 
@@ -17,6 +17,7 @@ forex-scalper-ai/
   README.md
   SESSION_CHECKPOINT.md
   configs/
+    baselines.yaml
     base.yaml
     live.yaml
     mt5.yaml
@@ -32,6 +33,7 @@ forex-scalper-ai/
   docker-compose.yml
   docs/
     architecture-decisions.md
+    baseline-strategies.md
     current-state.md
     dev-setup.md
     execution-simulator-v2.md
@@ -53,6 +55,7 @@ forex-scalper-ai/
       backtesting/
         __init__.py
         accounting.py
+        baselines.py
         config.py
         engine.py
         execution_simulator.py
@@ -138,11 +141,13 @@ forex-scalper-ai/
         paths.py
       validation/
         __init__.py
+        baseline_suite.py
         metrics.py
         walk_forward.py
   tests/
     integration/
       .gitkeep
+      test_baseline_walk_forward_suite.py
       test_backtesting_replay.py
       test_deployment_bootstrap.py
       test_domain_roundtrip.py
@@ -156,6 +161,7 @@ forex-scalper-ai/
       test_walk_forward_splits.py
     unit/
       test_backtesting_accounting.py
+      test_backtesting_baselines.py
       test_backtesting_execution_simulator.py
       test_config_loader.py
       test_data_bar_builders.py
@@ -184,5 +190,6 @@ forex-scalper-ai/
       test_rl_environment.py
       test_rl_policy_training.py
       test_services_oms.py
+      test_validation_baseline_suite.py
       test_validation_metrics.py
 ```

@@ -14,7 +14,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Current Snapshot
 
-- Date: `2026-04-27`
+- Date: `2026-04-28`
 - Repo phase status: `PHASE 1-12 complete`
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
@@ -64,6 +64,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/execution-simulator-v2.md`
   - V2 covers latency, partial fills, queue-position proxy, stale/closed-market rejections, forced rejects/cancels, cancel/replace races, and execution-quality metrics
   - `make test` and `make PYTHON=.venv/bin/python test` both passed with `141 passed`
+- 2026-04-28 completed P1.2 Baseline Strategy Suite:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/baselines.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/validation/baseline_suite.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/configs/baselines.yaml`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/baseline-strategies.md`
+  - added tests for baseline strategy behavior, cost/risk sensitivity reports, and walk-forward baseline reports
+  - `make test` and `make PYTHON=.venv/bin/python test` both passed with `148 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -74,7 +81,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - The test now uses the current UTC timestamp instead of a stale fixed `2026-03-28` timestamp, so broker connectivity health is not downgraded to `WARN` only because time has passed.
 - Full repository-wide `python3 -m pytest` passed again in the available host environment with `109 passed` before P0.2.
 - PHASE 12 deployment/runtime layer is implemented.
-- Full repository-wide `python3 -m pytest` now passes in the available host environment with `141 passed`.
+- Full repository-wide `python3 -m pytest` now passes in the available host environment with `148 passed`.
 - Added pure execution reconciliation helpers in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
 - Wired reconciliation into deployment/runtime health and metrics in:
@@ -141,7 +148,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-27: `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` -> `6 passed`
 - 2026-04-27: `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` -> `17 passed`
 - 2026-04-27: `python3 -m pytest tests/unit/test_backtesting_execution_simulator.py` -> `5 passed`
-- `python3 -m pytest` -> `141 passed`
+- 2026-04-28: `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` -> `7 passed`
+- 2026-04-28: `.venv/bin/python -m ruff check` on the new P1.2 code and tests -> passed
+- 2026-04-28: `make compile` -> passed
+- 2026-04-28: `make test` -> `148 passed`
+- 2026-04-28: `make PYTHON=.venv/bin/python compile` -> passed
+- 2026-04-28: `make PYTHON=.venv/bin/python test` -> `148 passed`
+- `python3 -m pytest` -> `148 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -167,7 +180,7 @@ Start with real MT5 terminal validation when package, terminal, credentials, and
 - run MT5 preflight and smoke checks against the real terminal
 
 If real MT5 validation remains unavailable:
-- continue with P1.2 Baseline Strategy Suite
+- continue with P1.3 Unified Validation Report
 
 ## If Context Gets Compressed
 

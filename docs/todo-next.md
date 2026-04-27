@@ -6,7 +6,7 @@
 
 ## Current Next Step
 
-- Real MT5 terminal validation when package, terminal, credentials, and live confirmation are available; otherwise P1.2 — Baseline Strategy Suite from `docs/post-phase-roadmap.md`
+- Real MT5 terminal validation when package, terminal, credentials, and live confirmation are available; otherwise P1.3 — Unified Validation Report from `docs/post-phase-roadmap.md`
 
 ## Deliverables
 
@@ -16,7 +16,9 @@
 - standalone OMS/RiskEngine state machine with kill switches and emergency flatten workflow — completed on 2026-04-27
 - full Python 3.11+ environment validation, including repo-wide test execution in the actual target interpreter — completed on 2026-04-27 with Python 3.12.13
 - execution-aware simulator V2 with latency, partial-fill, cancel/replace, stale/closed-market, queue-position, and execution-quality metrics — completed on 2026-04-27
+- baseline strategy suite with spread/mean-reversion, OFI/imbalance, volatility breakout, sensitivity scenarios, and walk-forward reports — completed on 2026-04-28
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
+- unified validation gate report for backtest, walk-forward, execution stress, latency/slippage, risk flags, and regime breakdown
 - deeper operational hardening for long-running services, alerting, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup around packaging and startup ergonomics
 
@@ -30,7 +32,7 @@
 ## Implementation Guidance
 
 - use `docs/post-phase-roadmap.md` as the canonical post-phase backlog
-- continue with real MT5 terminal validation when dependencies are available; if they remain unavailable, continue with P1.2 baseline strategy work
+- continue with real MT5 terminal validation when dependencies are available; if they remain unavailable, continue with P1.3 validation-gate reporting
 - keep deployment and hardening work separate from domain, model, and execution math
 - reuse the PHASE 12 runtime, health, and metrics surfaces instead of duplicating startup logic
 - favor explicit safety checks, reconciliation, and observability over implicit automation

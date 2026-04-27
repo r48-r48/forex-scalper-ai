@@ -63,6 +63,7 @@ python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only
 Config overlays live in `configs/`:
 
 - `base.yaml`
+- `baselines.yaml`
 - `research.yaml`
 - `paper.yaml`
 - `live.yaml`

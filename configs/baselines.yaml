@@ -1,0 +1,44 @@
+baseline_suite:
+  max_abs_position: 1.0
+  max_spread_bps: 2.0
+  strategies:
+    spread_mean_reversion:
+      return_column: mid_return
+      entry_return_threshold: 0.00025
+      exit_return_threshold: 0.00005
+    ofi_imbalance:
+      signal_columns:
+        - ofi
+        - mlofi_total
+      entry_threshold: 1.0
+      exit_threshold: 0.25
+    volatility_breakout:
+      return_column: mid_return
+      volatility_column: realized_volatility
+      absolute_return_threshold: 0.00025
+      entry_volatility_multiplier: 1.5
+      exit_volatility_multiplier: 0.5
+
+walk_forward:
+  train_size: 5000
+  validation_size: 1000
+  test_size: 1000
+  embargo_size: 50
+  step_size: 1000
+
+sensitivity_scenarios:
+  - name: low_cost_full_risk
+    spread_bps: 0.5
+    slippage_bps: 0.2
+    commission_bps: 0.0
+    max_abs_position: 1.0
+  - name: high_cost_full_risk
+    spread_bps: 2.0
+    slippage_bps: 1.0
+    commission_bps: 0.2
+    max_abs_position: 1.0
+  - name: low_cost_half_risk
+    spread_bps: 0.5
+    slippage_bps: 0.2
+    commission_bps: 0.0
+    max_abs_position: 0.5
