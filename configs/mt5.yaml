@@ -1,0 +1,22 @@
+environment: mt5
+
+runtime:
+  mode: live
+  paper_trading_default: false
+
+logging:
+  level: INFO
+  json: true
+
+broker:
+  live_enabled: true
+  live_adapter: mt5
+  mt5:
+    account_mode: netting
+
+monitoring:
+  service_name: scalper_ai_mt5_runtime
+
+deployment:
+  fallback_to_paper_on_live_failure: true
+  require_live_confirmation: true

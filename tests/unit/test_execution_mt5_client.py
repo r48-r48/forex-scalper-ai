@@ -1,0 +1,213 @@
+"""Tests for the real MT5 terminal client wrapper."""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+from datetime import datetime, timezone
+from pathlib import Path
+
+from scalper_ai.domain import OrderSide, OrderType
+from scalper_ai.execution import ExecutionOrderStatus
+from scalper_ai.execution.mt5_client import Mt5TerminalClient, Mt5TerminalClientConfig, discover_mt5_terminal_path
+from scalper_ai.execution.mt5_live import Mt5OrderRequest
+
+
+def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(
+            login=123456,
+            password="secret",
+            server="MetaQuotes-Demo",
+            order_comment_prefix="scalper_ai",
+        ),
+        module=module,
+    )
+    submitted_at = datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc)
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-1",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=submitted_at,
+            volume_lots=1.0,
+        )
+    )
+
+    assert module.initialize_kwargs["login"] == 123456
+    assert module.initialize_kwargs["password"] == "secret"
+    assert module.initialize_kwargs["server"] == "MetaQuotes-Demo"
+    assert module.last_order_send_payload["action"] == module.TRADE_ACTION_DEAL
+    assert module.last_order_send_payload["symbol"] == "EURUSD.a"
+    assert module.last_order_send_payload["price"] == 1.1002
+    assert state.broker_order_id == "9001"
+    assert state.status is ExecutionOrderStatus.FILLED
+    assert state.filled_volume_lots == 1.0
+    assert state.average_fill_price == 1.1002
+
+
+def test_mt5_terminal_client_describes_account_positions_and_closes_cleanly() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    account = client.describe_account()
+    positions = client.list_positions()
+
+    assert account.login == 123456
+    assert account.balance == 250000.0
+    assert len(positions) == 1
+    assert positions[0].broker_symbol == "USDJPY"
+    assert positions[0].net_volume_lots == -0.5
+    assert client.is_connected() is True
+    assert client.ping_latency_ms() is not None
+
+    client.close()
+    assert module.shutdown_called is True
+
+
+def test_discover_mt5_terminal_path_finds_macos_bundle_executable(tmp_path: Path) -> None:
+    applications_root = tmp_path / "Applications"
+    executable = applications_root / "MetaTrader 5.app" / "Wrapper" / "MetaTrader5Terminal.app" / "MetaTrader5Terminal"
+    executable.parent.mkdir(parents=True)
+    executable.write_text("binary", encoding="utf-8")
+
+    resolved = discover_mt5_terminal_path(search_roots=(applications_root,))
+
+    assert resolved == executable.resolve()
+
+
+class _FakeMetaTrader5Module:
+    TRADE_ACTION_DEAL = 1
+    TRADE_ACTION_PENDING = 5
+    TRADE_ACTION_REMOVE = 8
+    TRADE_RETCODE_DONE = 10009
+    TRADE_RETCODE_PLACED = 10008
+    TRADE_RETCODE_DONE_PARTIAL = 10010
+    ORDER_TYPE_BUY = 0
+    ORDER_TYPE_SELL = 1
+    ORDER_TYPE_BUY_LIMIT = 2
+    ORDER_TYPE_SELL_LIMIT = 3
+    ORDER_TYPE_BUY_STOP = 4
+    ORDER_TYPE_SELL_STOP = 5
+    ORDER_TYPE_BUY_STOP_LIMIT = 6
+    ORDER_TYPE_SELL_STOP_LIMIT = 7
+    ORDER_TIME_GTC = 0
+    ORDER_TIME_DAY = 1
+    ORDER_FILLING_FOK = 0
+    ORDER_FILLING_IOC = 1
+    ORDER_FILLING_RETURN = 2
+    ORDER_STATE_PARTIAL = 2
+    ORDER_STATE_FILLED = 4
+    ORDER_STATE_CANCELED = 5
+    ORDER_STATE_REJECTED = 7
+    POSITION_TYPE_BUY = 0
+    POSITION_TYPE_SELL = 1
+
+    def __init__(self) -> None:
+        self.initialize_kwargs: dict[str, object] = {}
+        self.last_order_send_payload: dict[str, object] = {}
+        self.shutdown_called = False
+        self._history_orders: dict[int, SimpleNamespace] = {}
+        self._deals: dict[int, list[SimpleNamespace]] = {}
+        self._positions: dict[str, SimpleNamespace] = {
+            "USDJPY": SimpleNamespace(
+                symbol="USDJPY",
+                type=self.POSITION_TYPE_SELL,
+                volume=0.5,
+                price_open=150.25,
+                time=1_774_670_400,
+            )
+        }
+
+    def initialize(self, **kwargs: object) -> bool:
+        self.initialize_kwargs = dict(kwargs)
+        return True
+
+    def shutdown(self) -> None:
+        self.shutdown_called = True
+
+    def last_error(self) -> tuple[int, str]:
+        return (0, "ok")
+
+    def terminal_info(self) -> SimpleNamespace:
+        return SimpleNamespace(name="MT5")
+
+    def account_info(self) -> SimpleNamespace:
+        return SimpleNamespace(
+            login=123456,
+            server="MetaQuotes-Demo",
+            balance=250000.0,
+            equity=250100.0,
+            leverage=100,
+            company="MetaQuotes",
+            currency="USD",
+        )
+
+    def symbol_select(self, symbol: str, enable: bool) -> bool:
+        return True
+
+    def symbol_info_tick(self, symbol: str) -> SimpleNamespace:
+        return SimpleNamespace(bid=1.1000, ask=1.1002)
+
+    def order_send(self, request: dict[str, object]) -> SimpleNamespace:
+        self.last_order_send_payload = dict(request)
+        order_id = 9001
+        self._history_orders[order_id] = SimpleNamespace(
+            ticket=order_id,
+            symbol=request["symbol"],
+            state=self.ORDER_STATE_FILLED,
+            volume_initial=request["volume"],
+            volume_current=0.0,
+            time_setup=1_774_670_400,
+            time_done=1_774_670_400,
+            comment="done",
+        )
+        self._deals[order_id] = [
+            SimpleNamespace(
+                order=order_id,
+                volume=request["volume"],
+                price=request["price"],
+            )
+        ]
+        self._positions[str(request["symbol"])] = SimpleNamespace(
+            symbol=request["symbol"],
+            type=self.POSITION_TYPE_BUY,
+            volume=request["volume"],
+            price_open=request["price"],
+            time=1_774_670_400,
+        )
+        return SimpleNamespace(
+            retcode=self.TRADE_RETCODE_DONE,
+            order=order_id,
+            price=request["price"],
+            comment="done",
+            time=1_774_670_400,
+        )
+
+    def orders_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
+        return ()
+
+    def positions_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
+        symbol = kwargs.get("symbol")
+        if symbol is None:
+            return tuple(self._positions.values())
+        position = self._positions.get(str(symbol))
+        return () if position is None else (position,)
+
+    def history_orders_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
+        ticket = kwargs.get("ticket")
+        if ticket is None:
+            return tuple(self._history_orders.values())
+        order = self._history_orders.get(int(ticket))
+        return () if order is None else (order,)
+
+    def history_deals_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
+        ticket = kwargs.get("ticket")
+        if ticket is None:
+            return tuple(deal for deals in self._deals.values() for deal in deals)
+        return tuple(self._deals.get(int(ticket), ()))

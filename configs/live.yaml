@@ -1,0 +1,26 @@
+environment: live
+
+runtime:
+  mode: live
+  paper_trading_default: false
+
+logging:
+  level: INFO
+  json: true
+
+risk:
+  max_daily_drawdown: 0.01
+  max_spread_pips: 0.8
+  stale_quote_seconds: 0.5
+  max_order_frequency_per_minute: 10
+
+broker:
+  live_enabled: true
+  live_adapter: external
+
+monitoring:
+  service_name: scalper_ai_live_runtime
+
+deployment:
+  fallback_to_paper_on_live_failure: true
+  require_live_confirmation: true

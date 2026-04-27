@@ -1,0 +1,74 @@
+project_name: forex-scalper-ai
+environment: base
+
+runtime:
+  mode: research
+  timezone: UTC
+  seed: 42
+  paper_trading_default: true
+
+logging:
+  level: INFO
+  json: false
+  logger_name: scalper_ai
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  stream_prefix: scalper_ai
+
+directories:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  artifacts_dir: data/artifacts
+
+risk:
+  kill_switch_enabled: true
+  max_position_size: 100000.0
+  max_daily_drawdown: 0.02
+  max_spread_pips: 1.5
+  stale_quote_seconds: 2.0
+  max_order_frequency_per_minute: 30
+  cooldown_after_loss_burst_seconds: 300
+  loss_burst_threshold: 3
+  volatility_filter_enabled: true
+  news_filter_enabled: true
+
+ingestion:
+  batch_size: 5000
+  flush_interval_seconds: 1.0
+  parquet_compression: zstd
+  replay_speed_multiplier: 0.0
+  mt5_poll_interval_seconds: 0.5
+
+broker:
+  live_enabled: false
+  live_adapter: unconfigured
+  allow_live_without_kill_switch: false
+  mt5:
+    terminal_path: null
+    login: null
+    password: null
+    server: null
+    timeout_milliseconds: 10000
+    magic_number: 4242001
+    deviation_points: 20
+    base_units_per_lot: 100000.0
+    min_volume_lots: 0.01
+    volume_step_lots: 0.01
+    history_lookback_hours: 24
+    account_mode: netting
+    order_comment_prefix: scalper_ai
+    symbol_map: {}
+
+monitoring:
+  health_enabled: true
+  metrics_enabled: true
+  service_name: scalper_ai_runtime
+
+deployment:
+  create_directories_on_startup: true
+  fallback_to_paper_on_live_failure: true
+  require_live_confirmation: true
+  live_confirmation_phrase: ENABLE_LIVE_TRADING

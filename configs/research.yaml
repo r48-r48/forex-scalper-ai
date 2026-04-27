@@ -1,0 +1,13 @@
+environment: research
+
+runtime:
+  mode: research
+  paper_trading_default: true
+
+logging:
+  level: DEBUG
+  json: false
+
+risk:
+  max_daily_drawdown: 0.03
+  max_order_frequency_per_minute: 20

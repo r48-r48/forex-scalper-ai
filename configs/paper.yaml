@@ -1,0 +1,12 @@
+environment: paper
+
+runtime:
+  mode: paper
+  paper_trading_default: true
+
+logging:
+  level: INFO
+  json: false
+
+monitoring:
+  service_name: scalper_ai_paper_runtime
