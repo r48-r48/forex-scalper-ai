@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `python3 -m pytest` passed with `136 passed` on 2026-04-27 in both the local Python 3.9.6 compatibility environment and the Python 3.12.13 target-validation `.venv`.
+- Current repository state: PHASE 1-12 complete, `python3 -m pytest` / `make test` passed with `141 passed` on 2026-04-27 in both the local Python 3.9.6 compatibility environment and the Python 3.12.13 target-validation `.venv`.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -42,6 +42,7 @@ Already implemented:
 - MT5 terminal client, live adapter skeleton, preflight checks, and smoke script
 - unified event journal envelope, JSONL audit writer, and flat Parquet-friendly export records
 - standalone OMS lifecycle helpers and deterministic pre-trade RiskEngine contracts
+- execution-aware simulator V2 with latency, partial-fill, queue, stale/closed-market, reject, cancel, and cancel/replace race scenarios
 
 Known gaps:
 - no real MT5 terminal/package/credentials validation yet
@@ -55,7 +56,8 @@ Known gaps:
 - P0.3 Unified Event Journal Contract: completed on 2026-04-27.
 - P0.4 OMS/RiskEngine State Machine: completed on 2026-04-27.
 - P0.5 Python 3.11+ Target Validation: completed on 2026-04-27 with Python 3.12.13.
-- Current next task: real MT5 terminal validation when package/terminal/credentials are available; otherwise continue with P1.1 Execution-Aware Simulator V2.
+- P1.1 Execution-Aware Simulator V2: completed on 2026-04-27.
+- Current next task: real MT5 terminal validation when package/terminal/credentials are available; otherwise continue with P1.2 Baseline Strategy Suite.
 
 ## P0 Workstream
 
@@ -232,10 +234,13 @@ Completed validation notes:
 - `make PYTHON=.venv/bin/python test` passed with `136 passed`.
 - `make PYTHON=.venv/bin/python mt5-preflight` passed with structured missing-dependency diagnostics for the absent `MetaTrader5` package, terminal credentials, and live confirmation.
 - Fixed a target-env config loader bug so `SCALPER_AI_*` env overrides behave the same with and without `pydantic-settings` installed.
+- After P1.1, the same Python 3.12.13 `.venv` full suite passes with `141 passed`.
 
 ## P1 Workstream
 
 ### P1.1 — Execution-Aware Simulator V2
+
+Status: completed on 2026-04-27.
 
 Goal: extend backtesting beyond immediate market fills.
 
@@ -250,6 +255,13 @@ Tasks:
 Definition of done:
 - Forced scenarios have tests.
 - Backtest reports include execution-quality metrics, not only pnl/drawdown.
+
+Completed implementation notes:
+- Added `scalper_ai.backtesting.execution_simulator` with `run_execution_aware_backtest`.
+- V2 supports latency steps, partial-fill ratios, available-liquidity caps, queue-ahead proxy, forced rejects/cancels, stale-market-data rejections, closed-market rejections, and cancel/replace race fills.
+- Added execution-quality metrics for fill ratio, cancel ratio, reject ratio, slippage cost, average slippage bps, and average latency steps.
+- Added `docs/execution-simulator-v2.md`.
+- Added forced-scenario tests in `tests/unit/test_backtesting_execution_simulator.py`.
 
 ### P1.2 — Baseline Strategy Suite
 
@@ -361,7 +373,7 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available. If those remain unavailable, continue with `P1.1 — Execution-Aware Simulator V2`.
+Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available. If those remain unavailable, continue with `P1.2 — Baseline Strategy Suite`.
 
 Recommended first implementation slice:
 1. Install the `MetaTrader5` Python package in the target runtime.
@@ -369,6 +381,12 @@ Recommended first implementation slice:
 3. Configure `SCALPER_AI_BROKER_MT5_*` credentials or intentionally use a saved terminal session.
 4. Set explicit live confirmation before any true live startup.
 5. Run MT5 preflight and smoke checks against the real terminal.
+
+Fallback implementation slice:
+1. Add a strategy interface or adapter if the existing backtest protocol is not enough.
+2. Implement spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines.
+3. Add configs and walk-forward reports.
+4. Add sensitivity analysis for fees, slippage, and risk limits.
 
 Then run:
 

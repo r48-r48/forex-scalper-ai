@@ -34,6 +34,7 @@ forex-scalper-ai/
     architecture-decisions.md
     current-state.md
     dev-setup.md
+    execution-simulator-v2.md
     event-schema.md
     interfaces.md
     oms-risk.md
@@ -54,6 +55,7 @@ forex-scalper-ai/
         accounting.py
         config.py
         engine.py
+        execution_simulator.py
       config/
         __init__.py
         loader.py
@@ -154,6 +156,7 @@ forex-scalper-ai/
       test_walk_forward_splits.py
     unit/
       test_backtesting_accounting.py
+      test_backtesting_execution_simulator.py
       test_config_loader.py
       test_data_bar_builders.py
       test_data_buffering.py

@@ -101,14 +101,15 @@
   - unified event journal contracts were added with JSONL audit writing and flat Parquet-friendly export records
   - standalone OMS lifecycle helpers and deterministic pre-trade RiskEngine contracts were added
   - Python 3.12.13 target-runtime validation was completed in a local `.venv` with full dev and ML extras installed
-  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `136 passed`
-  - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `136 passed`
+  - execution-aware simulator V2 was added for latency, partial fills, queue-position proxy, stale/closed-market behavior, rejects, cancels, cancel/replace races, and execution-quality metrics
+  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `141 passed`
+  - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `141 passed`
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
 - The repository now has research, validation, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, and OMS/RiskEngine layers.
-- The next work should focus on real MT5 terminal validation, live adapter refinement, and operational stabilization.
+- The next work should focus on real MT5 terminal validation, baseline strategy validation, live adapter refinement, and operational stabilization.
 
 ## Important Constraints
 
@@ -128,12 +129,14 @@
 - `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` passed on 2026-04-27.
 - `python3 -m pytest` passed on 2026-04-27 with `136 passed` after P0.4 OMS/RiskEngine hardening.
 - `make PYTHON=.venv/bin/python compile` passed on 2026-04-27 in Python 3.12.13.
-- `make PYTHON=.venv/bin/python test` passed on 2026-04-27 with `136 passed` in Python 3.12.13.
+- `make PYTHON=.venv/bin/python test` passed on 2026-04-27 with `141 passed` in Python 3.12.13.
+- `make PYTHON=.venv/bin/python lint` ran on 2026-04-27 and found a historical full-repo Ruff backlog; targeted Ruff for the new P1.1 simulator and tests passed.
 - `make PYTHON=.venv/bin/python mt5-preflight` passed on 2026-04-27 with structured missing-dependency diagnostics.
 - `make compile` passed on 2026-04-27.
-- `make test` passed on 2026-04-27 with `136 passed`.
+- `make test` passed on 2026-04-27 with `141 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
+- `python3 -m pytest tests/unit/test_backtesting_execution_simulator.py` passed on 2026-04-27 with `5 passed`.
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py` passed on 2026-04-27 with `12 passed`.
 - `make run-paper` passed on 2026-04-27.
 - `make health-paper` passed on 2026-04-27 with overall `pass`.
@@ -166,4 +169,4 @@ Move to post-phase hardening:
 - install the `MetaTrader5` Python package plus real `SCALPER_AI_BROKER_MT5_*` credentials, then run `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` followed by `python3 scripts/mt5_smoke.py --config-name mt5`
 - validate the new MT5 terminal client against an actual installed terminal, especially broker-side polling, history/deal normalization, and partial-fill behavior
 - add deeper operational hardening such as long-running service supervision, alerting, and dependency checks beyond the current connectivity layer
-- if real MT5 validation remains unavailable, continue with P1.1 Execution-Aware Simulator V2 from `docs/post-phase-roadmap.md`
+- if real MT5 validation remains unavailable, continue with P1.2 Baseline Strategy Suite from `docs/post-phase-roadmap.md`

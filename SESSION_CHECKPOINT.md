@@ -58,6 +58,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `make PYTHON=.venv/bin/python compile` passed
   - `make PYTHON=.venv/bin/python test` passed with `136 passed`
   - `make PYTHON=.venv/bin/python mt5-preflight` passed with structured missing-dependency diagnostics
+- 2026-04-27 completed P1.1 Execution-Aware Simulator V2:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/execution_simulator.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_backtesting_execution_simulator.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/execution-simulator-v2.md`
+  - V2 covers latency, partial fills, queue-position proxy, stale/closed-market rejections, forced rejects/cancels, cancel/replace races, and execution-quality metrics
+  - `make test` and `make PYTHON=.venv/bin/python test` both passed with `141 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -68,7 +74,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - The test now uses the current UTC timestamp instead of a stale fixed `2026-03-28` timestamp, so broker connectivity health is not downgraded to `WARN` only because time has passed.
 - Full repository-wide `python3 -m pytest` passed again in the available host environment with `109 passed` before P0.2.
 - PHASE 12 deployment/runtime layer is implemented.
-- Full repository-wide `python3 -m pytest` now passes in the available host environment with `136 passed`.
+- Full repository-wide `python3 -m pytest` now passes in the available host environment with `141 passed`.
 - Added pure execution reconciliation helpers in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
 - Wired reconciliation into deployment/runtime health and metrics in:
@@ -119,21 +125,23 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-27: `python3 -m pytest tests/unit/test_deployment_runtime.py::test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provider` -> `1 passed`
 - 2026-04-27: `python3 -m pytest` -> `136 passed` after P0.4 OMS/RiskEngine hardening
 - 2026-04-27: `make PYTHON=.venv/bin/python compile` -> passed in Python 3.12.13
-- 2026-04-27: `make PYTHON=.venv/bin/python test` -> `136 passed` in Python 3.12.13
+- 2026-04-27: `make PYTHON=.venv/bin/python test` -> `141 passed` in Python 3.12.13
+- 2026-04-27: `make PYTHON=.venv/bin/python lint` -> failed with historical full-repo Ruff backlog; targeted Ruff on the new P1.1 files passed
 - 2026-04-27: `make PYTHON=.venv/bin/python mt5-preflight` -> structured missing-dependency diagnostics
 - 2026-04-27: `python3 scripts/run_runtime.py describe --config-name paper` -> passed
 - 2026-04-27: `python3 scripts/run_runtime.py health --config-name paper` -> overall `pass`
-- 2026-04-27: `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` -> structured preflight diagnostics; not ready for connection because `MetaTrader5` package, terminal discovery, credentials, and live confirmation are missing in this environment
+- 2026-04-27: `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` -> structured preflight diagnostics; auto-discovery found the local MT5 terminal bundle path, but the `MetaTrader5` package, credentials, and live confirmation are still missing in this environment
 - 2026-04-27: `make compile` -> passed
-- 2026-04-27: `make test` -> `136 passed`
+- 2026-04-27: `make test` -> `141 passed`
 - 2026-04-27: `make run-paper` -> passed
 - 2026-04-27: `make health-paper` -> overall `pass`
 - 2026-04-27: `make mt5-preflight` -> structured missing-dependency diagnostics
-- 2026-04-27: `make lint` -> not run to completion because `ruff` is not installed in the local Python 3.9.6 environment; `make lint` remains available for dev/CI environments with dev dependencies installed
+- 2026-04-27: `make lint` in the local Python 3.9.6 environment still lacks ruff; `make PYTHON=.venv/bin/python lint` runs ruff and currently exposes a historical full-repo backlog
 - 2026-04-27: `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py` -> `12 passed`
 - 2026-04-27: `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` -> `6 passed`
 - 2026-04-27: `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` -> `17 passed`
-- `python3 -m pytest` -> `136 passed`
+- 2026-04-27: `python3 -m pytest tests/unit/test_backtesting_execution_simulator.py` -> `5 passed`
+- `python3 -m pytest` -> `141 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -159,7 +167,7 @@ Start with real MT5 terminal validation when package, terminal, credentials, and
 - run MT5 preflight and smoke checks against the real terminal
 
 If real MT5 validation remains unavailable:
-- continue with P1.1 Execution-Aware Simulator V2
+- continue with P1.2 Baseline Strategy Suite
 
 ## If Context Gets Compressed
 

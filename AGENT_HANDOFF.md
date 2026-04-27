@@ -293,6 +293,7 @@ Already available building blocks:
 - pure broker reconciliation helpers for orders and positions
 - unified audit journal events, JSONL writer, and flat export records
 - standalone OMS lifecycle helpers and deterministic pre-trade risk engine contracts
+- execution-aware simulator V2 for latency, partial fills, queue proxy, rejects, cancels, stale/closed-market behavior, and execution-quality metrics
 - canonical post-phase backlog in `docs/post-phase-roadmap.md`
 
 Current repository status:
@@ -307,12 +308,15 @@ Current repository status:
 - P0.3 Unified Event Journal Contract completed on 2026-04-27 with audit event envelope, JSONL writer, flat export, schema docs, and round-trip tests
 - P0.4 OMS/RiskEngine State Machine completed on 2026-04-27 with lifecycle transitions, emergency flatten intent, deterministic risk blocks, and journalable risk decisions
 - P0.5 Python 3.11+ Target Validation completed on 2026-04-27 using a local Python 3.12.13 `.venv`
+- P1.1 Execution-Aware Simulator V2 completed on 2026-04-27 with latency, partial-fill, queue, stale/closed-market, reject, cancel, cancel/replace race scenarios, and execution-quality metrics
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
 - `python3 -m pytest` passed on 2026-04-27 with `119 passed` after unified journal hardening
 - `python3 -m pytest` passed on 2026-04-27 with `136 passed` after OMS/RiskEngine hardening
 - `make PYTHON=.venv/bin/python test` passed on 2026-04-27 with `136 passed` in Python 3.12.13
+- `make test` passed on 2026-04-27 with `141 passed` after execution-aware simulator V2
+- `make PYTHON=.venv/bin/python test` passed on 2026-04-27 with `141 passed` after execution-aware simulator V2
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -338,17 +342,18 @@ Current repository status:
 
 ## Last Session Snapshot
 
-- Session closed on: 2026-03-28
+- Session updated on: 2026-04-27
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
-  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and pytest passes with `136 passed`
+  - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
+  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `141 passed`
   - P0.4 OMS/RiskEngine State Machine is complete: `scalper_ai.services.oms` now provides lifecycle transition validation and emergency flatten intents, while `scalper_ai.risk.engine` provides deterministic pre-trade risk checks and journalable risk decisions
   - P0.3 Unified Event Journal Contract is complete: `scalper_ai.journal` now provides `JournalEvent`, `JournalEventType`, JSONL writer/reader, flat record export, and `docs/event-schema.md`
   - P0.2 MT5 Safe Submit Chain is complete: `Mt5TerminalClient.submit_order()` now runs `order_check` before `order_send`, failed or unavailable checks return structured rejections, and fake-module tests cover check/send paths
   - stale project-memory paths were updated to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
   - Pydantic warning cleanup was completed for logging config field naming and domain model JSON config
   - repository-wide `pytest` passed in the available Python 3.9.6 environment with `109 passed` and no Pydantic warnings before P0.2
-  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `136 passed`
+  - repository-wide `pytest` now passes in the available Python 3.9.6 environment with `141 passed`
   - pure execution reconciliation helpers were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
   - reconciliation is now wired into `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/runtime.py` health and metrics surfaces
   - broker snapshot contract and internal execution state tracker were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/snapshots.py`
@@ -368,7 +373,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
   - start real MT5 terminal validation when the `MetaTrader5` package, terminal, credentials, and explicit live confirmation are available
-  - if MT5 validation remains unavailable, continue with `P1.1 — Execution-Aware Simulator V2` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
+  - if MT5 validation remains unavailable, continue with `P1.2 — Baseline Strategy Suite` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/post-phase-roadmap.md`
 
 ## Constraints To Preserve
 

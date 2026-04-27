@@ -17,6 +17,14 @@ from scalper_ai.backtesting.engine import (
     TargetPositionStrategy,
     run_backtest,
 )
+from scalper_ai.backtesting.execution_simulator import (
+    ExecutionBacktestResult,
+    ExecutionQualityMetrics,
+    ExecutionSimulatorConfig,
+    SimulatedExecutionOrder,
+    SimulatedOrderStatus,
+    run_execution_aware_backtest,
+)
 
 __all__ = [
     "BacktestConfig",
@@ -24,6 +32,11 @@ __all__ = [
     "BacktestMetrics",
     "BacktestResult",
     "BacktestState",
+    "ExecutionBacktestResult",
+    "ExecutionQualityMetrics",
+    "ExecutionSimulatorConfig",
+    "SimulatedExecutionOrder",
+    "SimulatedOrderStatus",
     "TargetPositionStrategy",
     "apply_fill_to_cash",
     "apply_fill_to_position",
@@ -31,5 +44,6 @@ __all__ = [
     "calculate_equity",
     "mark_position",
     "run_backtest",
+    "run_execution_aware_backtest",
     "simulate_market_fill",
 ]

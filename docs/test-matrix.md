@@ -13,7 +13,7 @@ python3 -m pytest
 Result:
 
 ```text
-136 passed
+141 passed
 ```
 
 The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created with bundled Python 3.12.13 for target-runtime validation.
@@ -28,7 +28,7 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 | Feature engineering | `tests/unit/test_features_*.py`, `tests/integration/test_feature_offline_online_parity.py` | spread/returns/volatility, OFI/MLOFI, VPIN proxy, online/offline parity | none | passed locally |
 | Models | `tests/unit/test_models_*.py`, `tests/integration/test_model_dataset_bridge.py` | tensorizer, causal mask, Transformer predictor bridge | Torch | passed locally |
 | RL | `tests/unit/test_rl_*.py`, `tests/integration/test_rl_episode_rollout.py` | deterministic trading environment, policy helpers, rollout/training smoke | Torch | passed locally |
-| Backtesting | `tests/unit/test_backtesting_accounting.py`, `tests/integration/test_backtesting_replay.py` | costs-aware market fills, netting accounting, replay engine V1 | pandas | passed locally |
+| Backtesting | `tests/unit/test_backtesting_accounting.py`, `tests/unit/test_backtesting_execution_simulator.py`, `tests/integration/test_backtesting_replay.py` | costs-aware market fills, netting accounting, replay engine V1, execution-aware V2 scenarios | pandas | passed locally |
 | Validation | `tests/unit/test_validation_metrics.py`, `tests/integration/test_validation_walk_forward.py` | fold metrics, walk-forward orchestration, backtest-frame conversion | pandas | passed locally |
 | Execution | `tests/unit/test_execution_*.py`, `tests/integration/test_execution_workflow.py` | paper adapter, router, live stub, MT5 adapter/client fakes, reconciliation | no real broker; fake MT5 modules | passed locally |
 | Journal | `tests/unit/test_journal_events.py`, `tests/integration/test_journal_jsonl.py` | audit event envelope, event categories, JSONL write/read, flat record export | local filesystem | passed locally |
@@ -41,14 +41,14 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 |---|---|---|
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
-| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `136 passed` |
+| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `141 passed` |
 | Real MT5 terminal smoke | pending | Requires package, terminal, account/session credentials, and explicit live confirmation |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
 
 ## Test Risk Notes
 
 - MT5 tests currently use fake modules and do not prove broker behavior against a real terminal.
-- Backtesting V1 models immediate market fills with explicit costs, but latency, queue position, partial fills, and cancel/replace races are future P1 work.
+- Backtesting V1 models immediate market fills with explicit costs; execution-aware V2 now covers latency, queue position, partial fills, stale/closed markets, and cancel/replace races with forced-scenario tests.
 - Current test suite includes the unified event journal and OMS/RiskEngine contracts, but the baseline strategy suite remains a future POST-PHASE roadmap item.
-- Linting is exposed through `make lint`, but ruff is not installed in the current local Python 3.9.6 environment.
+- Linting is exposed through `make lint`. The local Python 3.9.6 environment does not include ruff; the Python 3.12.13 `.venv` can run ruff, but full-repo lint still has a historical backlog while the new P1.1 files pass targeted ruff checks.
 - Full type checking is exposed through `make typecheck`, but mypy is not yet part of the GitHub Actions gate until a dedicated mypy baseline pass is reviewed.
