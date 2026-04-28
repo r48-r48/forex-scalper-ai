@@ -156,6 +156,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated OMS tests to use `datetime.UTC`
   - targeted Ruff is now green for `src/scalper_ai/services` and `tests/unit/test_services_oms.py`
   - full Ruff baseline dropped from `416` to `409` issues
+- 2026-04-28 completed validation Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/validation/metrics.py`
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/validation/walk_forward.py`
+  - updated validation tests to use `datetime.UTC`
+  - targeted Ruff is now green for `src/scalper_ai/validation` and selected validation tests
+  - full Ruff baseline dropped from `409` to `402` issues
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -290,6 +296,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `409` historical issues after OMS cleanup
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after OMS cleanup
 - 2026-04-28: `.venv/bin/pytest` -> `165 passed` after OMS cleanup
+- 2026-04-28: `.venv/bin/ruff check src/scalper_ai/validation tests/unit/test_validation_metrics.py tests/unit/test_validation_gate.py tests/unit/test_validation_shadow.py` -> passed after validation cleanup
+- 2026-04-28: `.venv/bin/pytest tests/unit/test_validation_metrics.py tests/unit/test_validation_gate.py tests/unit/test_validation_shadow.py tests/integration/test_validation_walk_forward.py tests/integration/test_baseline_walk_forward_suite.py tests/integration/test_supervised_filter_walk_forward.py` -> `11 passed` after validation cleanup
+- 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `402` historical issues after validation cleanup
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after validation cleanup
+- 2026-04-28: `.venv/bin/pytest` -> `165 passed` after validation cleanup
 - `.venv/bin/pytest` -> `165 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`

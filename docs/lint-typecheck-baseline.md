@@ -17,21 +17,21 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result after the scripts, config-layer, logging-utils, journal, and OMS cleanup batches:
+Current result after the scripts, config-layer, logging-utils, journal, OMS, and validation cleanup batches:
 
 ```text
-Found 409 errors.
-252 fixable with --fix.
+Found 402 errors.
+249 fixable with --fix.
 ```
 
 Statistics:
 
 ```text
-134 E501  line-too-long
+130 E501  line-too-long
  99 UP045 non-pep604-annotation-optional
- 95 UP017 datetime-timezone-utc
- 23 I001  unsorted-imports
- 18 UP035 deprecated-import
+ 94 UP017 datetime-timezone-utc
+ 22 I001  unsorted-imports
+ 17 UP035 deprecated-import
  14 UP042 replace-str-enum
   9 UP037 quoted-annotation
   6 B009  get-attr-with-constant
@@ -48,6 +48,7 @@ Completed cleanup batches:
 - 2026-04-28: logging-utils cleanup converted the remaining optional annotation in `src/scalper_ai/utils/logging.py`. Targeted Ruff is green for `src/scalper_ai/utils` and `tests/unit/test_logging.py`.
 - 2026-04-28: journal cleanup converted `JournalEventType` to `StrEnum`, modernized optional annotations, removed quoted annotations, and switched tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/journal` and journal tests.
 - 2026-04-28: OMS cleanup converted `OmsOrderStatus` to `StrEnum`, modernized optional annotations, removed quoted annotations, and switched tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/services` and OMS tests.
+- 2026-04-28: validation cleanup sorted imports, moved `Sequence` to `collections.abc`, wrapped long walk-forward expressions, and switched validation tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/validation` and selected validation tests.
 
 Recommended cleanup order:
 

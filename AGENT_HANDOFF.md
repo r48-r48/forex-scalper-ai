@@ -330,6 +330,7 @@ Current repository status:
 - Logging-utils Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `434` to `433` issues
 - Journal Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `433` to `416` issues
 - OMS Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `416` to `409` issues
+- Validation Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `409` to `402` issues
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -386,6 +387,10 @@ Current repository status:
 - `.venv/bin/pytest tests/unit/test_services_oms.py` passed on 2026-04-28 with `5 passed` after OMS cleanup
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after OMS cleanup
 - `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after OMS cleanup
+- Validation Ruff cleanup passed on 2026-04-28: targeted Ruff is green for `src/scalper_ai/validation` and selected validation tests; full Ruff baseline dropped from `409` to `402` issues
+- `.venv/bin/pytest tests/unit/test_validation_metrics.py tests/unit/test_validation_gate.py tests/unit/test_validation_shadow.py tests/integration/test_validation_walk_forward.py tests/integration/test_baseline_walk_forward_suite.py tests/integration/test_supervised_filter_walk_forward.py` passed on 2026-04-28 with `11 passed` after validation cleanup
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after validation cleanup
+- `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after validation cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -422,7 +427,7 @@ Current repository status:
   - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, safe broker probe, empty history polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
-  - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `409` Ruff issues after scripts/config/logging/journal/OMS cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
+  - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `402` Ruff issues after scripts/config/logging/journal/OMS/validation cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
   - Local JSONL alert transport and HTTP webhook alert transport are implemented; concrete endpoint routing remains pending after Docker/runtime topology validation
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics

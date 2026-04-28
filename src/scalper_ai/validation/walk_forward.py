@@ -7,7 +7,12 @@ from typing import Protocol
 
 import pandas as pd
 
-from scalper_ai.backtesting import BacktestConfig, BacktestResult, TargetPositionStrategy, run_backtest
+from scalper_ai.backtesting import (
+    BacktestConfig,
+    BacktestResult,
+    TargetPositionStrategy,
+    run_backtest,
+)
 from scalper_ai.data.datasets import SupervisedDataset
 from scalper_ai.data.splits import (
     DatasetPartitions,
@@ -78,7 +83,9 @@ def supervised_partition_to_backtest_frame(
         raise ValueError("current_feature_prefix must be non-empty.")
 
     frame = partition.to_frame()
-    lagged_columns = [column for column in frame.columns if str(column).startswith(current_feature_prefix)]
+    lagged_columns = [
+        column for column in frame.columns if str(column).startswith(current_feature_prefix)
+    ]
     if not lagged_columns:
         raise ValueError(f"No feature columns were found with prefix: {current_feature_prefix}")
 
@@ -90,7 +97,9 @@ def supervised_partition_to_backtest_frame(
         if not stripped_name:
             raise ValueError("Backtest frame columns must not collapse to an empty name.")
         if stripped_name in backtest_frame.columns or stripped_name in renamed_columns.values():
-            raise ValueError(f"Backtest frame contains duplicate stripped feature name: {stripped_name}")
+            raise ValueError(
+                f"Backtest frame contains duplicate stripped feature name: {stripped_name}"
+            )
         renamed_columns[column_name] = stripped_name
 
     current_features = frame.loc[:, lagged_columns].copy()
@@ -113,7 +122,9 @@ def run_walk_forward_validation(
 
     splits = generate_walk_forward_splits(dataset, config=walk_forward_config)
     if not splits:
-        raise ValueError("No walk-forward splits were generated for the provided dataset and config.")
+        raise ValueError(
+            "No walk-forward splits were generated for the provided dataset and config."
+        )
 
     resolved_backtest_config = backtest_config or BacktestConfig()
     folds: list[WalkForwardValidationFold] = []

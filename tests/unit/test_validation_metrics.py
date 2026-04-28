@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -161,4 +161,4 @@ def _strategy_factory(*, train, validation, test, split):
 
 
 def _timestamp(minutes: int) -> datetime:
-    return datetime(2026, 3, 28, 9, 0, 0, tzinfo=timezone.utc) + timedelta(minutes=minutes)
+    return datetime(2026, 3, 28, 9, 0, 0, tzinfo=UTC) + timedelta(minutes=minutes)
