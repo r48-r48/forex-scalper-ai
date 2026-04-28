@@ -17,28 +17,28 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result after scripts, config, logging, journal, OMS, validation, and models cleanup batches:
+Current result after scripts, config, logging, journal, OMS, validation, models, and risk cleanup batches:
 
 ```text
-Found 392 errors.
-244 fixable with --fix.
+Found 374 errors.
+228 fixable with --fix.
 ```
 
 Statistics:
 
 ```text
 125 E501  line-too-long
- 95 UP045 non-pep604-annotation-optional
- 94 UP017 datetime-timezone-utc
- 22 I001  unsorted-imports
+ 93 UP017 datetime-timezone-utc
+ 87 UP045 non-pep604-annotation-optional
+ 21 I001  unsorted-imports
  16 UP035 deprecated-import
- 14 UP042 replace-str-enum
-  9 UP037 quoted-annotation
-  6 B009  get-attr-with-constant
+ 12 UP042 replace-str-enum
+  8 UP037 quoted-annotation
   6 B905  zip-without-explicit-strict
   2 F401  unused-import
   2 UP007 non-pep604-annotation-union
   1 B007  unused-loop-control-variable
+  1 B009  get-attr-with-constant
 ```
 
 Completed cleanup batches:
@@ -50,6 +50,7 @@ Completed cleanup batches:
 - 2026-04-28: OMS cleanup converted `OmsOrderStatus` to `StrEnum`, modernized optional annotations, removed quoted annotations, and switched tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/services` and OMS tests.
 - 2026-04-28: validation cleanup sorted imports, moved `Sequence` to `collections.abc`, wrapped long walk-forward expressions, and switched validation tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/validation` and selected validation tests.
 - 2026-04-28: models cleanup modernized tensorizer/transformer annotations, moved `Sequence` to `collections.abc`, and wrapped long tensorizer/transformer expressions. Targeted Ruff is green for `src/scalper_ai/models` and selected model tests.
+- 2026-04-28: risk cleanup converted risk enums to `StrEnum`, added a narrow `RiskConfigLike` protocol for typed config-derived limits, modernized optional annotations, and switched tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/risk` and risk tests.
 
 Recommended cleanup order:
 

@@ -5,21 +5,21 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
+from typing import Protocol
 
 from scalper_ai.domain import OrderIntent, OrderSide, PositionState
 from scalper_ai.journal import JournalEvent, JournalEventType
 
 
-class RiskDecisionStatus(str, Enum):
+class RiskDecisionStatus(StrEnum):
     """Risk decision outcome."""
 
     APPROVED = "approved"
     REJECTED = "rejected"
 
 
-class RiskRejectCode(str, Enum):
+class RiskRejectCode(StrEnum):
     """Stable reject reasons emitted by the risk engine."""
 
     SESSION_KILL_SWITCH = "session_kill_switch"
@@ -35,13 +35,23 @@ class RiskRejectCode(str, Enum):
     REDUCE_ONLY_INCREASES_EXPOSURE = "reduce_only_increases_exposure"
 
 
+class RiskConfigLike(Protocol):
+    """Config fields required to derive deterministic risk limits."""
+
+    max_position_size: float
+    max_daily_drawdown: float
+    max_order_frequency_per_minute: int
+    stale_quote_seconds: float
+    loss_burst_threshold: int
+
+
 @dataclass(frozen=True)
 class RiskLimits:
     """Deterministic guardrails used by the pre-trade risk engine."""
 
     max_position_size: float
-    max_daily_loss: Optional[float] = None
-    max_daily_drawdown: Optional[float] = None
+    max_daily_loss: float | None = None
+    max_daily_drawdown: float | None = None
     max_order_rate_per_minute: int = 30
     stale_market_data_seconds: float = 2.0
     reject_burst_threshold: int = 3
@@ -64,15 +74,15 @@ class RiskLimits:
             raise ValueError("reject_burst_window_seconds must be greater than zero.")
 
     @classmethod
-    def from_risk_config(cls, config: object) -> "RiskLimits":
+    def from_risk_config(cls, config: RiskConfigLike) -> RiskLimits:
         """Build limits from the application RiskConfig without coupling to config imports."""
 
         return cls(
-            max_position_size=float(getattr(config, "max_position_size")),
-            max_daily_drawdown=float(getattr(config, "max_daily_drawdown")),
-            max_order_rate_per_minute=int(getattr(config, "max_order_frequency_per_minute")),
-            stale_market_data_seconds=float(getattr(config, "stale_quote_seconds")),
-            reject_burst_threshold=int(getattr(config, "loss_burst_threshold")),
+            max_position_size=float(config.max_position_size),
+            max_daily_drawdown=float(config.max_daily_drawdown),
+            max_order_rate_per_minute=int(config.max_order_frequency_per_minute),
+            stale_market_data_seconds=float(config.stale_quote_seconds),
+            reject_burst_threshold=int(config.loss_burst_threshold),
         )
 
 
@@ -86,10 +96,10 @@ class RiskContext:
     known_intent_ids: frozenset[str] = frozenset()
     known_broker_order_ids: frozenset[str] = frozenset()
     recent_rejection_timestamps: Sequence[datetime] = ()
-    latest_market_data_at: Optional[datetime] = None
+    latest_market_data_at: datetime | None = None
     realized_pnl_today: float = 0.0
-    starting_equity: Optional[float] = None
-    current_equity: Optional[float] = None
+    starting_equity: float | None = None
+    current_equity: float | None = None
     session_kill_switch: bool = False
     symbol_kill_switches: frozenset[str] = frozenset()
 
@@ -113,9 +123,9 @@ class RiskDecision:
     checked_at: datetime
     intent_id: str
     symbol: str
-    code: Optional[RiskRejectCode] = None
-    reason: Optional[str] = None
-    projected_position: Optional[float] = None
+    code: RiskRejectCode | None = None
+    reason: str | None = None
+    projected_position: float | None = None
 
     @property
     def accepted(self) -> bool:

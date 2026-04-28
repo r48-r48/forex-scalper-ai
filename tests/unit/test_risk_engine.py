@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -10,8 +10,7 @@ from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionMode, P
 from scalper_ai.journal import JournalEventType
 from scalper_ai.risk import RiskContext, RiskDecisionStatus, RiskEngine, RiskLimits, RiskRejectCode
 
-
-BASE_TS = datetime(2026, 4, 27, 11, 30, tzinfo=timezone.utc)
+BASE_TS = datetime(2026, 4, 27, 11, 30, tzinfo=UTC)
 
 
 def test_risk_engine_approves_order_and_emits_journalable_decision() -> None:

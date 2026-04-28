@@ -332,6 +332,7 @@ Current repository status:
 - OMS Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `416` to `409` issues
 - Validation Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `409` to `402` issues
 - Models Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `402` to `392` issues
+- Risk Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `392` to `374` issues
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -396,6 +397,10 @@ Current repository status:
 - `.venv/bin/pytest tests/unit/test_models_transformer.py tests/unit/test_models_tensorizer.py tests/unit/test_models_baseline_filter.py tests/integration/test_model_dataset_bridge.py` passed on 2026-04-28 with `8 passed` after models cleanup
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after models cleanup
 - `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after models cleanup
+- Risk Ruff cleanup passed on 2026-04-28: targeted Ruff is green for `src/scalper_ai/risk` and `tests/unit/test_risk_engine.py`; full Ruff baseline dropped from `392` to `374` issues
+- `.venv/bin/pytest tests/unit/test_risk_engine.py` passed on 2026-04-28 with `12 passed` after risk cleanup
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after risk cleanup
+- `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after risk cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -432,7 +437,7 @@ Current repository status:
   - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, safe broker probe, empty history polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
-  - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `392` Ruff issues after scripts/config/logging/journal/OMS/validation/models cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
+  - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `374` Ruff issues after scripts/config/logging/journal/OMS/validation/models/risk cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
   - Local JSONL alert transport and HTTP webhook alert transport are implemented; concrete endpoint routing remains pending after Docker/runtime topology validation
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
