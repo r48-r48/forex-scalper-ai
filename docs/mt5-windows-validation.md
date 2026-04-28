@@ -46,6 +46,7 @@ Additional direct broker-side probe:
 - `mt5.orders_total()`
 - `mt5.positions_total()`
 - `scripts\mt5_broker_probe.py` through the normalized `Mt5TerminalClient`
+- `scripts\mt5_demo_order.py` with explicit operator confirmation in Parallels; it blocked before `order_send` because terminal-side trading permission was disabled
 
 No `order_send()` call was made.
 
@@ -91,6 +92,7 @@ Safe broker probe:
 - `terminal_info().tradeapi_disabled` was `false`.
 - `account_info().trade_allowed` and `account_info().trade_expert` were `true`.
 - `terminal_info().trade_allowed` was `false`, so terminal-side trading/AutoTrading is still disabled for API order submission.
+- `scripts\mt5_demo_order.py` was run with explicit operator confirmation and correctly returned `blocked_reason=terminal_trade_not_allowed`; `order_send_attempted=false`.
 - No `order_send()` call was made.
 
 ## Follow-Up

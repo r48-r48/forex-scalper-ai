@@ -113,6 +113,14 @@ python3 scripts/mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-
 
 The broker probe reads terminal/account/symbol/tick/history state and can run `order_check`, but it never calls `order_send`.
 
+After explicit operator approval, a controlled demo-order validation can be run with strict safety gates:
+
+```bash
+python3 scripts/mt5_demo_order.py --config-name mt5 --symbol EURUSD --time-in-force ioc --expected-login 610769553 --expected-server Dukascopy-demo-mt5-1 --i-understand-this-sends-a-demo-order --output-path data/artifacts/mt5_demo_order.json
+```
+
+The demo-order script refuses to call `order_send` unless the terminal is connected to a demo server, account and terminal trading permissions are enabled, there are no open orders or positions for the symbol, and broker `order_check` accepts the request.
+
 Further MT5 validation still requires:
 
 - `MetaTrader5` Python package is installed
