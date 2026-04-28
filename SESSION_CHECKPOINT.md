@@ -191,6 +191,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - Parallels Windows 11 has no `docker` command
   - `docker-compose.yml` parsed successfully with PyYAML
   - local paper runtime `describe`, `health`, and `metrics` commands passed through `.venv/bin/python`
+- 2026-04-29 completed controlled Parallels MT5 demo-order validation after explicit operator approval:
+  - fresh permissions were green: account login `610769553`, server `Dukascopy-demo-mt5-1`, account trading enabled, terminal trading enabled, `tradeapi_disabled=false`
+  - `scripts\mt5_demo_order.py --config-name mt5 --symbol EURUSD --time-in-force ioc --expected-login 610769553 --expected-server Dukascopy-demo-mt5-1 --i-understand-this-sends-a-demo-order` sent a minimum-volume `0.01` lot EURUSD IOC demo order; order `156757224` filled
+  - the original auto-flatten sent an opposite order `156757225`, but Dukascopy account `margin_mode=2` behaved as hedging and left both `+0.01` and `-0.01` EURUSD positions open
+  - added `scripts/mt5_flatten_positions.py` to close demo positions by explicit MT5 position ticket
+  - `scripts\mt5_flatten_positions.py --config-name mt5 --symbol EURUSD --expected-login 610769553 --expected-server Dukascopy-demo-mt5-1 --time-in-force ioc --i-understand-this-closes-demo-positions` closed both remaining positions via orders `156757226` and `156757227`
+  - final `scripts\mt5_smoke.py --config-name mt5 --include-orders --include-positions` returned `order_count=0`, `position_count=0`, balance/equity `99941.09 TRY`
+  - post-demo `mt5_broker_probe.py` still reported `raw_order_count=0` and `raw_deal_count=0`; broker history normalization remains unresolved for this Dukascopy session
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -346,6 +354,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --include-raw-samples` -> `order_check.accepted=true`, `retcode=0`, `comment=Done`, `order_send_called=false`
 - 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --history-lookback-hours 8760 --include-raw-samples` -> `raw_order_count=0`, `raw_deal_count=0`, `order_check.accepted=true`, `order_send_called=false`
 - 2026-04-28: local runtime hardening fallback -> `.venv/bin/python scripts/run_runtime.py describe/health/metrics --config-name paper` passed; Docker itself is unavailable locally and in Parallels
+- 2026-04-29: Parallels Windows 11 controlled MT5 demo order -> minimum EURUSD IOC order filled, initial opposite flatten created hedged positions, ticket-specific flatten closed both, final smoke had zero orders/positions
+- 2026-04-29: `.venv/bin/ruff check scripts/mt5_demo_order.py scripts/mt5_flatten_positions.py tests/unit/test_scripts_mt5_demo_order.py tests/unit/test_scripts_mt5_flatten_positions.py` -> passed
+- 2026-04-29: `.venv/bin/pytest tests/unit/test_scripts_mt5_demo_order.py tests/unit/test_scripts_mt5_flatten_positions.py` -> `5 passed`
 - `.venv/bin/pytest` -> `165 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
@@ -365,9 +376,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 ## Recommended Next Move
 
 Continue MT5 demo validation when the Windows terminal is available:
-- validate non-empty history/deal normalization after a controlled demo fill or imported broker history exists
+- investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
+- add hedging-aware MT5 execution/reconciliation support for accounts with `margin_mode=2`
 - lock in broker-specific IOC behavior for Dukascopy EURUSD
-- exercise a controlled demo-order path only after explicit operator approval and a fresh trade-permission check
 - reconcile resulting order/deal/position state through existing snapshot contracts
 
 If further MT5 validation is paused:

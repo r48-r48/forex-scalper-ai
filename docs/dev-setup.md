@@ -121,6 +121,12 @@ python3 scripts/mt5_demo_order.py --config-name mt5 --symbol EURUSD --time-in-fo
 
 The demo-order script refuses to call `order_send` unless the terminal is connected to a demo server, account and terminal trading permissions are enabled, there are no open orders or positions for the symbol, and broker `order_check` accepts the request.
 
+If a demo broker uses hedging mode and leaves positions open, close them by position ticket:
+
+```bash
+python3 scripts/mt5_flatten_positions.py --config-name mt5 --symbol EURUSD --expected-login 610769553 --expected-server Dukascopy-demo-mt5-1 --time-in-force ioc --i-understand-this-closes-demo-positions --output-path data/artifacts/mt5_flatten_positions.json
+```
+
 Further MT5 validation still requires:
 
 - `MetaTrader5` Python package is installed

@@ -236,15 +236,17 @@ def collect_mt5_demo_order_payload(
         ]
 
         if auto_flatten:
-            flatten_state = _flatten_symbol_position(
-                client=client,
+            flatten_results = _flatten_symbol_positions_by_ticket(
+                module=module,
                 symbol=symbol.strip(),
-                timestamp=datetime.now(UTC),
+                magic_number=config.broker.mt5.magic_number,
+                deviation_points=config.broker.mt5.deviation_points,
                 time_in_force=time_in_force,
             )
-            payload["flatten_order_send_attempted"] = flatten_state is not None
-            if flatten_state is not None:
-                payload["flatten_order"] = _order_state_to_dict(flatten_state)
+            payload["flatten_order_send_attempted"] = any(
+                result["order_send_attempted"] for result in flatten_results
+            )
+            payload["flatten_orders"] = flatten_results
             payload["post_flatten_positions"] = [
                 _position_state_to_dict(position) for position in client.list_positions()
             ]
@@ -313,28 +315,93 @@ def _safety_block_reason(
     return None
 
 
-def _flatten_symbol_position(
+def _flatten_symbol_positions_by_ticket(
     *,
-    client: Any,
+    module: MetaTrader5ModuleProtocol,
     symbol: str,
-    timestamp: datetime,
+    magic_number: int,
+    deviation_points: int,
     time_in_force: TimeInForce,
-) -> Mt5OrderState | None:
-    position = client.get_position(symbol)
-    if position is None or abs(position.net_volume_lots) <= 0:
-        return None
-    side = OrderSide.SELL if position.net_volume_lots > 0 else OrderSide.BUY
-    return client.submit_order(
-        Mt5OrderRequest(
-            client_order_id=f"demo_flatten_{int(timestamp.timestamp())}",
-            broker_symbol=symbol,
-            side=side,
-            order_type=OrderType.MARKET,
-            submitted_at=timestamp.astimezone(UTC),
-            volume_lots=abs(position.net_volume_lots),
+) -> list[dict[str, Any]]:
+    positions = tuple(
+        _safe_mapping(position) for position in _safe_sequence(module.positions_get(symbol=symbol))
+    )
+    return [
+        _close_one_position(
+            module,
+            position=position,
+            magic_number=magic_number,
+            deviation_points=deviation_points,
             time_in_force=time_in_force,
         )
-    )
+        for position in positions
+    ]
+
+
+def _close_one_position(
+    module: MetaTrader5ModuleProtocol,
+    *,
+    position: Mapping[str, Any],
+    magic_number: int,
+    deviation_points: int,
+    time_in_force: TimeInForce,
+) -> dict[str, Any]:
+    symbol = str(position["symbol"])
+    volume = float(position["volume"])
+    tick = _safe_mapping(module.symbol_info_tick(symbol))
+    position_type_buy = getattr(module, "POSITION_TYPE_BUY", 0)
+    order_type_buy = getattr(module, "ORDER_TYPE_BUY", 0)
+    order_type_sell = getattr(module, "ORDER_TYPE_SELL", 1)
+    close_type = order_type_sell if position.get("type") == position_type_buy else order_type_buy
+    price = tick.get("bid") if close_type == order_type_sell else tick.get("ask")
+    request = {
+        "action": getattr(module, "TRADE_ACTION_DEAL", 1),
+        "symbol": symbol,
+        "volume": volume,
+        "type": close_type,
+        "position": position["ticket"],
+        "price": price,
+        "deviation": deviation_points,
+        "magic": magic_number,
+        "comment": "scalper_ai_flatten",
+        "type_time": getattr(module, "ORDER_TIME_GTC", 0),
+        "type_filling": _filling_policy_code(module, time_in_force),
+    }
+    check = module.order_check(request)
+    check_payload = _safe_mapping(check)
+    if not _check_accepted(module, check_payload.get("retcode")):
+        return {
+            "position": _json_safe(position),
+            "request": _json_safe(request),
+            "check": _json_safe(check_payload),
+            "order_send_attempted": False,
+            "send": None,
+            "last_error": module.last_error(),
+        }
+    result = module.order_send(request)
+    return {
+        "position": _json_safe(position),
+        "request": _json_safe(request),
+        "check": _json_safe(check_payload),
+        "order_send_attempted": True,
+        "send": _json_safe(_safe_mapping(result)),
+        "last_error": module.last_error(),
+    }
+
+
+def _filling_policy_code(module: MetaTrader5ModuleProtocol, time_in_force: TimeInForce) -> int:
+    if time_in_force is TimeInForce.IOC:
+        return getattr(module, "ORDER_FILLING_IOC", 1)
+    return getattr(module, "ORDER_FILLING_FOK", 0)
+
+
+def _check_accepted(module: MetaTrader5ModuleProtocol, retcode: Any) -> bool:
+    return retcode in {
+        0,
+        getattr(module, "TRADE_RETCODE_DONE", 10009),
+        getattr(module, "TRADE_RETCODE_DONE_PARTIAL", 10010),
+        getattr(module, "TRADE_RETCODE_PLACED", 10008),
+    }
 
 
 def _blocked(payload: dict[str, Any], reason: str) -> dict[str, Any]:

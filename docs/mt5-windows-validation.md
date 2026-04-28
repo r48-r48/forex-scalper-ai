@@ -95,13 +95,24 @@ Safe broker probe:
 - `scripts\mt5_demo_order.py` was run with explicit operator confirmation and correctly returned `blocked_reason=terminal_trade_not_allowed`; `order_send_attempted=false`.
 - No `order_send()` call was made.
 
+Controlled demo-order test after terminal trading was enabled:
+
+- Fresh permission check passed: account trading enabled, terminal trading enabled, and `tradeapi_disabled=false`.
+- Minimum-volume EURUSD IOC demo order `156757224` was filled.
+- The original auto-flatten sent opposite order `156757225`, but Dukascopy account `margin_mode=2` behaved as hedging and left two positions open.
+- `scripts\mt5_flatten_positions.py` was added and used to close both remaining EURUSD positions by position ticket via orders `156757226` and `156757227`.
+- Final smoke returned `0` open orders and `0` open positions.
+- Balance/equity settled at `99941.09 TRY` after spread/execution costs.
+- Post-demo `history_orders_get` and `history_deals_get` still returned `0` rows in the 24-hour probe window, so history/deal normalization remains unresolved for this broker/session.
+
 ## Follow-Up
 
 - Treat MT5 filling mode as broker and symbol specific. The Windows notebook MetaQuotes demo accepted FOK for EURUSD, while the Parallels Dukascopy demo accepted IOC and rejected FOK.
 - Use IOC for Dukascopy EURUSD unless symbol metadata changes.
 - Use FOK for the previous Windows notebook MetaQuotes demo only if a fresh broker probe still accepts it.
+- Treat Dukascopy demo account `margin_mode=2` as hedging for execution/reconciliation. Closing exposure requires position-ticket close requests, not merely an opposite market order.
 - Keep MT5 order comments at `29` characters or shorter.
 - Configure explicit terminal path and broker env vars only when moving beyond saved terminal-session smoke checks.
 - Enable and document live confirmation only for an intentionally approved live-safe run.
-- Validate non-empty history/deal normalization after a controlled demo fill or imported broker history is available.
+- Investigate why non-empty order/deal history is still unavailable through `history_orders_get` and `history_deals_get` after controlled demo fills.
 - Keep `order_send()` disabled until the operator explicitly approves a demo-order test and a fresh terminal permission check shows terminal-side trading is enabled.

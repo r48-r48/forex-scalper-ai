@@ -355,6 +355,7 @@ Current repository status:
 - Parallels Windows 11 MT5 broker probe passed on 2026-04-28 with EURUSD IOC: `order_check.accepted=true`, `retcode=0`, `comment=Done`, and `order_send_called=false`; EURUSD FOK returned safe rejection `retcode=10030`, `Unsupported filling mode`
 - Parallels Windows 11 deeper MT5 history/permission check passed on 2026-04-28 without order submission: one-year raw history is still empty, account trading permissions are enabled, and terminal-side trading permission remains disabled
 - Docker/runtime availability check passed on 2026-04-28 as far as this host allows: Docker is absent on local macOS Codex and Parallels Windows, Compose YAML parses, and local paper runtime describe/health/metrics pass
+- Controlled Parallels MT5 demo-order validation ran on 2026-04-29 after explicit operator approval: minimum EURUSD IOC order filled, original auto-flatten opened a hedged opposite position because Dukascopy reports `margin_mode=2`, ticket-specific flatten closed all EURUSD positions, final smoke showed zero open orders/positions, and raw history APIs still returned zero orders/deals
 - `.venv/bin/python scripts/run_runtime.py describe --config-name paper`, `health --config-name paper`, and `metrics --config-name paper` passed on 2026-04-28 after Docker/Compose packaging
 - `docker-compose.yml` parsed successfully with PyYAML on 2026-04-28 after Docker/Compose packaging
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after Docker/Compose packaging
@@ -442,6 +443,7 @@ Current repository status:
   - Same-Mac Parallels Windows 11 MT5 validation is working through `prlctl exec --current-user`: Dukascopy demo account `610769553` connects, EURUSD IOC `order_check` passes, FOK is rejected as unsupported filling mode, and `order_send` remains untested/blocked pending explicit operator approval plus a fresh trade-permission check
   - Parallels deeper MT5 validation confirmed one-year raw history is empty and terminal-side trading permission is disabled, so non-empty deal normalization requires a later controlled demo fill or imported broker history
   - Docker/Compose runtime build/run remains pending on a Docker-enabled host; current host and Parallels VM both lack Docker, while local paper runtime describe/health/metrics still pass
+  - Controlled Parallels demo-order validation is complete: use IOC for Dukascopy EURUSD, handle Dukascopy as hedging (`margin_mode=2`) rather than netting, and use position-ticket close logic for flattening
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
   - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `374` Ruff issues after scripts/config/logging/journal/OMS/validation/models/risk cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes

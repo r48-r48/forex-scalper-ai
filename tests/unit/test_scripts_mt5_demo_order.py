@@ -70,13 +70,16 @@ def test_demo_order_sends_min_volume_and_auto_flattens_on_demo_account() -> None
     assert payload["order_send_attempted"] is True
     assert payload["flatten_order_send_attempted"] is True
     assert payload["submitted_order"]["status"] == "filled"
-    assert payload["flatten_order"]["status"] == "filled"
+    assert payload["post_flatten_positions"] == []
+    assert len(payload["flatten_orders"]) == 1
+    assert payload["flatten_orders"][0]["send"]["retcode"] == module.TRADE_RETCODE_DONE
     assert payload["raw_history"]["raw_order_count"] == 2
     assert payload["raw_history"]["raw_deal_count"] == 2
     assert module.order_send_call_count == 2
     assert module.sent_payloads[0]["type_filling"] == module.ORDER_FILLING_IOC
     assert module.sent_payloads[0]["volume"] == 0.01
     assert module.sent_payloads[1]["type"] == module.ORDER_TYPE_SELL
+    assert module.sent_payloads[1]["position"] == 9001
 
 
 def _load_demo_order_module() -> ModuleType:
@@ -116,7 +119,7 @@ class _FakeMetaTrader5Module:
         self.terminal_trade_allowed = True
         self.order_send_call_count = 0
         self.sent_payloads: list[dict[str, object]] = []
-        self._positions: dict[str, SimpleNamespace] = {}
+        self._positions: dict[int, SimpleNamespace] = {}
         self._history_orders: dict[int, SimpleNamespace] = {}
         self._history_deals: dict[int, list[SimpleNamespace]] = {}
         self._next_order_id = 9001
@@ -183,21 +186,18 @@ class _FakeMetaTrader5Module:
         volume = float(request["volume"])
         price = float(request["price"])
         order_type = int(request["type"])
-        existing = self._positions.get(symbol)
-        signed_volume = volume if order_type == self.ORDER_TYPE_BUY else -volume
-        net_volume = signed_volume
-        if existing is not None:
-            current = (
-                existing.volume if existing.type == self.POSITION_TYPE_BUY else -existing.volume
-            )
-            net_volume = current + signed_volume
-        if abs(net_volume) <= 1e-12:
-            self._positions.pop(symbol, None)
+        if "position" in request:
+            self._positions.pop(int(request["position"]), None)
         else:
-            self._positions[symbol] = SimpleNamespace(
+            self._positions[order_id] = SimpleNamespace(
                 symbol=symbol,
-                type=self.POSITION_TYPE_BUY if net_volume > 0 else self.POSITION_TYPE_SELL,
-                volume=abs(net_volume),
+                ticket=order_id,
+                type=(
+                    self.POSITION_TYPE_BUY
+                    if order_type == self.ORDER_TYPE_BUY
+                    else self.POSITION_TYPE_SELL
+                ),
+                volume=volume,
                 price_open=price,
                 time=1_777_419_360,
             )
@@ -236,8 +236,7 @@ class _FakeMetaTrader5Module:
         symbol = kwargs.get("symbol")
         if symbol is None:
             return tuple(self._positions.values())
-        position = self._positions.get(str(symbol))
-        return () if position is None else (position,)
+        return tuple(position for position in self._positions.values() if position.symbol == symbol)
 
     def history_orders_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
         ticket = kwargs.get("ticket")

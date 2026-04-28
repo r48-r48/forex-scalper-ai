@@ -223,6 +223,7 @@
 - Parallels MT5 FOK probe on Dukascopy EURUSD returned `retcode=10030`, `Unsupported filling mode`; use IOC for this broker/symbol unless future symbol metadata changes.
 - Parallels MT5 deeper history/permission check on 2026-04-28 used a one-year lookback and still found `0` raw historical orders/deals; non-empty history/deal normalization is blocked until a controlled demo fill or imported broker history exists. Account permissions report `trade_allowed=true` and `trade_expert=true`, but terminal-side `trade_allowed=false`, so AutoTrading/trading permission must be enabled and rechecked before any approved demo `order_send`.
 - Docker/runtime hardening check on 2026-04-28 confirmed no `docker` binary is available in either the local macOS Codex environment or the Parallels Windows VM; `docker-compose.yml` still parses successfully, and local paper runtime `describe`, `health`, and `metrics` commands pass without Docker.
+- Controlled Parallels MT5 demo-order validation ran on 2026-04-29 after explicit operator approval and terminal trading enablement: a minimum-volume EURUSD IOC demo order was filled, the first auto-flatten attempt exposed Dukascopy `margin_mode=2` hedging behavior by opening an opposite position, and a position-ticket flatten script then closed both demo positions. Final smoke returned `order_count=0` and `position_count=0`; balance/equity settled at `99941.09 TRY`. Broker history APIs still returned `0` raw orders/deals, so non-empty history normalization remains unresolved for this broker/session.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
@@ -256,5 +257,5 @@
 ## Exact Next Step
 
 Move to post-phase hardening:
-- continue MT5 demo validation beyond connection/order_check/broker-probe: optional env credentials, non-empty history/deal normalization after a controlled demo fill or imported broker history, IOC execution settings for Dukascopy EURUSD, and controlled demo-order behavior only after explicit operator approval plus terminal trade-permission recheck
+- continue MT5 demo validation beyond connection/order_check/broker-probe: add hedging-aware MT5 reconciliation/close handling for Dukascopy `margin_mode=2`, investigate why broker history APIs remain empty after filled demo orders, and keep IOC execution settings for Dukascopy EURUSD
 - if further MT5 validation is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`
