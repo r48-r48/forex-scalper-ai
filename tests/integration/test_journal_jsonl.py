@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from scalper_ai.domain import FillEvent, LiquidityFlag, OrderSide, PositionMode, PositionState
@@ -20,8 +20,8 @@ def test_jsonl_journal_writer_round_trips_execution_events(tmp_path: Path) -> No
         intent_id="intent-1",
         broker_order_id="broker-1",
         symbol="EURUSD",
-        event_timestamp=datetime(2026, 4, 27, 10, 4, tzinfo=timezone.utc),
-        received_timestamp=datetime(2026, 4, 27, 10, 4, 0, 20_000, tzinfo=timezone.utc),
+        event_timestamp=datetime(2026, 4, 27, 10, 4, tzinfo=UTC),
+        received_timestamp=datetime(2026, 4, 27, 10, 4, 0, 20_000, tzinfo=UTC),
         side=OrderSide.BUY,
         fill_price=1.1002,
         fill_quantity=10_000.0,
@@ -33,7 +33,7 @@ def test_jsonl_journal_writer_round_trips_execution_events(tmp_path: Path) -> No
     )
     position = PositionState(
         symbol="EURUSD",
-        timestamp=datetime(2026, 4, 27, 10, 4, 1, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 4, 27, 10, 4, 1, tzinfo=UTC),
         net_quantity=10_000.0,
         average_entry_price=1.1002,
         mark_price=1.1003,
@@ -47,9 +47,9 @@ def test_jsonl_journal_writer_round_trips_execution_events(tmp_path: Path) -> No
         "operation": "order_send",
         "symbol": "EURUSD",
         "latency_ms": 7.5,
-        "timestamp": datetime(2026, 4, 27, 10, 4, 2, tzinfo=timezone.utc),
+        "timestamp": datetime(2026, 4, 27, 10, 4, 2, tzinfo=UTC),
     }
-    recorded_at = datetime(2026, 4, 27, 10, 4, 3, tzinfo=timezone.utc)
+    recorded_at = datetime(2026, 4, 27, 10, 4, 3, tzinfo=UTC)
     events = (
         JournalEvent.from_payload(
             event_id="journal-fill-1",

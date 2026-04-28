@@ -83,6 +83,7 @@ Known gaps:
 - Config-layer Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `496` to `434`.
 - HTTP webhook alert transport: completed on 2026-04-28 with config/env fields and fake-opener unit coverage.
 - Logging-utils Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `434` to `433`.
+- Journal Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `433` to `416`.
 - Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream

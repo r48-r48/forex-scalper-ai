@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from enum import Enum
-from typing import Any, Optional
+from enum import Enum, StrEnum
+from typing import Any
 
 import orjson
 
@@ -34,7 +34,7 @@ SYMBOL_FIELD_PRIORITY = (
 )
 
 
-class JournalEventType(str, Enum):
+class JournalEventType(StrEnum):
     """Canonical categories for the unified audit journal."""
 
     MARKET_DATA = "market_data_event"
@@ -62,10 +62,10 @@ class JournalEvent(DomainModel):
     payload_type: NonEmptyStr
     payload: dict[str, Any]
     schema_version: NonEmptyStr = "journal.v1"
-    correlation_id: Optional[NonEmptyStr] = None
-    causation_id: Optional[NonEmptyStr] = None
-    strategy_id: Optional[NonEmptyStr] = None
-    symbol: Optional[NonEmptyStr] = None
+    correlation_id: NonEmptyStr | None = None
+    causation_id: NonEmptyStr | None = None
+    strategy_id: NonEmptyStr | None = None
+    symbol: NonEmptyStr | None = None
 
     @classmethod
     def from_payload(
@@ -82,7 +82,7 @@ class JournalEvent(DomainModel):
         causation_id: str | None = None,
         strategy_id: str | None = None,
         symbol: str | None = None,
-    ) -> "JournalEvent":
+    ) -> JournalEvent:
         """Create one journal event from an existing domain record or JSON-ready mapping."""
 
         normalized_payload = normalize_journal_payload(payload)

@@ -146,6 +146,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/utils/logging.py`
   - targeted Ruff is now green for `src/scalper_ai/utils` and `tests/unit/test_logging.py`
   - full Ruff baseline dropped from `434` to `433` issues
+- 2026-04-28 completed journal Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/journal/events.py`
+  - updated journal unit/integration tests to use `datetime.UTC`
+  - targeted Ruff is now green for `src/scalper_ai/journal` and journal tests
+  - full Ruff baseline dropped from `433` to `416` issues
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -270,6 +275,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `433` historical issues after logging-utils cleanup
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after logging-utils cleanup
 - 2026-04-28: `.venv/bin/pytest` -> `165 passed` after logging-utils cleanup
+- 2026-04-28: `.venv/bin/ruff check src/scalper_ai/journal tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` -> passed after journal cleanup
+- 2026-04-28: `.venv/bin/pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` -> `6 passed` after journal cleanup
+- 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `416` historical issues after journal cleanup
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after journal cleanup
+- 2026-04-28: `.venv/bin/pytest` -> `165 passed` after journal cleanup
 - `.venv/bin/pytest` -> `165 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`

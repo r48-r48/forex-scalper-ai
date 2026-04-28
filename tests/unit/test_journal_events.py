@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -14,8 +14,8 @@ def test_journal_event_from_domain_payload_infers_core_metadata() -> None:
     tick = TickEvent(
         symbol="EURUSD",
         venue="MT5",
-        event_timestamp=datetime(2026, 4, 27, 10, 0, tzinfo=timezone.utc),
-        received_timestamp=datetime(2026, 4, 27, 10, 0, 0, 50_000, tzinfo=timezone.utc),
+        event_timestamp=datetime(2026, 4, 27, 10, 0, tzinfo=UTC),
+        received_timestamp=datetime(2026, 4, 27, 10, 0, 0, 50_000, tzinfo=UTC),
         bid=1.1010,
         ask=1.1012,
         source=EventSource.REPLAY,
@@ -25,7 +25,7 @@ def test_journal_event_from_domain_payload_infers_core_metadata() -> None:
         event_id="journal-tick-1",
         event_type=JournalEventType.MARKET_DATA,
         payload=tick,
-        recorded_at=datetime(2026, 4, 27, 10, 0, 1, tzinfo=timezone.utc),
+        recorded_at=datetime(2026, 4, 27, 10, 0, 1, tzinfo=UTC),
         source="replay",
         correlation_id="decision-1",
     )
@@ -40,7 +40,7 @@ def test_journal_event_from_domain_payload_infers_core_metadata() -> None:
 
 
 def test_journal_event_from_mapping_payload_normalizes_nested_values() -> None:
-    recorded_at = datetime(2026, 4, 27, 10, 1, tzinfo=timezone.utc)
+    recorded_at = datetime(2026, 4, 27, 10, 1, tzinfo=UTC)
     payload = {
         "signal_id": "signal-1",
         "symbol": "EURUSD",
@@ -74,7 +74,7 @@ def test_journal_flat_records_are_parquet_friendly() -> None:
         intent_id="intent-1",
         strategy_id="micro-v1",
         symbol="EURUSD",
-        created_at=datetime(2026, 4, 27, 10, 2, tzinfo=timezone.utc),
+        created_at=datetime(2026, 4, 27, 10, 2, tzinfo=UTC),
         side=OrderSide.BUY,
         order_type=OrderType.MARKET,
         quantity=10_000.0,
@@ -84,7 +84,7 @@ def test_journal_flat_records_are_parquet_friendly() -> None:
         event_id="journal-order-request-1",
         event_type=JournalEventType.ORDER_REQUEST,
         payload=intent,
-        recorded_at=datetime(2026, 4, 27, 10, 2, 1, tzinfo=timezone.utc),
+        recorded_at=datetime(2026, 4, 27, 10, 2, 1, tzinfo=UTC),
         source="oms",
         correlation_id="decision-1",
         strategy_id=intent.strategy_id,
