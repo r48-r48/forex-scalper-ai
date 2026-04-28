@@ -48,9 +48,10 @@ Already implemented:
 - paper/shadow champion-challenger decision reporting without broker order submission
 - interpretable supervised baseline filter with leakage-safe walk-forward evaluation
 - observability alert-rule docs, platform roadmap, production checklist, incident/postmortem templates, and release/incident runbooks
+- Windows MT5 terminal connection and broker-side order_check smoke against an authorized demo session, without order_send
 
 Known gaps:
-- no real MT5 terminal/package/credentials validation yet
+- MT5 history/deal normalization and controlled demo-order behavior still need explicit approval and validation
 - no Docker/Compose runtime image yet
 - no real alert transport or OpenTelemetry trace path yet
 - no dedicated full-repo Ruff/mypy cleanup baseline yet
@@ -69,7 +70,8 @@ Known gaps:
 - P2.1 Supervised Baseline Filter: completed on 2026-04-28.
 - P2.2 Observability Expansion: completed on 2026-04-28 as documentation and roadmap.
 - P2.3 Release Runbooks: completed on 2026-04-28 as documented procedures and templates.
-- Current next task: real MT5 terminal validation when package/terminal/credentials are available.
+- Real Windows MT5 terminal connection/order_check smoke: completed on 2026-04-28 without order_send.
+- Current next task: deeper MT5 demo validation or, if paused, platform cleanup.
 
 ## P0 Workstream
 
@@ -432,16 +434,15 @@ Completed implementation notes:
 
 ## Immediate Next Task
 
-Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available.
+Continue MT5 demo validation when the Windows terminal is available.
 
-Recommended first implementation slice:
-1. Install the `MetaTrader5` Python package in the target runtime.
-2. Configure terminal path or validate auto-discovery.
-3. Configure `SCALPER_AI_BROKER_MT5_*` credentials or intentionally use a saved terminal session.
-4. Set explicit live confirmation before any true live startup.
-5. Run MT5 preflight and smoke checks against the real terminal.
+Recommended next MT5 slice:
+1. Add explicit terminal-path/env documentation for the validated Windows terminal.
+2. Validate history/order/deal polling and normalization against demo terminal history.
+3. Exercise a controlled demo-order path only after explicit operator approval.
+4. Reconcile the resulting order/deal/position state back through the existing snapshot contracts.
 
-If real MT5 validation remains unavailable, the next non-MT5 work is platform cleanup:
+If further MT5 validation is paused, the next non-MT5 work is platform cleanup:
 1. Add a Docker/Compose runtime image around the paper-safe default.
 2. Create a full-repo Ruff/mypy cleanup baseline.
 3. Wire alert-rule documents to an actual transport after the runtime topology is fixed.

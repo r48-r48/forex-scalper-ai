@@ -320,6 +320,7 @@ Current repository status:
 - P2.1 Supervised Baseline Filter completed on 2026-04-28 with transparent centroid-difference model and walk-forward evaluation
 - P2.2 Observability Expansion completed on 2026-04-28 as alert-rule docs and platform roadmap
 - P2.3 Release Runbooks completed on 2026-04-28 as production checklist, incident/postmortem templates, and runbooks
+- Windows MT5 terminal connection/order_check smoke completed on 2026-04-28 through SSH against an authorized demo terminal session, without order_send
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -333,6 +334,7 @@ Current repository status:
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after P1.3-P2.3
 - `.venv/bin/pytest` passed on 2026-04-28 with `157 passed` after P1.3-P2.3
 - `.venv/bin/ruff check` passed on the new P1.3-P2.1 source/test files on 2026-04-28
+- Windows MT5 smoke/probe passed on 2026-04-28: package import, terminal/account snapshot, EURUSD tick, FOK order_check retcode 0 / Done, zero open orders and positions, and no order_send
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -366,6 +368,7 @@ Current repository status:
   - P2.1 Supervised Baseline Filter is complete: `scalper_ai.models.baseline_filter` provides the transparent filter, while `scalper_ai.validation.supervised_filter` provides train-only fit and test-only walk-forward evaluation
   - P1.4 Paper And Shadow Mode is complete: `scalper_ai.validation.shadow` provides decision-only champion/challenger reporting and JSON artifact persistence without broker orders
   - P1.3 Unified Validation Report is complete: `scalper_ai.validation.gate` provides pass/warn/fail validation reports, thresholds, risk flags, latency/slippage summaries, regime breakdown, and JSON artifact persistence
+  - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
   - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `157 passed`
@@ -394,7 +397,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - start real MT5 terminal validation when the `MetaTrader5` package, terminal, credentials, and explicit live confirmation are available
+  - continue deeper MT5 demo validation when the Windows terminal is available, especially history/deal normalization and controlled demo-order behavior only after explicit operator approval
   - if MT5 remains unavailable, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup
 
 ## Constraints To Preserve
@@ -411,7 +414,7 @@ Current repository status:
 
 ## Post-Phase Focus
 
-- validate the MT5-backed client against a real installed terminal and credentials
+- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
 - add Docker/Compose runtime packaging, alert transport wiring, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface

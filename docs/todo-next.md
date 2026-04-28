@@ -6,8 +6,8 @@
 
 ## Current Next Step
 
-- Real MT5 terminal validation when package, terminal, credentials, and live confirmation are available.
-- If MT5 remains unavailable, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
+- Continue MT5 demo validation beyond the completed Windows terminal connection/order_check smoke: explicit terminal path, optional env credentials, history/deal normalization, and controlled demo-order behavior only after explicit operator approval.
+- If further MT5 work is paused, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
 
 ## Deliverables
 
@@ -23,6 +23,7 @@
 - interpretable supervised baseline filter with leakage-safe walk-forward evaluation — completed on 2026-04-28
 - observability alert-rule docs and platform roadmap — completed on 2026-04-28
 - production checklist, incident/postmortem templates, and release/incident runbooks — completed on 2026-04-28
+- Windows MT5 terminal connection and broker-side order_check smoke against an authorized demo session — completed on 2026-04-28 without order_send
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for Docker/Compose runtime packaging, alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup around full-repo lint/typecheck baselines and startup ergonomics
@@ -37,7 +38,7 @@
 ## Implementation Guidance
 
 - use `docs/post-phase-roadmap.md` as the canonical post-phase backlog
-- continue with real MT5 terminal validation when dependencies are available; if they remain unavailable, continue with platform/runtime hardening that does not require a broker
+- continue with MT5 terminal validation when the Windows terminal is available; if it is paused, continue with platform/runtime hardening that does not require a broker
 - keep deployment and hardening work separate from domain, model, and execution math
 - reuse the PHASE 12 runtime, health, and metrics surfaces instead of duplicating startup logic
 - favor explicit safety checks, reconciliation, and observability over implicit automation
@@ -46,7 +47,7 @@
 ## Validation Goal
 
 - keep repository-wide `pytest` green in Python 3.12.13 and future Python 3.11+ CI/target environments
-- add targeted validation around the MT5-backed live adapter, real terminal behavior, preflight diagnostics, reconciliation, and long-running runtime behavior
+- add targeted validation around the MT5-backed live adapter, real terminal behavior, history/deal normalization, reconciliation, and long-running runtime behavior
 - keep deployment CLI and paper-safe runtime wiring working while hardening the live path
 - keep validation gates and shadow reports as required promotion artifacts for new strategies
 

@@ -93,6 +93,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/production-checklist.md`
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/incident-template.md`
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/postmortem-template.md`
+- 2026-04-28 completed first real Windows MT5 validation:
+  - SSH access to the Windows notebook was established with a dedicated key
+  - Windows repo at `C:\Users\PC\projects\forex-scalper-ai` is on commit `f5c5894`
+  - `.venv` Python is 3.12.10 and `MetaTrader5` is installed
+  - `scripts\mt5_smoke.py --config-name mt5 --preflight-only` and full smoke connected to an authorized demo terminal session
+  - direct broker probe validated terminal/account snapshots, `6053` symbols, EURUSD tick data, zero open orders, zero open positions, and FOK `order_check` retcode `0` / `Done`
+  - no `order_send()` call was made
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -179,6 +186,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after P1.3-P2.3
 - 2026-04-28: `.venv/bin/pytest` -> `157 passed` after P1.3-P2.3
 - 2026-04-28: `.venv/bin/ruff check` on the new P1.3-P2.1 source/test files -> passed
+- 2026-04-28: Windows MT5 smoke/probe through SSH -> connected, terminal/account snapshots available, EURUSD FOK order_check passed, no orders sent
 - `.venv/bin/pytest` -> `157 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
@@ -197,14 +205,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Start with real MT5 terminal validation when package, terminal, credentials, and explicit live confirmation are available:
-- install the `MetaTrader5` Python package in the target runtime
-- configure terminal path or validate auto-discovery
-- configure `SCALPER_AI_BROKER_MT5_*` credentials or intentionally use a saved terminal session
-- set explicit live confirmation before true live startup
-- run MT5 preflight and smoke checks against the real terminal
+Continue MT5 demo validation when the Windows terminal is available:
+- document explicit terminal path/env wiring
+- validate history/deal normalization
+- exercise a controlled demo-order path only after explicit operator approval
+- reconcile resulting order/deal/position state through existing snapshot contracts
 
-If real MT5 validation remains unavailable:
+If further MT5 validation is paused:
 - continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup
 
 ## If Context Gets Compressed

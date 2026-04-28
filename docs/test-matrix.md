@@ -42,7 +42,7 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
 | Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `157 passed` |
-| Real MT5 terminal smoke | pending | Requires package, terminal, account/session credentials, and explicit live confirmation |
+| Real MT5 terminal smoke | partial pass | Windows notebook, Python 3.12.10, package installed, terminal/account snapshot, EURUSD tick, and FOK order_check passed against demo session; no order_send |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
 
 ## Test Risk Notes
