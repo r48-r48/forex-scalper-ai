@@ -17,11 +17,11 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result after the scripts and config-layer cleanup batches:
+Current result after the scripts, config-layer, and logging-utils cleanup batches:
 
 ```text
-Found 434 errors.
-275 fixable with --fix.
+Found 433 errors.
+274 fixable with --fix.
 ```
 
 Statistics:
@@ -29,7 +29,7 @@ Statistics:
 ```text
 134 E501  line-too-long
 107 UP017 datetime-timezone-utc
-107 UP045 non-pep604-annotation-optional
+106 UP045 non-pep604-annotation-optional
  24 I001  unsorted-imports
  18 UP035 deprecated-import
  16 UP042 replace-str-enum
@@ -45,6 +45,7 @@ Completed cleanup batches:
 
 - 2026-04-28: scripts entrypoints cleanup removed script-level `B008`, `E402`, several `E501`, one `I001`, one `F401`, and two `UP045` issues. `collect_ticks.py --help` now works without editable install by bootstrapping `src/` like the other scripts.
 - 2026-04-28: config-layer cleanup converted optional annotations in `src/scalper_ai/config`, sorted imports, and wrapped remaining long expressions. Targeted Ruff is green for `src/scalper_ai/config` and `tests/unit/test_config_loader.py`.
+- 2026-04-28: logging-utils cleanup converted the remaining optional annotation in `src/scalper_ai/utils/logging.py`. Targeted Ruff is green for `src/scalper_ai/utils` and `tests/unit/test_logging.py`.
 
 Recommended cleanup order:
 

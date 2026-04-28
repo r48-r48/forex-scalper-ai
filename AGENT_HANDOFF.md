@@ -327,6 +327,7 @@ Current repository status:
 - Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `434`; mypy has `51` errors in `30` files
 - Local JSONL alert transport completed on 2026-04-28: `scalper_ai.deployment.alerts` converts warning/failing health snapshots into alert events and appends them through `JsonlAlertTransport`
 - HTTP webhook alert transport completed on 2026-04-28: `WebhookAlertTransport` posts batched health-alert JSON through an explicit HTTP(S) endpoint with timeout/header controls and config/env fields
+- Logging-utils Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `434` to `433` issues
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -371,6 +372,10 @@ Current repository status:
 - `.venv/bin/pytest tests/unit/test_deployment_alerts.py tests/unit/test_config_loader.py` passed on 2026-04-28 with `13 passed`
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after HTTP webhook alert transport
 - `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after HTTP webhook alert transport
+- Logging-utils Ruff cleanup passed on 2026-04-28: targeted Ruff is green for `src/scalper_ai/utils` and `tests/unit/test_logging.py`; full Ruff baseline dropped from `434` to `433` issues
+- `.venv/bin/pytest tests/unit/test_logging.py` passed on 2026-04-28 with `2 passed` after logging-utils cleanup
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after logging-utils cleanup
+- `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after logging-utils cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -407,7 +412,7 @@ Current repository status:
   - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, safe broker probe, empty history polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
-  - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `434` Ruff issues after scripts/config cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
+  - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `433` Ruff issues after scripts/config/logging cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
   - Local JSONL alert transport and HTTP webhook alert transport are implemented; concrete endpoint routing remains pending after Docker/runtime topology validation
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics

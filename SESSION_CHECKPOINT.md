@@ -142,6 +142,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - exported `WebhookAlertTransport` from `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/__init__.py`
   - added config/env fields for `monitoring.alert_webhook_url`, timeout, and warning inclusion
   - tests use a fake opener, so no real network request is made
+- 2026-04-28 completed logging-utils Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/utils/logging.py`
+  - targeted Ruff is now green for `src/scalper_ai/utils` and `tests/unit/test_logging.py`
+  - full Ruff baseline dropped from `434` to `433` issues
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -261,6 +265,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/pytest tests/unit/test_deployment_alerts.py tests/unit/test_config_loader.py` -> `13 passed` after webhook alert transport
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after webhook alert transport
 - 2026-04-28: `.venv/bin/pytest` -> `165 passed` after webhook alert transport
+- 2026-04-28: `.venv/bin/ruff check src/scalper_ai/utils tests/unit/test_logging.py` -> passed after logging-utils cleanup
+- 2026-04-28: `.venv/bin/pytest tests/unit/test_logging.py` -> `2 passed` after logging-utils cleanup
+- 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `433` historical issues after logging-utils cleanup
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after logging-utils cleanup
+- 2026-04-28: `.venv/bin/pytest` -> `165 passed` after logging-utils cleanup
 - `.venv/bin/pytest` -> `165 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`

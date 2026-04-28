@@ -6,7 +6,7 @@ import json
 import logging
 import logging.config
 import time
-from typing import Any, Optional
+from typing import Any
 
 from scalper_ai.config.models import LoggingConfig
 
@@ -80,7 +80,7 @@ def configure_logging(config: LoggingConfig) -> None:
     logging.config.dictConfig(build_logging_config(config))
 
 
-def get_logger(name: Optional[str] = None) -> logging.Logger:
+def get_logger(name: str | None = None) -> logging.Logger:
     """Return a configured logger."""
 
     return logging.getLogger(name or "scalper_ai")
