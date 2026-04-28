@@ -44,6 +44,7 @@ forex-scalper-ai/
     event-schema.md
     incident-template.md
     interfaces.md
+    lint-typecheck-baseline.md
     mt5-windows-validation.md
     oms-risk.md
     post-phase-roadmap.md

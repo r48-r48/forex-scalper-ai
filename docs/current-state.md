@@ -112,13 +112,14 @@
   - real Windows MT5 broker probe through the normalized client passed with EURUSD FOK `order_check` retcode `0` / `Done`, zero orders/positions, and no order submission
   - the live MetaTrader5 Python bridge comment limit was validated at `29` characters, and `Mt5TerminalClient` now sanitizes/clamps order comments before `order_check` or `order_send`
   - paper-safe Docker/Compose runtime packaging was added around the PHASE 12 runtime without live credentials or live order submission
+  - full-repo Ruff/mypy cleanup baseline was captured in `docs/lint-typecheck-baseline.md`
   - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `158 passed`
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
 - The repository now has research, validation, baseline strategies, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, OMS/RiskEngine layers, validation gates, shadow reports, supervised baseline filtering, and operational runbooks.
-- The next work should focus on deeper MT5 demo validation after explicit operator approval for demo-order behavior, Docker runtime validation on a Docker-enabled host, alert wiring, and full-repo lint/typecheck cleanup.
+- The next work should focus on deeper MT5 demo validation after explicit operator approval for demo-order behavior, Docker runtime validation on a Docker-enabled host, alert wiring, and retiring the full-repo lint/typecheck baseline in small batches.
 
 ## Important Constraints
 
@@ -160,6 +161,10 @@
 - `docker-compose.yml` parsed successfully with PyYAML on 2026-04-28 after Docker/Compose packaging.
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after Docker/Compose packaging.
 - `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after Docker/Compose packaging.
+- `.venv/bin/ruff check src tests scripts --statistics` ran on 2026-04-28 and found `511` historical Ruff issues; details are recorded in `docs/lint-typecheck-baseline.md`.
+- `.venv/bin/mypy src` ran on 2026-04-28 and found `51` historical mypy errors in `30` files; details are recorded in `docs/lint-typecheck-baseline.md`.
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after the lint/typecheck baseline.
+- `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after the lint/typecheck baseline.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
@@ -194,4 +199,4 @@
 
 Move to post-phase hardening:
 - continue MT5 demo validation beyond connection/order_check/broker-probe: explicit terminal path, optional env credentials, non-empty history/deal normalization, and controlled demo-order behavior only after explicit operator approval
-- if further MT5 validation is paused, validate Docker/Compose runtime packaging where Docker is available, then continue with alert transport wiring and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`
+- if further MT5 validation is paused, validate Docker/Compose runtime packaging where Docker is available, then continue with alert transport wiring and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`

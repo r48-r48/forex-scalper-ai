@@ -57,7 +57,7 @@ Known gaps:
 - MT5 non-empty history/deal normalization and controlled demo-order behavior still need explicit approval and validation
 - Docker/Compose runtime image exists but still needs validation in an environment with Docker installed
 - no real alert transport or OpenTelemetry trace path yet
-- no dedicated full-repo Ruff/mypy cleanup baseline yet
+- full-repo Ruff/mypy cleanup baseline exists; cleanup remains pending
 
 ## Roadmap Status
 
@@ -76,6 +76,7 @@ Known gaps:
 - Real Windows MT5 terminal connection/order_check smoke: completed on 2026-04-28 without order_send.
 - Safe Windows MT5 broker probe and comment-limit hardening: completed on 2026-04-28 without order_send.
 - Paper-safe Docker/Compose runtime packaging: completed on 2026-04-28 as source/config; Docker build/run validation remains pending in a Docker-enabled environment.
+- Full-repo Ruff/mypy cleanup baseline: completed on 2026-04-28 as measurement and cleanup plan in `docs/lint-typecheck-baseline.md`.
 - Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream
@@ -449,7 +450,7 @@ Recommended next MT5 slice:
 
 If further MT5 validation is paused, the next non-MT5 work is platform cleanup:
 1. Validate the Docker/Compose runtime image in a Docker-enabled environment.
-2. Create a full-repo Ruff/mypy cleanup baseline.
+2. Retire the full-repo Ruff/mypy baseline in small cleanup batches.
 3. Wire alert-rule documents to an actual transport after the runtime topology is fixed.
 
 Then run:

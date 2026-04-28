@@ -114,6 +114,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added Makefile targets `docker-build`, `compose-paper`, `compose-health`, and `compose-metrics`
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/docker-runtime.md`
   - Docker build/run validation remains pending because this local environment has no `docker` binary
+- 2026-04-28 completed full-repo Ruff/mypy cleanup baseline:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/lint-typecheck-baseline.md`
+  - added Makefile targets `lint-baseline` and `typecheck-baseline`
+  - Ruff baseline: `511` historical issues, `331` fixable with `--fix`
+  - mypy baseline: `51` errors in `30` files
+  - cleanup should proceed in small batches, with targeted Ruff remaining mandatory for newly touched code
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -210,6 +216,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `docker-compose.yml` parsed successfully with PyYAML after Docker/Compose packaging
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after Docker/Compose packaging
 - 2026-04-28: `.venv/bin/pytest` -> `158 passed` after Docker/Compose packaging
+- 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `511` historical issues
+- 2026-04-28: `.venv/bin/mypy src` -> `51` errors in `30` files
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after lint/typecheck baseline
+- 2026-04-28: `.venv/bin/pytest` -> `158 passed` after lint/typecheck baseline
 - `.venv/bin/pytest` -> `158 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
@@ -235,7 +245,7 @@ Continue MT5 demo validation when the Windows terminal is available:
 - reconcile resulting order/deal/position state through existing snapshot contracts
 
 If further MT5 validation is paused:
-- validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with alert transport wiring and full-repo Ruff/mypy cleanup
+- validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## If Context Gets Compressed
 

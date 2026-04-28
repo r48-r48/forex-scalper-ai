@@ -38,7 +38,9 @@ make install
 make compile
 make test
 make lint
+make lint-baseline
 make typecheck
+make typecheck-baseline
 make run-paper
 make health-paper
 make mt5-preflight
@@ -53,6 +55,7 @@ Equivalent raw commands:
 PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts
 python3 -m pytest
 python3 -m ruff check src tests scripts
+python3 -m ruff check src tests scripts --statistics
 python3 -m mypy src
 python3 scripts/run_runtime.py describe --config-name paper
 python3 scripts/run_runtime.py health --config-name paper

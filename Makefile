@@ -2,7 +2,7 @@ PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
 PYTHONPYCACHEPREFIX ?= /tmp/scalper_ai_pycache
 
-.PHONY: help install test compile lint typecheck run-paper health-paper metrics-paper mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics
+.PHONY: help install test compile lint lint-baseline typecheck typecheck-baseline run-paper health-paper metrics-paper mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics
 
 help:
 	@echo "Available targets:"
@@ -10,7 +10,9 @@ help:
 	@echo "  test           Run the full pytest suite"
 	@echo "  compile        Compile src, tests, and scripts"
 	@echo "  lint           Run ruff checks"
+	@echo "  lint-baseline  Run ruff checks with statistics for cleanup tracking"
 	@echo "  typecheck      Run mypy"
+	@echo "  typecheck-baseline Run mypy for cleanup tracking"
 	@echo "  run-paper      Print paper runtime summary"
 	@echo "  health-paper   Print paper runtime health snapshot"
 	@echo "  metrics-paper  Print paper runtime metrics"
@@ -33,7 +35,13 @@ compile:
 lint:
 	$(PYTHON) -m ruff check src tests scripts
 
+lint-baseline:
+	$(PYTHON) -m ruff check src tests scripts --statistics
+
 typecheck:
+	$(PYTHON) -m mypy src
+
+typecheck-baseline:
 	$(PYTHON) -m mypy src
 
 run-paper:

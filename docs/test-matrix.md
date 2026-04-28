@@ -51,5 +51,5 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 - MT5 unit tests use fake modules, while the Windows broker probe now proves connection, symbol/tick polling, empty history polling, FOK `order_check`, and 29-character comment clamping against a real authorized demo terminal without `order_send`.
 - Backtesting V1 models immediate market fills with explicit costs; execution-aware V2 now covers latency, queue position, partial fills, stale/closed markets, and cancel/replace races with forced-scenario tests.
 - Baseline strategies are deterministic and report explicit costs, but they still rely on replayed feature-frame quality and do not prove live broker profitability.
-- Linting is exposed through `make lint`. The local Python 3.9.6 environment does not include ruff; the Python 3.12.13 `.venv` can run ruff, but full-repo lint still has a historical backlog while the new P1.1-P2.1 source/test files pass targeted ruff checks.
-- Full type checking is exposed through `make typecheck`, but mypy is not yet part of the GitHub Actions gate until a dedicated mypy baseline pass is reviewed.
+- Linting is exposed through `make lint` and `make lint-baseline`. The Python 3.12.13 `.venv` baseline currently reports `511` historical Ruff issues; newly touched code should keep targeted Ruff checks green.
+- Full type checking is exposed through `make typecheck` and `make typecheck-baseline`. The Python 3.12.13 `.venv` baseline currently reports `51` mypy errors in `30` files, so mypy is not yet part of the GitHub Actions gate.
