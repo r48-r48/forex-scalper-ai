@@ -324,7 +324,7 @@ Current repository status:
 - Safe Windows MT5 broker probe completed on 2026-04-28 through the normalized client with account/terminal/symbol/tick/history diagnostics, EURUSD FOK `order_check` retcode `0` / `Done`, and no `order_send`
 - MT5 Python bridge order-comment limit was validated at `29` characters; `Mt5TerminalClient` now sanitizes and clamps comments before `order_check` or `order_send`
 - Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config: `Dockerfile`, `.dockerignore`, Compose `paper-runtime`, Makefile targets, and `docs/docker-runtime.md`; Docker build/run validation remains pending because this local environment has no `docker` binary
-- Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `434`; mypy has `51` errors in `30` files
+- Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `374`; mypy has `51` errors in `30` files
 - Local JSONL alert transport completed on 2026-04-28: `scalper_ai.deployment.alerts` converts warning/failing health snapshots into alert events and appends them through `JsonlAlertTransport`
 - HTTP webhook alert transport completed on 2026-04-28: `WebhookAlertTransport` posts batched health-alert JSON through an explicit HTTP(S) endpoint with timeout/header controls and config/env fields
 - Logging-utils Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `434` to `433` issues
@@ -351,6 +351,8 @@ Current repository status:
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after safe MT5 broker probe hardening
 - `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after safe MT5 broker probe hardening
 - Windows MT5 safe broker probe passed on 2026-04-28: `accepted=true`, `retcode=0`, `comment=Done`, zero open orders/positions, zero raw history counts, and `order_send_called=false`
+- Parallels Windows 11 MT5 smoke passed on 2026-04-28: connected to Dukascopy Bank SA demo account `610769553` on `Dukascopy-demo-mt5-1`, zero open orders/positions, and no order submission
+- Parallels Windows 11 MT5 broker probe passed on 2026-04-28 with EURUSD IOC: `order_check.accepted=true`, `retcode=0`, `comment=Done`, and `order_send_called=false`; EURUSD FOK returned safe rejection `retcode=10030`, `Unsupported filling mode`
 - `.venv/bin/python scripts/run_runtime.py describe --config-name paper`, `health --config-name paper`, and `metrics --config-name paper` passed on 2026-04-28 after Docker/Compose packaging
 - `docker-compose.yml` parsed successfully with PyYAML on 2026-04-28 after Docker/Compose packaging
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after Docker/Compose packaging
@@ -435,6 +437,7 @@ Current repository status:
   - P1.4 Paper And Shadow Mode is complete: `scalper_ai.validation.shadow` provides decision-only champion/challenger reporting and JSON artifact persistence without broker orders
   - P1.3 Unified Validation Report is complete: `scalper_ai.validation.gate` provides pass/warn/fail validation reports, thresholds, risk flags, latency/slippage summaries, regime breakdown, and JSON artifact persistence
   - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, safe broker probe, empty history polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
+  - Same-Mac Parallels Windows 11 MT5 validation is working through `prlctl exec --current-user`: Dukascopy demo account `610769553` connects, EURUSD IOC `order_check` passes, FOK is rejected as unsupported filling mode, and `order_send` remains untested/blocked pending explicit operator approval plus a fresh trade-permission check
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
   - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `374` Ruff issues after scripts/config/logging/journal/OMS/validation/models/risk cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes

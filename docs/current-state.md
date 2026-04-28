@@ -123,12 +123,13 @@
   - models Ruff cleanup was completed, reducing the full Ruff backlog from `402` to `392`
   - risk Ruff cleanup was completed, reducing the full Ruff backlog from `392` to `374`
   - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `165 passed`
+  - Parallels Windows 11 MT5 validation was completed on the same Mac through `prlctl exec` without SSH: MT5, Python 3.12.10, the project, and `MetaTrader5==5.0.5735` are installed in the VM; `mt5_smoke.py` connected to Dukascopy demo account `610769553`; `mt5_broker_probe.py` confirmed EURUSD tick/symbol/account diagnostics and accepted IOC `order_check`; FOK was rejected by the broker as an unsupported filling mode; no `order_send` call was made
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
 - The repository now has research, validation, baseline strategies, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, OMS/RiskEngine layers, validation gates, shadow reports, supervised baseline filtering, and operational runbooks.
-- The next work should focus on deeper MT5 demo validation after explicit operator approval for demo-order behavior, Docker runtime validation on a Docker-enabled host, network alert transport, and retiring the full-repo lint/typecheck baseline in small batches.
+- The next work should focus on deeper MT5 demo validation after explicit operator approval for demo-order behavior, non-empty history/deal normalization, Docker runtime validation on a Docker-enabled host, network alert transport, and retiring the full-repo lint/typecheck baseline in small batches.
 
 ## Important Constraints
 
@@ -216,6 +217,10 @@
 - `.venv/bin/pytest tests/unit/test_risk_engine.py` passed on 2026-04-28 with `12 passed` after risk cleanup.
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after risk cleanup.
 - `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after risk cleanup.
+- Parallels Windows 11 MT5 setup passed on 2026-04-28 through direct `prlctl exec --current-user`: MT5 official desktop terminal is installed at `C:\Program Files\MetaTrader 5\terminal64.exe`, the Windows local project copy is at `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai`, Python is `3.12.10`, and `MetaTrader5` imports as `5.0.5735`.
+- Parallels MT5 smoke passed on 2026-04-28: `scripts\mt5_smoke.py --config-name mt5` connected to Dukascopy Bank SA demo account `610769553` on `Dukascopy-demo-mt5-1`, balance/equity `100000.0`, leverage `100`, zero open orders, zero open positions, and ping around `4 ms`; no order submission was attempted.
+- Parallels MT5 safe broker probe passed on 2026-04-28 with EURUSD IOC: `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --include-raw-samples` returned `order_check.accepted=true`, `retcode=0`, `comment=Done`, margin `527.7`, zero raw orders/deals in the 24-hour window, `order_send_called=false`, EURUSD `filling_mode=2`, spread `2`, and live tick visibility.
+- Parallels MT5 FOK probe on Dukascopy EURUSD returned `retcode=10030`, `Unsupported filling mode`; use IOC for this broker/symbol unless future symbol metadata changes.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
@@ -249,5 +254,5 @@
 ## Exact Next Step
 
 Move to post-phase hardening:
-- continue MT5 demo validation beyond connection/order_check/broker-probe: explicit terminal path, optional env credentials, non-empty history/deal normalization, and controlled demo-order behavior only after explicit operator approval
+- continue MT5 demo validation beyond connection/order_check/broker-probe: optional env credentials, non-empty history/deal normalization, IOC execution settings for Dukascopy EURUSD, and controlled demo-order behavior only after explicit operator approval
 - if further MT5 validation is paused, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`

@@ -172,6 +172,15 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated risk tests to use `datetime.UTC`
   - targeted Ruff is now green for `src/scalper_ai/risk` and `tests/unit/test_risk_engine.py`
   - full Ruff baseline dropped from `392` to `374` issues
+- 2026-04-28 completed same-Mac Parallels Windows 11 MT5 setup and safe demo validation:
+  - VM: `Windows 11`, accessed directly with `prlctl exec --current-user`; SSH is not required for this VM
+  - Windows project copy: `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai`
+  - MT5 terminal: `C:\Program Files\MetaTrader 5\terminal64.exe`
+  - Python: `3.12.10`; `MetaTrader5` package: `5.0.5735`
+  - `scripts\mt5_smoke.py --config-name mt5` connected to Dukascopy Bank SA demo account `610769553` on `Dukascopy-demo-mt5-1`, with balance/equity `100000.0`, leverage `100`, zero open orders, zero open positions, and no order submission
+  - `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --include-raw-samples` returned `order_check.accepted=true`, `retcode=0`, `comment=Done`, `order_send_called=false`, spread `2`, and live tick visibility
+  - EURUSD FOK probe returned `retcode=10030`, `Unsupported filling mode`; use IOC for Dukascopy EURUSD unless broker symbol metadata changes
+  - Terminal reports `tradeapi_disabled=false`; `terminal.trade_allowed=false` was observed, so actual demo-order behavior still requires explicit operator approval plus a fresh trade-permission check before any `order_send`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -226,6 +235,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - Target-environment validation now uses the local `.venv` built from bundled Python 3.12.13.
 - `scripts/run_runtime.py` works from the repo without editable install because it now bootstraps `src/` into `sys.path`.
 - `scripts/handoff.py status` already reflects the post-phase roadmap.
+- Same-Mac Parallels VM access works through `prlctl exec "Windows 11" --current-user ...`; use this for MT5 checks instead of the Windows notebook SSH path when the VM is running.
 
 ## Recent Verification
 
@@ -321,6 +331,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `374` historical issues after risk cleanup
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after risk cleanup
 - 2026-04-28: `.venv/bin/pytest` -> `165 passed` after risk cleanup
+- 2026-04-28: Parallels Windows 11 `scripts\mt5_smoke.py --config-name mt5` -> connected to Dukascopy Bank SA demo account `610769553`, zero open orders/positions, no order submission
+- 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force fok --include-raw-samples` -> rejected safely with `retcode=10030`, `Unsupported filling mode`, `order_send_called=false`
+- 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --include-raw-samples` -> `order_check.accepted=true`, `retcode=0`, `comment=Done`, `order_send_called=false`
 - `.venv/bin/pytest` -> `165 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
@@ -340,9 +353,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 ## Recommended Next Move
 
 Continue MT5 demo validation when the Windows terminal is available:
-- document explicit terminal path/env wiring
 - validate non-empty history/deal normalization
-- exercise a controlled demo-order path only after explicit operator approval
+- lock in broker-specific IOC behavior for Dukascopy EURUSD
+- exercise a controlled demo-order path only after explicit operator approval and a fresh trade-permission check
 - reconcile resulting order/deal/position state through existing snapshot contracts
 
 If further MT5 validation is paused:
