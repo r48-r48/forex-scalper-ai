@@ -111,13 +111,14 @@
   - safe MT5 broker probe tooling was added for account/terminal/symbol/tick/history/order_check diagnostics without `order_send`
   - real Windows MT5 broker probe through the normalized client passed with EURUSD FOK `order_check` retcode `0` / `Done`, zero orders/positions, and no order submission
   - the live MetaTrader5 Python bridge comment limit was validated at `29` characters, and `Mt5TerminalClient` now sanitizes/clamps order comments before `order_check` or `order_send`
+  - paper-safe Docker/Compose runtime packaging was added around the PHASE 12 runtime without live credentials or live order submission
   - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `158 passed`
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
 - The repository now has research, validation, baseline strategies, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, OMS/RiskEngine layers, validation gates, shadow reports, supervised baseline filtering, and operational runbooks.
-- The next work should focus on deeper MT5 demo validation after explicit operator approval for demo-order behavior, Docker/Compose runtime packaging, alert wiring, and full-repo lint/typecheck cleanup.
+- The next work should focus on deeper MT5 demo validation after explicit operator approval for demo-order behavior, Docker runtime validation on a Docker-enabled host, alert wiring, and full-repo lint/typecheck cleanup.
 
 ## Important Constraints
 
@@ -154,6 +155,11 @@
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after the safe MT5 broker probe.
 - `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after the safe MT5 broker probe.
 - Windows MT5 safe broker probe passed on 2026-04-28 through SSH: `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force fok --include-raw-samples` returned `accepted=true`, `retcode=0`, `comment=Done`, zero open orders/positions, zero raw history counts in the 24-hour window, and `order_send_called=false`.
+- `Dockerfile`, `.dockerignore`, Compose `paper-runtime`, and Makefile Docker targets were added on 2026-04-28; Docker build/run validation was not executed because this local environment does not have `docker` installed.
+- `.venv/bin/python scripts/run_runtime.py describe --config-name paper`, `health --config-name paper`, and `metrics --config-name paper` passed on 2026-04-28 after Docker/Compose packaging.
+- `docker-compose.yml` parsed successfully with PyYAML on 2026-04-28 after Docker/Compose packaging.
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after Docker/Compose packaging.
+- `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after Docker/Compose packaging.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
@@ -188,4 +194,4 @@
 
 Move to post-phase hardening:
 - continue MT5 demo validation beyond connection/order_check/broker-probe: explicit terminal path, optional env credentials, non-empty history/deal normalization, and controlled demo-order behavior only after explicit operator approval
-- if further MT5 validation is paused, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`
+- if further MT5 validation is paused, validate Docker/Compose runtime packaging where Docker is available, then continue with alert transport wiring and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`

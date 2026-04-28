@@ -51,10 +51,11 @@ Already implemented:
 - Windows MT5 terminal connection and broker-side order_check smoke against an authorized demo session, without order_send
 - safe MT5 broker probe through the normalized client, including account/terminal/symbol/tick/history diagnostics and FOK order_check, without order_send
 - MT5 Python bridge comment-limit discovery and client-side comment sanitization/clamping at 29 characters
+- paper-safe Dockerfile and Compose `paper-runtime` profile around the PHASE 12 runtime
 
 Known gaps:
 - MT5 non-empty history/deal normalization and controlled demo-order behavior still need explicit approval and validation
-- no Docker/Compose runtime image yet
+- Docker/Compose runtime image exists but still needs validation in an environment with Docker installed
 - no real alert transport or OpenTelemetry trace path yet
 - no dedicated full-repo Ruff/mypy cleanup baseline yet
 
@@ -74,6 +75,7 @@ Known gaps:
 - P2.3 Release Runbooks: completed on 2026-04-28 as documented procedures and templates.
 - Real Windows MT5 terminal connection/order_check smoke: completed on 2026-04-28 without order_send.
 - Safe Windows MT5 broker probe and comment-limit hardening: completed on 2026-04-28 without order_send.
+- Paper-safe Docker/Compose runtime packaging: completed on 2026-04-28 as source/config; Docker build/run validation remains pending in a Docker-enabled environment.
 - Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream
@@ -446,7 +448,7 @@ Recommended next MT5 slice:
 4. Reconcile the resulting order/deal/position state back through the existing snapshot contracts.
 
 If further MT5 validation is paused, the next non-MT5 work is platform cleanup:
-1. Add a Docker/Compose runtime image around the paper-safe default.
+1. Validate the Docker/Compose runtime image in a Docker-enabled environment.
 2. Create a full-repo Ruff/mypy cleanup baseline.
 3. Wire alert-rule documents to an actual transport after the runtime topology is fixed.
 

@@ -1,0 +1,17 @@
+.git
+.github
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__
+*.egg-info
+*.py[cod]
+.env
+.env.*
+data/artifacts/*
+data/processed/*
+data/raw/*
+!data/artifacts/.gitkeep
+!data/processed/.gitkeep
+!data/raw/.gitkeep

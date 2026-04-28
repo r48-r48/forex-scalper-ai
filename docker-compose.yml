@@ -1,4 +1,27 @@
 services:
+  paper-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: forex-scalper-ai:local
+    profiles:
+      - paper
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      SCALPER_AI_REDIS_HOST: redis
+      SCALPER_AI_REDIS_PORT: "6379"
+      SCALPER_AI_DATA_RAW_DIR: /app/data/raw
+      SCALPER_AI_DATA_PROCESSED_DIR: /app/data/processed
+      SCALPER_AI_DATA_ARTIFACTS_DIR: /app/data/artifacts
+      SCALPER_AI_BROKER_LIVE_ENABLED: "false"
+      SCALPER_AI_BROKER_LIVE_ADAPTER: unconfigured
+      SCALPER_AI_LOG_JSON: "true"
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./data:/app/data
+
   redis:
     image: redis:7.4-alpine
     container_name: forex-scalper-ai-redis

@@ -323,6 +323,7 @@ Current repository status:
 - Windows MT5 terminal connection/order_check smoke completed on 2026-04-28 through SSH against an authorized demo terminal session, without order_send
 - Safe Windows MT5 broker probe completed on 2026-04-28 through the normalized client with account/terminal/symbol/tick/history diagnostics, EURUSD FOK `order_check` retcode `0` / `Done`, and no `order_send`
 - MT5 Python bridge order-comment limit was validated at `29` characters; `Mt5TerminalClient` now sanitizes and clamps comments before `order_check` or `order_send`
+- Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config: `Dockerfile`, `.dockerignore`, Compose `paper-runtime`, Makefile targets, and `docs/docker-runtime.md`; Docker build/run validation remains pending because this local environment has no `docker` binary
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -341,6 +342,10 @@ Current repository status:
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after safe MT5 broker probe hardening
 - `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after safe MT5 broker probe hardening
 - Windows MT5 safe broker probe passed on 2026-04-28: `accepted=true`, `retcode=0`, `comment=Done`, zero open orders/positions, zero raw history counts, and `order_send_called=false`
+- `.venv/bin/python scripts/run_runtime.py describe --config-name paper`, `health --config-name paper`, and `metrics --config-name paper` passed on 2026-04-28 after Docker/Compose packaging
+- `docker-compose.yml` parsed successfully with PyYAML on 2026-04-28 after Docker/Compose packaging
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after Docker/Compose packaging
+- `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after Docker/Compose packaging
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -376,6 +381,7 @@ Current repository status:
   - P1.3 Unified Validation Report is complete: `scalper_ai.validation.gate` provides pass/warn/fail validation reports, thresholds, risk flags, latency/slippage summaries, regime breakdown, and JSON artifact persistence
   - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, safe broker probe, empty history polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
+  - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
   - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `158 passed`
@@ -405,7 +411,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
   - continue deeper MT5 demo validation when the Windows terminal is available, especially non-empty history/deal normalization and controlled demo-order behavior only after explicit operator approval
-  - if MT5 remains unavailable, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup
+  - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with alert transport wiring and full-repo Ruff/mypy cleanup
 
 ## Constraints To Preserve
 
@@ -423,7 +429,7 @@ Current repository status:
 
 - continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, especially non-empty history/deal normalization and demo-order behavior only after explicit approval
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
-- add Docker/Compose runtime packaging, alert transport wiring, dependency supervision, and long-running runtime hardening
+- validate Docker/Compose runtime packaging, then add alert transport wiring, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface
 
 ## Suggested Next Prompt For A New Chat

@@ -42,6 +42,9 @@ make typecheck
 make run-paper
 make health-paper
 make mt5-preflight
+make docker-build
+make compose-paper
+make compose-health
 ```
 
 Equivalent raw commands:
@@ -117,6 +120,15 @@ Further MT5 validation still requires:
 
 ## Docker
 
-The repository currently ships `docker-compose.yml` with Redis for development infrastructure.
-Docker/Kubernetes production packaging remains deferred until real MT5 terminal validation is
-complete.
+The repository ships a paper-safe runtime image plus Compose wiring:
+
+```bash
+make docker-build
+make compose-paper
+make compose-health
+make compose-metrics
+```
+
+`paper-runtime` is profile-gated and keeps live trading disabled by default. See `docs/docker-runtime.md`.
+
+Kubernetes production packaging remains deferred until Compose-based paper/shadow operation is stable.

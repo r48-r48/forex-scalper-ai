@@ -10,9 +10,11 @@ forex-scalper-ai/
   .github/
     workflows/
       ci.yml
+  .dockerignore
   .gitignore
   AGENTS.md
   AGENT_HANDOFF.md
+  Dockerfile
   Makefile
   README.md
   SESSION_CHECKPOINT.md
@@ -37,6 +39,7 @@ forex-scalper-ai/
     baseline-strategies.md
     current-state.md
     dev-setup.md
+    docker-runtime.md
     execution-simulator-v2.md
     event-schema.md
     incident-template.md

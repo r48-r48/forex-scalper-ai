@@ -2,7 +2,7 @@ PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
 PYTHONPYCACHEPREFIX ?= /tmp/scalper_ai_pycache
 
-.PHONY: help install test compile lint typecheck run-paper health-paper metrics-paper mt5-preflight run-replay
+.PHONY: help install test compile lint typecheck run-paper health-paper metrics-paper mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics
 
 help:
 	@echo "Available targets:"
@@ -16,6 +16,10 @@ help:
 	@echo "  metrics-paper  Print paper runtime metrics"
 	@echo "  mt5-preflight  Run read-only MT5 preflight diagnostics"
 	@echo "  run-replay     Show replay tick collector help"
+	@echo "  docker-build   Build the paper-safe runtime image"
+	@echo "  compose-paper  Run the paper runtime summary through Docker Compose"
+	@echo "  compose-health Run the paper runtime health check through Docker Compose"
+	@echo "  compose-metrics Run the paper runtime metrics surface through Docker Compose"
 
 install:
 	$(PIP) install -e ".[dev,ml]"
@@ -46,3 +50,15 @@ mt5-preflight:
 
 run-replay:
 	$(PYTHON) scripts/collect_ticks.py --help
+
+docker-build:
+	docker build -t forex-scalper-ai:local .
+
+compose-paper:
+	docker compose --profile paper run --rm paper-runtime describe --config-name paper
+
+compose-health:
+	docker compose --profile paper run --rm paper-runtime health --config-name paper
+
+compose-metrics:
+	docker compose --profile paper run --rm paper-runtime metrics --config-name paper

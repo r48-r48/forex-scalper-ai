@@ -107,6 +107,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - real Windows probe through SSH returned EURUSD FOK `order_check` `accepted=true`, `retcode=0`, `comment=Done`, margin `11.71`, zero orders/positions, zero raw history counts in the 24-hour window, and `order_send_called=false`
   - a raw live-terminal comment probe showed the `MetaTrader5` Python bridge accepts order comments through length `29` and rejects `30+`; `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/mt5_client.py` now sanitizes comments to ASCII alphanumeric/underscore and clamps at `29`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_execution_mt5_client.py` now covers unsafe/long client-order IDs and the 29-character comment clamp
+- 2026-04-28 completed paper-safe Docker/Compose runtime packaging as source/config:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/Dockerfile`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/.dockerignore`
+  - added Compose `paper-runtime` profile to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docker-compose.yml`
+  - added Makefile targets `docker-build`, `compose-paper`, `compose-health`, and `compose-metrics`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/docker-runtime.md`
+  - Docker build/run validation remains pending because this local environment has no `docker` binary
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -198,6 +205,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after safe MT5 broker probe hardening
 - 2026-04-28: `.venv/bin/pytest` -> `158 passed` after safe MT5 broker probe hardening
 - 2026-04-28: Windows MT5 safe broker probe through SSH -> `accepted=true`, `retcode=0`, `comment=Done`, zero open orders/positions, zero raw history counts, and `order_send_called=false`
+- 2026-04-28: `command -v docker` -> no Docker binary available in the local Codex environment, so Docker build/run validation was not executed
+- 2026-04-28: `.venv/bin/python scripts/run_runtime.py describe --config-name paper`, `health --config-name paper`, and `metrics --config-name paper` -> passed after Docker/Compose packaging
+- 2026-04-28: `docker-compose.yml` parsed successfully with PyYAML after Docker/Compose packaging
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after Docker/Compose packaging
+- 2026-04-28: `.venv/bin/pytest` -> `158 passed` after Docker/Compose packaging
 - `.venv/bin/pytest` -> `158 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
@@ -223,7 +235,7 @@ Continue MT5 demo validation when the Windows terminal is available:
 - reconcile resulting order/deal/position state through existing snapshot contracts
 
 If further MT5 validation is paused:
-- continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup
+- validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with alert transport wiring and full-repo Ruff/mypy cleanup
 
 ## If Context Gets Compressed
 

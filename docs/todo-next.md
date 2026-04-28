@@ -7,7 +7,7 @@
 ## Current Next Step
 
 - Continue MT5 demo validation beyond the completed Windows terminal connection/order_check/broker-probe smoke: explicit terminal path, optional env credentials, non-empty history/deal normalization, and controlled demo-order behavior only after explicit operator approval.
-- If further MT5 work is paused, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
+- If further MT5 work is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with alert transport wiring and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
 
 ## Deliverables
 
@@ -26,8 +26,9 @@
 - Windows MT5 terminal connection and broker-side order_check smoke against an authorized demo session — completed on 2026-04-28 without order_send
 - safe MT5 broker probe through the normalized client, including terminal/account/symbol/tick/history diagnostics and broker-side FOK order_check — completed on 2026-04-28 without order_send
 - MT5 Python bridge order-comment limit discovery and client-side sanitize/clamp fix — completed on 2026-04-28
+- paper-safe Docker/Compose runtime packaging around the PHASE 12 runtime — completed on 2026-04-28 as source/config; Docker build/run validation remains pending on a Docker-enabled host
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
-- deeper operational hardening for Docker/Compose runtime packaging, alert transport wiring, and dependency supervision beyond the current broker health checks
+- deeper operational hardening for Docker/Compose runtime validation, alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup around full-repo lint/typecheck baselines and startup ergonomics
 
 ## Must-Have Capabilities

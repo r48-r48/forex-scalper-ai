@@ -22,16 +22,17 @@ Already present:
 - MT5 preflight diagnostics
 - unified journal contracts
 - OMS/RiskEngine safety controls
+- paper-safe Dockerfile and Compose `paper-runtime` profile
 
 ## Next Platform Steps
 
 Docker/Compose first:
 
-- define a runtime image for research and paper-safe execution
-- mount configs and artifact directories explicitly
-- run Redis or any future infrastructure dependency through Compose
+- validate the runtime image in an environment with Docker installed
+- keep configs and artifact directories mounted explicitly
+- keep Redis or any future infrastructure dependency through Compose
 - keep live credentials outside images
-- make paper mode the default container command
+- keep paper mode the default container command
 
 Service boundaries only when needed:
 
