@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType
 
 
-class OmsOrderStatus(str, Enum):
+class OmsOrderStatus(StrEnum):
     """Canonical OMS lifecycle states."""
 
     NEW = "new"
@@ -79,10 +78,10 @@ class OmsOrderRecord:
     status: OmsOrderStatus
     created_at: datetime
     updated_at: datetime
-    broker_order_id: Optional[str] = None
+    broker_order_id: str | None = None
     filled_quantity: float = 0.0
-    rejection_reason: Optional[str] = None
-    cancel_reason: Optional[str] = None
+    rejection_reason: str | None = None
+    cancel_reason: str | None = None
 
     def __post_init__(self) -> None:
         _ensure_aware(self.created_at, field_name="created_at")
@@ -95,7 +94,7 @@ class OmsOrderRecord:
             raise ValueError("broker_order_id must be non-empty when provided.")
 
     @classmethod
-    def new(cls, intent: OrderIntent) -> "OmsOrderRecord":
+    def new(cls, intent: OrderIntent) -> OmsOrderRecord:
         """Create a NEW OMS record from an order intent."""
 
         return cls(

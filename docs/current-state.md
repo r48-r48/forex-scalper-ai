@@ -118,6 +118,7 @@
   - HTTP webhook alert transport was added for batched health-alert delivery with config/env wiring and fake-opener unit coverage
   - logging utilities Ruff cleanup was completed, reducing the full Ruff backlog from `434` to `433`
   - journal Ruff cleanup was completed, reducing the full Ruff backlog from `433` to `416`
+  - OMS Ruff cleanup was completed, reducing the full Ruff backlog from `416` to `409`
   - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `165 passed`
 
 ## Current Problem / Current Focus
@@ -196,6 +197,10 @@
 - `.venv/bin/pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-28 with `6 passed` after journal cleanup.
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after journal cleanup.
 - `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after journal cleanup.
+- OMS Ruff cleanup passed on 2026-04-28: targeted Ruff is green for `src/scalper_ai/services` and `tests/unit/test_services_oms.py`; full Ruff baseline dropped from `416` to `409` issues.
+- `.venv/bin/pytest tests/unit/test_services_oms.py` passed on 2026-04-28 with `5 passed` after OMS cleanup.
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after OMS cleanup.
+- `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after OMS cleanup.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.

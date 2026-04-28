@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -14,8 +14,7 @@ from scalper_ai.services import (
     transition_order,
 )
 
-
-BASE_TS = datetime(2026, 4, 27, 11, 0, tzinfo=timezone.utc)
+BASE_TS = datetime(2026, 4, 27, 11, 0, tzinfo=UTC)
 
 
 def test_oms_order_lifecycle_accepts_valid_transitions() -> None:
