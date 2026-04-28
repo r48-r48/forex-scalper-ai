@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import importlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-import importlib
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Protocol
@@ -194,7 +194,9 @@ def discover_mt5_terminal_path(
     candidates = (
         _expand_mt5_path_candidate(configured_path)
         if configured_path is not None
-        else _iter_mt5_terminal_candidates(search_roots=DEFAULT_MT5_SEARCH_ROOTS if search_roots is None else search_roots)
+        else _iter_mt5_terminal_candidates(
+            search_roots=DEFAULT_MT5_SEARCH_ROOTS if search_roots is None else search_roots
+        )
     )
     for candidate in candidates:
         expanded = candidate.expanduser()
@@ -222,10 +224,14 @@ def _iter_mt5_terminal_candidates(
 def _expand_mt5_path_candidate(path: Path) -> tuple[Path, ...]:
     expanded = path.expanduser()
     candidates: list[Path] = [expanded]
-    is_bundle_like = expanded.suffix.lower() == ".app" or expanded.name in DEFAULT_MT5_APP_BUNDLE_NAMES
+    is_bundle_like = (
+        expanded.suffix.lower() == ".app" or expanded.name in DEFAULT_MT5_APP_BUNDLE_NAMES
+    )
     if is_bundle_like or expanded.is_dir():
         candidates.extend(expanded / suffix for suffix in DEFAULT_MT5_BUNDLE_EXECUTABLE_SUFFIXES)
-        candidates.extend(expanded / executable_name for executable_name in DEFAULT_MT5_EXECUTABLE_NAMES)
+        candidates.extend(
+            expanded / executable_name for executable_name in DEFAULT_MT5_EXECUTABLE_NAMES
+        )
     return tuple(candidates)
 
 
@@ -420,14 +426,19 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         if not positions:
             return None
         if len(positions) > 1:
-            raise RuntimeError("MT5 client expects one netting position per symbol, but multiple positions were found.")
+            raise RuntimeError(
+                "MT5 client expects one netting position per symbol, "
+                "but multiple positions were found."
+            )
         return self._normalize_position_record(positions[0])
 
     def list_positions(self) -> tuple[Mt5PositionState, ...]:
         """Return normalized broker positions for reconciliation."""
 
         self._ensure_initialized()
-        positions = [self._normalize_position_record(raw_position) for raw_position in self._positions_get()]
+        positions = [
+            self._normalize_position_record(raw_position) for raw_position in self._positions_get()
+        ]
         return tuple(sorted(positions, key=lambda position: position.broker_symbol))
 
     def is_connected(self) -> bool:
@@ -472,7 +483,9 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         if not initialized:
             raise RuntimeError(f"MT5 initialize failed: {self._last_error_message()}")
         if self._module.account_info() is None:
-            raise RuntimeError("MT5 initialize succeeded but account_info() returned no active account.")
+            raise RuntimeError(
+                "MT5 initialize succeeded but account_info() returned no active account."
+            )
         self._initialized = True
 
     def _build_order_payload(self, request: Mt5OrderRequest) -> dict[str, Any]:
@@ -502,7 +515,9 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         ask = self._coerce_float(tick.get("ask"))
         bid = self._coerce_float(tick.get("bid"))
         if ask is None or bid is None:
-            raise RuntimeError(f"MT5 symbol_info_tick returned no usable bid/ask for {broker_symbol}.")
+            raise RuntimeError(
+                f"MT5 symbol_info_tick returned no usable bid/ask for {broker_symbol}."
+            )
         return ask if side is OrderSide.BUY else bid
 
     @staticmethod
@@ -547,15 +562,25 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             remaining_volume_lots=remaining_volume_lots,
             historical=historical,
         )
-        submitted_at = self._payload_timestamp(payload, primary="time_setup_msc", fallback="time_setup")
+        submitted_at = self._payload_timestamp(
+            payload, primary="time_setup_msc", fallback="time_setup"
+        )
         updated_at = self._payload_timestamp(
             payload,
             primary="time_done_msc",
             fallback="time_done",
             default=submitted_at,
         )
-        rejection_reason = self._coerce_optional_str(payload.get("comment")) if status is ExecutionOrderStatus.REJECTED else None
-        cancel_reason = self._coerce_optional_str(payload.get("comment")) if status is ExecutionOrderStatus.CANCELED else None
+        rejection_reason = (
+            self._coerce_optional_str(payload.get("comment"))
+            if status is ExecutionOrderStatus.REJECTED
+            else None
+        )
+        cancel_reason = (
+            self._coerce_optional_str(payload.get("comment"))
+            if status is ExecutionOrderStatus.CANCELED
+            else None
+        )
         return Mt5OrderState(
             broker_order_id=broker_order_id,
             broker_symbol=broker_symbol,
@@ -608,7 +633,9 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             ticket = kwargs.get("ticket")
             if ticket is None:
                 return orders
-            return tuple(order for order in orders if self._coerce_mapping(order).get("ticket") == ticket)
+            return tuple(
+                order for order in orders if self._coerce_mapping(order).get("ticket") == ticket
+            )
 
     def _positions_get(self, **kwargs: Any) -> tuple[Any, ...]:
         try:
@@ -618,23 +645,33 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             symbol = kwargs.get("symbol")
             if symbol is None:
                 return positions
-            return tuple(position for position in positions if self._coerce_mapping(position).get("symbol") == symbol)
+            return tuple(
+                position
+                for position in positions
+                if self._coerce_mapping(position).get("symbol") == symbol
+            )
 
     def _history_orders_get(self, **kwargs: Any) -> tuple[Any, ...]:
         start_time, end_time = self._history_window()
         try:
-            return self._safe_sequence(self._module.history_orders_get(start_time, end_time, **kwargs))
+            return self._safe_sequence(
+                self._module.history_orders_get(start_time, end_time, **kwargs)
+            )
         except TypeError:
             orders = self._safe_sequence(self._module.history_orders_get(start_time, end_time))
             ticket = kwargs.get("ticket")
             if ticket is None:
                 return orders
-            return tuple(order for order in orders if self._coerce_mapping(order).get("ticket") == ticket)
+            return tuple(
+                order for order in orders if self._coerce_mapping(order).get("ticket") == ticket
+            )
 
     def _history_deals_get(self, **kwargs: Any) -> tuple[Any, ...]:
         start_time, end_time = self._history_window()
         try:
-            return self._safe_sequence(self._module.history_deals_get(start_time, end_time, **kwargs))
+            return self._safe_sequence(
+                self._module.history_deals_get(start_time, end_time, **kwargs)
+            )
         except TypeError:
             deals = self._safe_sequence(self._module.history_deals_get(start_time, end_time))
             ticket = kwargs.get("ticket")
@@ -643,18 +680,21 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             return tuple(
                 deal
                 for deal in deals
-                if self._coerce_mapping(deal).get("order") == ticket or self._coerce_mapping(deal).get("ticket") == ticket
+                if self._coerce_mapping(deal).get("order") == ticket
+                or self._coerce_mapping(deal).get("ticket") == ticket
             )
 
     def _history_window(self) -> tuple[datetime, datetime]:
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         start_time = end_time - timedelta(hours=self._config.history_lookback_hours)
         return start_time, end_time
 
     def _ensure_symbol_selected(self, symbol: str) -> None:
         selected = self._module.symbol_select(symbol, True)
         if not selected:
-            raise RuntimeError(f"MT5 symbol_select failed for {symbol}: {self._last_error_message()}")
+            raise RuntimeError(
+                f"MT5 symbol_select failed for {symbol}: {self._last_error_message()}"
+            )
 
     def _build_rejected_state(
         self,
@@ -711,7 +751,9 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
 
     def _result_timestamp(self, result: Any, *, fallback: datetime) -> datetime:
         payload = self._coerce_mapping(result)
-        return self._payload_timestamp(payload, primary="time_msc", fallback="time", default=fallback)
+        return self._payload_timestamp(
+            payload, primary="time_msc", fallback="time", default=fallback
+        )
 
     @staticmethod
     def _result_comment(result: Any) -> str | None:
@@ -777,11 +819,17 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
     def _order_type_code(self, side: OrderSide, order_type: OrderType) -> int:
         side_prefix = "BUY" if side is OrderSide.BUY else "SELL"
         if order_type is OrderType.MARKET:
-            return getattr(self._module, f"ORDER_TYPE_{side_prefix}", 0 if side is OrderSide.BUY else 1)
+            return getattr(
+                self._module, f"ORDER_TYPE_{side_prefix}", 0 if side is OrderSide.BUY else 1
+            )
         if order_type is OrderType.LIMIT:
-            return getattr(self._module, f"ORDER_TYPE_{side_prefix}_LIMIT", 2 if side is OrderSide.BUY else 3)
+            return getattr(
+                self._module, f"ORDER_TYPE_{side_prefix}_LIMIT", 2 if side is OrderSide.BUY else 3
+            )
         if order_type is OrderType.STOP:
-            return getattr(self._module, f"ORDER_TYPE_{side_prefix}_STOP", 4 if side is OrderSide.BUY else 5)
+            return getattr(
+                self._module, f"ORDER_TYPE_{side_prefix}_STOP", 4 if side is OrderSide.BUY else 5
+            )
         if order_type is OrderType.STOP_LIMIT:
             return getattr(
                 self._module,
@@ -803,7 +851,13 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         return getattr(self._module, "ORDER_FILLING_RETURN", 2)
 
     def _comment_for(self, suffix: str) -> str:
-        return f"{self._config.order_comment_prefix}:{suffix}"[:31]
+        raw_comment = f"{self._config.order_comment_prefix}_{suffix}"
+        safe_comment = "".join(
+            character if character.isascii() and character.isalnum() else "_"
+            for character in raw_comment
+        ).strip("_")
+        # The MetaTrader5 Python bridge rejects comments at 30+ characters.
+        return (safe_comment or "scalper_ai")[:29]
 
     def _last_error_message(self) -> str:
         error = self._module.last_error()
@@ -821,10 +875,10 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
     ) -> datetime:
         primary_value = payload.get(primary)
         if primary_value is not None:
-            return datetime.fromtimestamp(float(primary_value) / 1000.0, tz=timezone.utc)
+            return datetime.fromtimestamp(float(primary_value) / 1000.0, tz=UTC)
         fallback_value = payload.get(fallback)
         if fallback_value is not None:
-            return datetime.fromtimestamp(float(fallback_value), tz=timezone.utc)
+            return datetime.fromtimestamp(float(fallback_value), tz=UTC)
         if default is not None:
             return default
         raise ValueError("MT5 payload did not contain a usable timestamp.")

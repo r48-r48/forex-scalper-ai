@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 from scalper_ai.domain import OrderSide, OrderType
 from scalper_ai.execution import ExecutionOrderStatus
-from scalper_ai.execution.mt5_client import Mt5TerminalClient, Mt5TerminalClientConfig, discover_mt5_terminal_path
+from scalper_ai.execution.mt5_client import (
+    Mt5TerminalClient,
+    Mt5TerminalClientConfig,
+    discover_mt5_terminal_path,
+)
 from scalper_ai.execution.mt5_live import Mt5OrderRequest
 
 
@@ -23,7 +27,7 @@ def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission(
         ),
         module=module,
     )
-    submitted_at = datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc)
+    submitted_at = datetime(2026, 3, 28, 14, 0, tzinfo=UTC)
 
     state = client.submit_order(
         Mt5OrderRequest(
@@ -58,11 +62,11 @@ def test_mt5_terminal_client_exposes_normalized_order_check_result() -> None:
 
     check = client.check_order(
         Mt5OrderRequest(
-            client_order_id="intent-check",
+            client_order_id="intent:check/with spaces",
             broker_symbol="EURUSD.a",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
-            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc),
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
             volume_lots=1.0,
         )
     )
@@ -71,6 +75,7 @@ def test_mt5_terminal_client_exposes_normalized_order_check_result() -> None:
     assert check.retcode == 0
     assert check.margin == 100.0
     assert check.margin_free == 249900.0
+    assert module.last_order_check_payload["comment"] == "scalper_ai_intent_check_with_"
 
 
 def test_mt5_terminal_client_rejects_order_when_order_check_rejects_without_sending() -> None:
@@ -91,7 +96,7 @@ def test_mt5_terminal_client_rejects_order_when_order_check_rejects_without_send
             broker_symbol="EURUSD.a",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
-            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc),
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
             volume_lots=1.0,
         )
     )
@@ -117,7 +122,7 @@ def test_mt5_terminal_client_rejects_order_when_order_check_returns_none() -> No
             broker_symbol="EURUSD.a",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
-            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc),
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
             volume_lots=1.0,
         )
     )
@@ -143,7 +148,7 @@ def test_mt5_terminal_client_keeps_send_failure_after_successful_check_as_reject
             broker_symbol="EURUSD.a",
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
-            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=timezone.utc),
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
             volume_lots=1.0,
         )
     )
@@ -177,7 +182,13 @@ def test_mt5_terminal_client_describes_account_positions_and_closes_cleanly() ->
 
 def test_discover_mt5_terminal_path_finds_macos_bundle_executable(tmp_path: Path) -> None:
     applications_root = tmp_path / "Applications"
-    executable = applications_root / "MetaTrader 5.app" / "Wrapper" / "MetaTrader5Terminal.app" / "MetaTrader5Terminal"
+    executable = (
+        applications_root
+        / "MetaTrader 5.app"
+        / "Wrapper"
+        / "MetaTrader5Terminal.app"
+        / "MetaTrader5Terminal"
+    )
     executable.parent.mkdir(parents=True)
     executable.write_text("binary", encoding="utf-8")
 

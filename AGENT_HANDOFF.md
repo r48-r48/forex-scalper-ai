@@ -321,6 +321,8 @@ Current repository status:
 - P2.2 Observability Expansion completed on 2026-04-28 as alert-rule docs and platform roadmap
 - P2.3 Release Runbooks completed on 2026-04-28 as production checklist, incident/postmortem templates, and runbooks
 - Windows MT5 terminal connection/order_check smoke completed on 2026-04-28 through SSH against an authorized demo terminal session, without order_send
+- Safe Windows MT5 broker probe completed on 2026-04-28 through the normalized client with account/terminal/symbol/tick/history diagnostics, EURUSD FOK `order_check` retcode `0` / `Done`, and no `order_send`
+- MT5 Python bridge order-comment limit was validated at `29` characters; `Mt5TerminalClient` now sanitizes and clamps comments before `order_check` or `order_send`
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -335,6 +337,10 @@ Current repository status:
 - `.venv/bin/pytest` passed on 2026-04-28 with `157 passed` after P1.3-P2.3
 - `.venv/bin/ruff check` passed on the new P1.3-P2.1 source/test files on 2026-04-28
 - Windows MT5 smoke/probe passed on 2026-04-28: package import, terminal/account snapshot, EURUSD tick, FOK order_check retcode 0 / Done, zero open orders and positions, and no order_send
+- `.venv/bin/ruff check scripts/mt5_broker_probe.py tests/unit/test_scripts_mt5_broker_probe.py src/scalper_ai/execution/mt5_client.py tests/unit/test_execution_mt5_client.py` passed on 2026-04-28
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after safe MT5 broker probe hardening
+- `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after safe MT5 broker probe hardening
+- Windows MT5 safe broker probe passed on 2026-04-28: `accepted=true`, `retcode=0`, `comment=Done`, zero open orders/positions, zero raw history counts, and `order_send_called=false`
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -356,7 +362,7 @@ Current repository status:
 - `python3 scripts/mt5_smoke.py --help` passed on 2026-03-28
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed on 2026-03-28 and auto-discovered the local MT5 terminal path
 - `python3 scripts/mt5_smoke.py --config-name mt5` now fails with structured JSON preflight diagnostics on 2026-03-28 when dependencies are missing
-- repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `157 passed`
+- repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `158 passed`
 
 ## Last Session Snapshot
 
@@ -368,17 +374,18 @@ Current repository status:
   - P2.1 Supervised Baseline Filter is complete: `scalper_ai.models.baseline_filter` provides the transparent filter, while `scalper_ai.validation.supervised_filter` provides train-only fit and test-only walk-forward evaluation
   - P1.4 Paper And Shadow Mode is complete: `scalper_ai.validation.shadow` provides decision-only champion/challenger reporting and JSON artifact persistence without broker orders
   - P1.3 Unified Validation Report is complete: `scalper_ai.validation.gate` provides pass/warn/fail validation reports, thresholds, risk flags, latency/slippage summaries, regime breakdown, and JSON artifact persistence
-  - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
+  - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, safe broker probe, empty history polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
+  - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
-  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `157 passed`
+  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `158 passed`
   - P0.4 OMS/RiskEngine State Machine is complete: `scalper_ai.services.oms` now provides lifecycle transition validation and emergency flatten intents, while `scalper_ai.risk.engine` provides deterministic pre-trade risk checks and journalable risk decisions
   - P0.3 Unified Event Journal Contract is complete: `scalper_ai.journal` now provides `JournalEvent`, `JournalEventType`, JSONL writer/reader, flat record export, and `docs/event-schema.md`
   - P0.2 MT5 Safe Submit Chain is complete: `Mt5TerminalClient.submit_order()` now runs `order_check` before `order_send`, failed or unavailable checks return structured rejections, and fake-module tests cover check/send paths
   - stale project-memory paths were updated to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
   - Pydantic warning cleanup was completed for logging config field naming and domain model JSON config
   - repository-wide `pytest` passed in the available Python 3.9.6 environment with `109 passed` and no Pydantic warnings before P0.2
-  - repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `157 passed`
+  - repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `158 passed`
   - pure execution reconciliation helpers were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
   - reconciliation is now wired into `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/runtime.py` health and metrics surfaces
   - broker snapshot contract and internal execution state tracker were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/snapshots.py`
@@ -397,7 +404,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue deeper MT5 demo validation when the Windows terminal is available, especially history/deal normalization and controlled demo-order behavior only after explicit operator approval
+  - continue deeper MT5 demo validation when the Windows terminal is available, especially non-empty history/deal normalization and controlled demo-order behavior only after explicit operator approval
   - if MT5 remains unavailable, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup
 
 ## Constraints To Preserve
@@ -414,7 +421,7 @@ Current repository status:
 
 ## Post-Phase Focus
 
-- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session
+- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, especially non-empty history/deal normalization and demo-order behavior only after explicit approval
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
 - add Docker/Compose runtime packaging, alert transport wiring, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface

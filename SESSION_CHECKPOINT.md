@@ -100,6 +100,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `scripts\mt5_smoke.py --config-name mt5 --preflight-only` and full smoke connected to an authorized demo terminal session
   - direct broker probe validated terminal/account snapshots, `6053` symbols, EURUSD tick data, zero open orders, zero open positions, and FOK `order_check` retcode `0` / `Done`
   - no `order_send()` call was made
+- 2026-04-28 completed safe MT5 broker probe hardening:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/mt5_broker_probe.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_mt5_broker_probe.py`
+  - the script collects preflight, account, terminal, symbol, tick, normalized orders/positions, raw history counts, and optional `order_check` diagnostics without calling `order_send`
+  - real Windows probe through SSH returned EURUSD FOK `order_check` `accepted=true`, `retcode=0`, `comment=Done`, margin `11.71`, zero orders/positions, zero raw history counts in the 24-hour window, and `order_send_called=false`
+  - a raw live-terminal comment probe showed the `MetaTrader5` Python bridge accepts order comments through length `29` and rejects `30+`; `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/mt5_client.py` now sanitizes comments to ASCII alphanumeric/underscore and clamps at `29`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_execution_mt5_client.py` now covers unsafe/long client-order IDs and the 29-character comment clamp
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -110,7 +117,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - The test now uses the current UTC timestamp instead of a stale fixed `2026-03-28` timestamp, so broker connectivity health is not downgraded to `WARN` only because time has passed.
 - Full repository-wide `python3 -m pytest` passed again in the available host environment with `109 passed` before P0.2.
 - PHASE 12 deployment/runtime layer is implemented.
-- Full repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `157 passed`.
+- Full repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `158 passed`.
 - Added pure execution reconciliation helpers in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
 - Wired reconciliation into deployment/runtime health and metrics in:
@@ -187,7 +194,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/pytest` -> `157 passed` after P1.3-P2.3
 - 2026-04-28: `.venv/bin/ruff check` on the new P1.3-P2.1 source/test files -> passed
 - 2026-04-28: Windows MT5 smoke/probe through SSH -> connected, terminal/account snapshots available, EURUSD FOK order_check passed, no orders sent
-- `.venv/bin/pytest` -> `157 passed`
+- 2026-04-28: `.venv/bin/ruff check scripts/mt5_broker_probe.py tests/unit/test_scripts_mt5_broker_probe.py src/scalper_ai/execution/mt5_client.py tests/unit/test_execution_mt5_client.py` -> passed
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after safe MT5 broker probe hardening
+- 2026-04-28: `.venv/bin/pytest` -> `158 passed` after safe MT5 broker probe hardening
+- 2026-04-28: Windows MT5 safe broker probe through SSH -> `accepted=true`, `retcode=0`, `comment=Done`, zero open orders/positions, zero raw history counts, and `order_send_called=false`
+- `.venv/bin/pytest` -> `158 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -207,7 +218,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 Continue MT5 demo validation when the Windows terminal is available:
 - document explicit terminal path/env wiring
-- validate history/deal normalization
+- validate non-empty history/deal normalization
 - exercise a controlled demo-order path only after explicit operator approval
 - reconcile resulting order/deal/position state through existing snapshot contracts
 

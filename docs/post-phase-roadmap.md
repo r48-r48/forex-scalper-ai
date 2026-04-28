@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `.venv/bin/pytest` passed with `157 passed` on 2026-04-28 in the Python 3.12.13 target-validation environment.
+- Current repository state: PHASE 1-12 complete, `.venv/bin/pytest` passed with `158 passed` on 2026-04-28 in the Python 3.12.13 target-validation environment.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -49,9 +49,11 @@ Already implemented:
 - interpretable supervised baseline filter with leakage-safe walk-forward evaluation
 - observability alert-rule docs, platform roadmap, production checklist, incident/postmortem templates, and release/incident runbooks
 - Windows MT5 terminal connection and broker-side order_check smoke against an authorized demo session, without order_send
+- safe MT5 broker probe through the normalized client, including account/terminal/symbol/tick/history diagnostics and FOK order_check, without order_send
+- MT5 Python bridge comment-limit discovery and client-side comment sanitization/clamping at 29 characters
 
 Known gaps:
-- MT5 history/deal normalization and controlled demo-order behavior still need explicit approval and validation
+- MT5 non-empty history/deal normalization and controlled demo-order behavior still need explicit approval and validation
 - no Docker/Compose runtime image yet
 - no real alert transport or OpenTelemetry trace path yet
 - no dedicated full-repo Ruff/mypy cleanup baseline yet
@@ -71,7 +73,8 @@ Known gaps:
 - P2.2 Observability Expansion: completed on 2026-04-28 as documentation and roadmap.
 - P2.3 Release Runbooks: completed on 2026-04-28 as documented procedures and templates.
 - Real Windows MT5 terminal connection/order_check smoke: completed on 2026-04-28 without order_send.
-- Current next task: deeper MT5 demo validation or, if paused, platform cleanup.
+- Safe Windows MT5 broker probe and comment-limit hardening: completed on 2026-04-28 without order_send.
+- Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream
 

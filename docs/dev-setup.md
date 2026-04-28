@@ -54,6 +54,7 @@ python3 -m mypy src
 python3 scripts/run_runtime.py describe --config-name paper
 python3 scripts/run_runtime.py health --config-name paper
 python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only
+python3 scripts/mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force fok --skip-order-check
 ```
 
 `PYTHONPYCACHEPREFIX` keeps Python bytecode writes inside `/tmp` when sandbox or host permissions prevent writes to the default user cache.
@@ -90,7 +91,7 @@ Expected behavior:
 - health snapshot returns overall `pass`
 - runtime stops after printing the requested surface
 
-## MT5 Preflight
+## MT5 Preflight And Broker Probe
 
 ```bash
 make mt5-preflight
@@ -98,12 +99,21 @@ make mt5-preflight
 
 This is read-only and does not attempt a terminal connection when preflight is not ready. In an environment without the `MetaTrader5` package or credentials, it should print structured diagnostics rather than a traceback.
 
-Real MT5 validation remains pending until:
+When an authorized terminal session is available, run the safe broker probe:
+
+```bash
+python3 scripts/mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force fok --include-raw-samples --output-path data/artifacts/mt5_broker_probe.json
+```
+
+The broker probe reads terminal/account/symbol/tick/history state and can run `order_check`, but it never calls `order_send`.
+
+Further MT5 validation still requires:
 
 - `MetaTrader5` Python package is installed
 - terminal path is configured or auto-discovered
 - `SCALPER_AI_BROKER_MT5_*` credentials are available or terminal-side saved credentials are intentionally used
 - `SCALPER_AI_LIVE_CONFIRMATION` is provided for live-safe runtime startup
+- explicit operator approval before any controlled demo-order `order_send` test
 
 ## Docker
 

@@ -6,7 +6,7 @@
 
 ## Current Next Step
 
-- Continue MT5 demo validation beyond the completed Windows terminal connection/order_check smoke: explicit terminal path, optional env credentials, history/deal normalization, and controlled demo-order behavior only after explicit operator approval.
+- Continue MT5 demo validation beyond the completed Windows terminal connection/order_check/broker-probe smoke: explicit terminal path, optional env credentials, non-empty history/deal normalization, and controlled demo-order behavior only after explicit operator approval.
 - If further MT5 work is paused, continue with Docker/Compose runtime packaging, alert transport wiring, and full-repo Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
 
 ## Deliverables
@@ -24,6 +24,8 @@
 - observability alert-rule docs and platform roadmap — completed on 2026-04-28
 - production checklist, incident/postmortem templates, and release/incident runbooks — completed on 2026-04-28
 - Windows MT5 terminal connection and broker-side order_check smoke against an authorized demo session — completed on 2026-04-28 without order_send
+- safe MT5 broker probe through the normalized client, including terminal/account/symbol/tick/history diagnostics and broker-side FOK order_check — completed on 2026-04-28 without order_send
+- MT5 Python bridge order-comment limit discovery and client-side sanitize/clamp fix — completed on 2026-04-28
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for Docker/Compose runtime packaging, alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup around full-repo lint/typecheck baselines and startup ergonomics
@@ -47,7 +49,7 @@
 ## Validation Goal
 
 - keep repository-wide `pytest` green in Python 3.12.13 and future Python 3.11+ CI/target environments
-- add targeted validation around the MT5-backed live adapter, real terminal behavior, history/deal normalization, reconciliation, and long-running runtime behavior
+- add targeted validation around the MT5-backed live adapter, real terminal behavior, non-empty history/deal normalization, reconciliation, and long-running runtime behavior
 - keep deployment CLI and paper-safe runtime wiring working while hardening the live path
 - keep validation gates and shadow reports as required promotion artifacts for new strategies
 

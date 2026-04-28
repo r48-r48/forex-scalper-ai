@@ -13,7 +13,7 @@ Latest local validation in the available desktop environment:
 Result:
 
 ```text
-157 passed
+158 passed
 ```
 
 The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created with bundled Python 3.12.13 for target-runtime validation.
@@ -30,7 +30,7 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 | RL | `tests/unit/test_rl_*.py`, `tests/integration/test_rl_episode_rollout.py` | deterministic trading environment, policy helpers, rollout/training smoke | Torch | passed locally |
 | Backtesting | `tests/unit/test_backtesting_accounting.py`, `tests/unit/test_backtesting_baselines.py`, `tests/unit/test_backtesting_execution_simulator.py`, `tests/integration/test_backtesting_replay.py` | costs-aware market fills, netting accounting, replay engine V1, baseline strategies, execution-aware V2 scenarios | pandas | passed locally |
 | Validation | `tests/unit/test_validation_metrics.py`, `tests/unit/test_validation_baseline_suite.py`, `tests/unit/test_validation_gate.py`, `tests/unit/test_validation_shadow.py`, `tests/integration/test_validation_walk_forward.py`, `tests/integration/test_baseline_walk_forward_suite.py`, `tests/integration/test_supervised_filter_walk_forward.py` | fold metrics, walk-forward orchestration, backtest-frame conversion, baseline suite and sensitivity reports, validation gate, shadow decisions, supervised filter walk-forward | pandas | passed locally |
-| Execution | `tests/unit/test_execution_*.py`, `tests/integration/test_execution_workflow.py` | paper adapter, router, live stub, MT5 adapter/client fakes, reconciliation | no real broker; fake MT5 modules | passed locally |
+| Execution | `tests/unit/test_execution_*.py`, `tests/unit/test_scripts_mt5_broker_probe.py`, `tests/integration/test_execution_workflow.py` | paper adapter, router, live stub, MT5 adapter/client fakes, reconciliation, safe broker probe payloads | no real broker; fake MT5 modules | passed locally |
 | Journal | `tests/unit/test_journal_events.py`, `tests/integration/test_journal_jsonl.py` | audit event envelope, event categories, JSONL write/read, flat record export | local filesystem | passed locally |
 | OMS/Risk | `tests/unit/test_services_oms.py`, `tests/unit/test_risk_engine.py` | OMS lifecycle transitions, emergency flatten intent, deterministic pre-trade risk blocks, journalable risk decisions | none | passed locally |
 | Deployment | `tests/unit/test_deployment_*.py`, `tests/integration/test_deployment_bootstrap.py` | runtime safety, health, metrics, MT5 preflight, live factory fakes | no real broker; fake MT5 modules | passed locally |
@@ -41,13 +41,13 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 |---|---|---|
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
-| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `157 passed` |
-| Real MT5 terminal smoke | partial pass | Windows notebook, Python 3.12.10, package installed, terminal/account snapshot, EURUSD tick, and FOK order_check passed against demo session; no order_send |
+| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `158 passed` |
+| Real MT5 terminal smoke | partial pass | Windows notebook, Python 3.12.10, package installed, terminal/account snapshot, EURUSD tick, FOK order_check, safe broker probe, and comment-limit validation passed against demo session; no order_send |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
 
 ## Test Risk Notes
 
-- MT5 tests currently use fake modules and do not prove broker behavior against a real terminal.
+- MT5 unit tests use fake modules, while the Windows broker probe now proves connection, symbol/tick polling, empty history polling, FOK `order_check`, and 29-character comment clamping against a real authorized demo terminal without `order_send`.
 - Backtesting V1 models immediate market fills with explicit costs; execution-aware V2 now covers latency, queue position, partial fills, stale/closed markets, and cancel/replace races with forced-scenario tests.
 - Baseline strategies are deterministic and report explicit costs, but they still rely on replayed feature-frame quality and do not prove live broker profitability.
 - Linting is exposed through `make lint`. The local Python 3.9.6 environment does not include ruff; the Python 3.12.13 `.venv` can run ruff, but full-repo lint still has a historical backlog while the new P1.1-P2.1 source/test files pass targeted ruff checks.

@@ -65,6 +65,7 @@ forex-scalper-ai/
   scripts/
     collect_ticks.py
     handoff.py
+    mt5_broker_probe.py
     mt5_smoke.py
     run_runtime.py
   src/
@@ -212,6 +213,7 @@ forex-scalper-ai/
       test_risk_engine.py
       test_rl_environment.py
       test_rl_policy_training.py
+      test_scripts_mt5_broker_probe.py
       test_services_oms.py
       test_validation_baseline_suite.py
       test_validation_gate.py
