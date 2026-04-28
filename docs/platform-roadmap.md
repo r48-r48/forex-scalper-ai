@@ -19,6 +19,7 @@ Already present:
 - GitHub Actions CI for safe non-live checks
 - paper-safe deployment runtime
 - health snapshots and Prometheus-style metrics
+- local JSONL alert rendering from health snapshots
 - MT5 preflight diagnostics
 - unified journal contracts
 - OMS/RiskEngine safety controls
@@ -43,7 +44,7 @@ Service boundaries only when needed:
 - journal/export service
 
 OpenTelemetry should wait until at least two real service boundaries exist.
-Before that, health snapshots, metrics text, JSONL journal events, and logs are enough.
+Before that, health snapshots, metrics text, JSONL alert events, JSONL journal events, and logs are enough.
 
 ## Later, Not Now
 

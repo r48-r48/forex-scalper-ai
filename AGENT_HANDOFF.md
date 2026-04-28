@@ -325,6 +325,7 @@ Current repository status:
 - MT5 Python bridge order-comment limit was validated at `29` characters; `Mt5TerminalClient` now sanitizes and clamps comments before `order_check` or `order_send`
 - Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config: `Dockerfile`, `.dockerignore`, Compose `paper-runtime`, Makefile targets, and `docs/docker-runtime.md`; Docker build/run validation remains pending because this local environment has no `docker` binary
 - Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff has `511` historical issues, mypy has `51` errors in `30` files
+- Local JSONL alert transport completed on 2026-04-28: `scalper_ai.deployment.alerts` converts warning/failing health snapshots into alert events and appends them through `JsonlAlertTransport`
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -351,6 +352,10 @@ Current repository status:
 - `.venv/bin/mypy src` ran on 2026-04-28 and reported `51` errors in `30` files
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after the lint/typecheck baseline
 - `.venv/bin/pytest` passed on 2026-04-28 with `158 passed` after the lint/typecheck baseline
+- `.venv/bin/ruff check src/scalper_ai/deployment/alerts.py src/scalper_ai/deployment/__init__.py tests/unit/test_deployment_alerts.py` passed on 2026-04-28
+- `.venv/bin/pytest tests/unit/test_deployment_alerts.py` passed on 2026-04-28 with `3 passed`
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after alert transport wiring
+- `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after alert transport wiring
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -372,7 +377,7 @@ Current repository status:
 - `python3 scripts/mt5_smoke.py --help` passed on 2026-03-28
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed on 2026-03-28 and auto-discovered the local MT5 terminal path
 - `python3 scripts/mt5_smoke.py --config-name mt5` now fails with structured JSON preflight diagnostics on 2026-03-28 when dependencies are missing
-- repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `158 passed`
+- repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `161 passed`
 
 ## Last Session Snapshot
 
@@ -388,16 +393,17 @@ Current repository status:
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
   - Full-repo Ruff/mypy cleanup baseline is documented; retire it in small batches rather than mixing broad style churn with trading behavior changes
+  - Local JSONL alert transport is implemented; network alert transport remains pending after Docker/runtime topology validation
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
-  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `158 passed`
+  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `161 passed`
   - P0.4 OMS/RiskEngine State Machine is complete: `scalper_ai.services.oms` now provides lifecycle transition validation and emergency flatten intents, while `scalper_ai.risk.engine` provides deterministic pre-trade risk checks and journalable risk decisions
   - P0.3 Unified Event Journal Contract is complete: `scalper_ai.journal` now provides `JournalEvent`, `JournalEventType`, JSONL writer/reader, flat record export, and `docs/event-schema.md`
   - P0.2 MT5 Safe Submit Chain is complete: `Mt5TerminalClient.submit_order()` now runs `order_check` before `order_send`, failed or unavailable checks return structured rejections, and fake-module tests cover check/send paths
   - stale project-memory paths were updated to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
   - Pydantic warning cleanup was completed for logging config field naming and domain model JSON config
   - repository-wide `pytest` passed in the available Python 3.9.6 environment with `109 passed` and no Pydantic warnings before P0.2
-  - repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `158 passed`
+  - repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `161 passed`
   - pure execution reconciliation helpers were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
   - reconciliation is now wired into `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/runtime.py` health and metrics surfaces
   - broker snapshot contract and internal execution state tracker were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/snapshots.py`
@@ -417,7 +423,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
   - continue deeper MT5 demo validation when the Windows terminal is available, especially non-empty history/deal normalization and controlled demo-order behavior only after explicit operator approval
-  - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with alert transport wiring and small-batch Ruff/mypy cleanup
+  - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## Constraints To Preserve
 
@@ -435,7 +441,7 @@ Current repository status:
 
 - continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, especially non-empty history/deal normalization and demo-order behavior only after explicit approval
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
-- validate Docker/Compose runtime packaging, retire lint/typecheck baseline in small batches, then add alert transport wiring, dependency supervision, and long-running runtime hardening
+- validate Docker/Compose runtime packaging, retire lint/typecheck baseline in small batches, then add network alert transport wiring, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface
 
 ## Suggested Next Prompt For A New Chat

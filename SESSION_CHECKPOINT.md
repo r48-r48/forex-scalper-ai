@@ -120,6 +120,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - Ruff baseline: `511` historical issues, `331` fixable with `--fix`
   - mypy baseline: `51` errors in `30` files
   - cleanup should proceed in small batches, with targeted Ruff remaining mandatory for newly touched code
+- 2026-04-28 completed local JSONL alert transport:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/alerts.py`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_deployment_alerts.py`
+  - warning/failing health checks can now be rendered as alert events with UTC timestamps, runtime mode, source check, rule id, severity, and details
+  - `JsonlAlertTransport` appends alerts to local JSONL for incident evidence without network dependencies
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -130,7 +135,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - The test now uses the current UTC timestamp instead of a stale fixed `2026-03-28` timestamp, so broker connectivity health is not downgraded to `WARN` only because time has passed.
 - Full repository-wide `python3 -m pytest` passed again in the available host environment with `109 passed` before P0.2.
 - PHASE 12 deployment/runtime layer is implemented.
-- Full repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `158 passed`.
+- Full repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `161 passed`.
 - Added pure execution reconciliation helpers in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
 - Wired reconciliation into deployment/runtime health and metrics in:
@@ -220,7 +225,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/mypy src` -> `51` errors in `30` files
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after lint/typecheck baseline
 - 2026-04-28: `.venv/bin/pytest` -> `158 passed` after lint/typecheck baseline
-- `.venv/bin/pytest` -> `158 passed`
+- 2026-04-28: `.venv/bin/ruff check src/scalper_ai/deployment/alerts.py src/scalper_ai/deployment/__init__.py tests/unit/test_deployment_alerts.py` -> passed
+- 2026-04-28: `.venv/bin/pytest tests/unit/test_deployment_alerts.py` -> `3 passed`
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after alert transport wiring
+- 2026-04-28: `.venv/bin/pytest` -> `161 passed` after alert transport wiring
+- `.venv/bin/pytest` -> `161 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -245,7 +254,7 @@ Continue MT5 demo validation when the Windows terminal is available:
 - reconcile resulting order/deal/position state through existing snapshot contracts
 
 If further MT5 validation is paused:
-- validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with alert transport wiring and small-batch Ruff/mypy cleanup
+- validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## If Context Gets Compressed
 

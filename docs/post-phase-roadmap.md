@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `.venv/bin/pytest` passed with `158 passed` on 2026-04-28 in the Python 3.12.13 target-validation environment.
+- Current repository state: PHASE 1-12 complete, `.venv/bin/pytest` passed with `161 passed` on 2026-04-28 in the Python 3.12.13 target-validation environment.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -52,11 +52,12 @@ Already implemented:
 - safe MT5 broker probe through the normalized client, including account/terminal/symbol/tick/history diagnostics and FOK order_check, without order_send
 - MT5 Python bridge comment-limit discovery and client-side comment sanitization/clamping at 29 characters
 - paper-safe Dockerfile and Compose `paper-runtime` profile around the PHASE 12 runtime
+- local JSONL alert transport for warning/failing health snapshots
 
 Known gaps:
 - MT5 non-empty history/deal normalization and controlled demo-order behavior still need explicit approval and validation
 - Docker/Compose runtime image exists but still needs validation in an environment with Docker installed
-- no real alert transport or OpenTelemetry trace path yet
+- no network alert transport or OpenTelemetry trace path yet
 - full-repo Ruff/mypy cleanup baseline exists; cleanup remains pending
 
 ## Roadmap Status
@@ -77,6 +78,7 @@ Known gaps:
 - Safe Windows MT5 broker probe and comment-limit hardening: completed on 2026-04-28 without order_send.
 - Paper-safe Docker/Compose runtime packaging: completed on 2026-04-28 as source/config; Docker build/run validation remains pending in a Docker-enabled environment.
 - Full-repo Ruff/mypy cleanup baseline: completed on 2026-04-28 as measurement and cleanup plan in `docs/lint-typecheck-baseline.md`.
+- Local JSONL alert transport: completed on 2026-04-28 for health snapshot alerts.
 - Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream
@@ -451,7 +453,7 @@ Recommended next MT5 slice:
 If further MT5 validation is paused, the next non-MT5 work is platform cleanup:
 1. Validate the Docker/Compose runtime image in a Docker-enabled environment.
 2. Retire the full-repo Ruff/mypy baseline in small cleanup batches.
-3. Wire alert-rule documents to an actual transport after the runtime topology is fixed.
+3. Wire alert-rule documents to a network transport after the runtime topology is fixed.
 
 Then run:
 

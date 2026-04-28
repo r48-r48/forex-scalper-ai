@@ -13,7 +13,7 @@ Latest local validation in the available desktop environment:
 Result:
 
 ```text
-158 passed
+161 passed
 ```
 
 The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created with bundled Python 3.12.13 for target-runtime validation.
@@ -33,7 +33,7 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 | Execution | `tests/unit/test_execution_*.py`, `tests/unit/test_scripts_mt5_broker_probe.py`, `tests/integration/test_execution_workflow.py` | paper adapter, router, live stub, MT5 adapter/client fakes, reconciliation, safe broker probe payloads | no real broker; fake MT5 modules | passed locally |
 | Journal | `tests/unit/test_journal_events.py`, `tests/integration/test_journal_jsonl.py` | audit event envelope, event categories, JSONL write/read, flat record export | local filesystem | passed locally |
 | OMS/Risk | `tests/unit/test_services_oms.py`, `tests/unit/test_risk_engine.py` | OMS lifecycle transitions, emergency flatten intent, deterministic pre-trade risk blocks, journalable risk decisions | none | passed locally |
-| Deployment | `tests/unit/test_deployment_*.py`, `tests/integration/test_deployment_bootstrap.py` | runtime safety, health, metrics, MT5 preflight, live factory fakes | no real broker; fake MT5 modules | passed locally |
+| Deployment | `tests/unit/test_deployment_*.py`, `tests/integration/test_deployment_bootstrap.py` | runtime safety, health, metrics, JSONL alerts, MT5 preflight, live factory fakes | no real broker; fake MT5 modules | passed locally |
 
 ## Environment Classification
 
@@ -41,7 +41,7 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 |---|---|---|
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
-| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `158 passed` |
+| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `161 passed` |
 | Real MT5 terminal smoke | partial pass | Windows notebook, Python 3.12.10, package installed, terminal/account snapshot, EURUSD tick, FOK order_check, safe broker probe, and comment-limit validation passed against demo session; no order_send |
 | Docker/Compose paper runtime | source added, not run locally | `Dockerfile`, `.dockerignore`, `paper-runtime` Compose profile, and Makefile targets exist; this local environment has no `docker` binary |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |

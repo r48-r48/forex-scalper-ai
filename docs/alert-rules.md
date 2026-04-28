@@ -2,8 +2,8 @@
 
 ## Purpose
 
-These rules describe the operational meaning of existing and planned health/metrics surfaces.
-They are written as operator guidance first; wiring to Prometheus, Alertmanager, or another system can happen once deployment topology is fixed.
+These rules describe the operational meaning of existing health/metrics surfaces.
+They are written as operator guidance first and now have a local JSONL transport for file-based alert capture. Prometheus Alertmanager or another network transport can be added once deployment topology is fixed.
 
 ## Broker Disconnect
 
@@ -46,3 +46,12 @@ They are written as operator guidance first; wiring to Prometheus, Alertmanager,
 - Alerts must state whether the runtime is research, paper, or live-safe.
 - Alerts must separate broker state from internal state.
 - Alerts must include the current paper/live posture.
+
+## Current Wiring
+
+- `scalper_ai.deployment.alerts.alerts_from_health_snapshot()` converts warning/failing health checks into alert events.
+- `JsonlAlertTransport` appends alert events to JSONL files for local operations and incident evidence.
+- Broker connectivity maps to `broker_disconnect`.
+- Execution reconciliation maps to `reconciliation_drift`.
+- Execution-mode downgrade maps to `execution_mode_degraded`.
+- Other warning/failing health checks map to `health_<check_name>`.

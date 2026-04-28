@@ -100,6 +100,7 @@ forex-scalper-ai/
         splits.py
       deployment/
         __init__.py
+        alerts.py
         entrypoints.py
         health.py
         live_factory.py
@@ -197,6 +198,7 @@ forex-scalper-ai/
       test_data_labels.py
       test_data_preprocessing.py
       test_data_replay.py
+      test_deployment_alerts.py
       test_deployment_mt5_preflight.py
       test_deployment_runtime.py
       test_domain_features.py

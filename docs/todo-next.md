@@ -7,7 +7,7 @@
 ## Current Next Step
 
 - Continue MT5 demo validation beyond the completed Windows terminal connection/order_check/broker-probe smoke: explicit terminal path, optional env credentials, non-empty history/deal normalization, and controlled demo-order behavior only after explicit operator approval.
-- If further MT5 work is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with alert transport wiring and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
+- If further MT5 work is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
 
 ## Deliverables
 
@@ -28,8 +28,9 @@
 - MT5 Python bridge order-comment limit discovery and client-side sanitize/clamp fix — completed on 2026-04-28
 - paper-safe Docker/Compose runtime packaging around the PHASE 12 runtime — completed on 2026-04-28 as source/config; Docker build/run validation remains pending on a Docker-enabled host
 - full-repo Ruff/mypy cleanup baseline — completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`; cleanup remains pending
+- local JSONL alert transport for health snapshots — completed on 2026-04-28; network alert transport remains pending after runtime topology validation
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
-- deeper operational hardening for Docker/Compose runtime validation, alert transport wiring, and dependency supervision beyond the current broker health checks
+- deeper operational hardening for Docker/Compose runtime validation, network alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics
 
 ## Must-Have Capabilities

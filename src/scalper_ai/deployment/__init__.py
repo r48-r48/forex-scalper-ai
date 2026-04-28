@@ -1,5 +1,11 @@
 """Deployment runtime bootstrap, health, and metrics helpers."""
 
+from scalper_ai.deployment.alerts import (
+    AlertEvent,
+    AlertSeverity,
+    JsonlAlertTransport,
+    alerts_from_health_snapshot,
+)
 from scalper_ai.deployment.entrypoints import bootstrap_runtime
 from scalper_ai.deployment.health import HealthCheckResult, HealthSnapshot, HealthStatus
 from scalper_ai.deployment.live_factory import (
@@ -12,6 +18,8 @@ from scalper_ai.deployment.mt5_preflight import Mt5PreflightReport, build_mt5_pr
 from scalper_ai.deployment.runtime import DeploymentRuntime, RuntimeLifecycleState, RuntimeSummary
 
 __all__ = [
+    "AlertEvent",
+    "AlertSeverity",
     "build_mt5_execution_adapter",
     "build_mt5_preflight_report",
     "build_mt5_terminal_client",
@@ -19,9 +27,11 @@ __all__ = [
     "HealthCheckResult",
     "HealthSnapshot",
     "HealthStatus",
+    "JsonlAlertTransport",
     "MetricSample",
     "MetricsRegistry",
     "Mt5PreflightReport",
+    "alerts_from_health_snapshot",
     "resolve_live_adapter_factory",
     "RuntimeLifecycleState",
     "RuntimeSummary",
