@@ -68,6 +68,22 @@ def test_load_app_config_applies_mt5_env_override(monkeypatch: pytest.MonkeyPatc
     assert config.broker.mt5.symbol_map == {"EURUSD": "EURUSD.a"}
 
 
+def test_load_app_config_applies_alert_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SCALPER_AI_ENV", "research")
+    monkeypatch.setenv(
+        "SCALPER_AI_MONITORING_ALERT_WEBHOOK_URL",
+        "https://alerts.example.test/hooks/scalper",
+    )
+    monkeypatch.setenv("SCALPER_AI_MONITORING_ALERT_WEBHOOK_TIMEOUT_SECONDS", "2.5")
+    monkeypatch.setenv("SCALPER_AI_MONITORING_ALERT_INCLUDE_WARNINGS", "false")
+
+    config = load_app_config(config_dir=resolve_repo_root() / "configs")
+
+    assert config.monitoring.alert_webhook_url == "https://alerts.example.test/hooks/scalper"
+    assert config.monitoring.alert_webhook_timeout_seconds == 2.5
+    assert config.monitoring.alert_include_warnings is False
+
+
 def test_runtime_timezone_must_stay_utc(tmp_path: Path) -> None:
     config_dir = tmp_path / "configs"
     config_dir.mkdir()

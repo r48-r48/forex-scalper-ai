@@ -115,7 +115,8 @@
   - full-repo Ruff/mypy cleanup baseline was captured in `docs/lint-typecheck-baseline.md`
   - local alert transport wiring was added to convert health snapshots into JSONL alert events
   - config-layer Ruff cleanup was completed for `src/scalper_ai/config` and `tests/unit/test_config_loader.py`, reducing the full Ruff backlog from `496` to `434`
-  - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `161 passed`
+  - HTTP webhook alert transport was added for batched health-alert delivery with config/env wiring and fake-opener unit coverage
+  - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `165 passed`
 
 ## Current Problem / Current Focus
 
@@ -180,6 +181,11 @@
 - `.venv/bin/python scripts/run_runtime.py describe --config-name paper` passed on 2026-04-28 after config cleanup.
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after config cleanup.
 - `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after config cleanup.
+- HTTP webhook alert transport passed targeted validation on 2026-04-28 with config/env wiring.
+- `.venv/bin/ruff check src/scalper_ai/deployment/alerts.py src/scalper_ai/deployment/__init__.py tests/unit/test_deployment_alerts.py src/scalper_ai/config tests/unit/test_config_loader.py` passed on 2026-04-28.
+- `.venv/bin/pytest tests/unit/test_deployment_alerts.py tests/unit/test_config_loader.py` passed on 2026-04-28 with `13 passed`.
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after HTTP webhook alert transport.
+- `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after HTTP webhook alert transport.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
@@ -208,7 +214,7 @@
 - `python3 scripts/mt5_smoke.py --help` passed.
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed and auto-discovered the local MT5 terminal bundle path.
 - `python3 scripts/mt5_smoke.py --config-name mt5` now exits with structured JSON preflight diagnostics instead of a raw traceback when dependencies are missing.
-- Full repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `161 passed`.
+- Full repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `165 passed`.
 
 ## Exact Next Step
 

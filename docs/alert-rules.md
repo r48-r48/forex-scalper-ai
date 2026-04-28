@@ -3,7 +3,7 @@
 ## Purpose
 
 These rules describe the operational meaning of existing health/metrics surfaces.
-They are written as operator guidance first and now have a local JSONL transport for file-based alert capture. Prometheus Alertmanager or another network transport can be added once deployment topology is fixed.
+They are written as operator guidance first and now have local JSONL and HTTP webhook transports for alert capture. Prometheus Alertmanager routing can be layered on top of the webhook path once deployment topology is fixed.
 
 ## Broker Disconnect
 
@@ -51,6 +51,8 @@ They are written as operator guidance first and now have a local JSONL transport
 
 - `scalper_ai.deployment.alerts.alerts_from_health_snapshot()` converts warning/failing health checks into alert events.
 - `JsonlAlertTransport` appends alert events to JSONL files for local operations and incident evidence.
+- `WebhookAlertTransport` posts batched alert JSON to an HTTP(S) endpoint with an explicit timeout and optional headers.
+- `monitoring.alert_webhook_url`, `monitoring.alert_webhook_timeout_seconds`, and `monitoring.alert_include_warnings` are available in config/env for operator wiring.
 - Broker connectivity maps to `broker_disconnect`.
 - Execution reconciliation maps to `reconciliation_drift`.
 - Execution-mode downgrade maps to `execution_mode_degraded`.

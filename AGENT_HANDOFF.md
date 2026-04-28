@@ -326,6 +326,7 @@ Current repository status:
 - Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config: `Dockerfile`, `.dockerignore`, Compose `paper-runtime`, Makefile targets, and `docs/docker-runtime.md`; Docker build/run validation remains pending because this local environment has no `docker` binary
 - Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `434`; mypy has `51` errors in `30` files
 - Local JSONL alert transport completed on 2026-04-28: `scalper_ai.deployment.alerts` converts warning/failing health snapshots into alert events and appends them through `JsonlAlertTransport`
+- HTTP webhook alert transport completed on 2026-04-28: `WebhookAlertTransport` posts batched health-alert JSON through an explicit HTTP(S) endpoint with timeout/header controls and config/env fields
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -365,6 +366,11 @@ Current repository status:
 - `.venv/bin/python scripts/run_runtime.py describe --config-name paper` passed on 2026-04-28 after config cleanup
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after config cleanup
 - `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after config cleanup
+- HTTP webhook alert transport passed targeted validation on 2026-04-28 with config/env wiring and no real network calls
+- `.venv/bin/ruff check src/scalper_ai/deployment/alerts.py src/scalper_ai/deployment/__init__.py tests/unit/test_deployment_alerts.py src/scalper_ai/config tests/unit/test_config_loader.py` passed on 2026-04-28
+- `.venv/bin/pytest tests/unit/test_deployment_alerts.py tests/unit/test_config_loader.py` passed on 2026-04-28 with `13 passed`
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after HTTP webhook alert transport
+- `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after HTTP webhook alert transport
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -386,7 +392,7 @@ Current repository status:
 - `python3 scripts/mt5_smoke.py --help` passed on 2026-03-28
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed on 2026-03-28 and auto-discovered the local MT5 terminal path
 - `python3 scripts/mt5_smoke.py --config-name mt5` now fails with structured JSON preflight diagnostics on 2026-03-28 when dependencies are missing
-- repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `161 passed`
+- repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `165 passed`
 
 ## Last Session Snapshot
 
@@ -402,17 +408,17 @@ Current repository status:
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
   - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `434` Ruff issues after scripts/config cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
-  - Local JSONL alert transport is implemented; network alert transport remains pending after Docker/runtime topology validation
+  - Local JSONL alert transport and HTTP webhook alert transport are implemented; concrete endpoint routing remains pending after Docker/runtime topology validation
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
-  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `161 passed`
+  - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `165 passed`
   - P0.4 OMS/RiskEngine State Machine is complete: `scalper_ai.services.oms` now provides lifecycle transition validation and emergency flatten intents, while `scalper_ai.risk.engine` provides deterministic pre-trade risk checks and journalable risk decisions
   - P0.3 Unified Event Journal Contract is complete: `scalper_ai.journal` now provides `JournalEvent`, `JournalEventType`, JSONL writer/reader, flat record export, and `docs/event-schema.md`
   - P0.2 MT5 Safe Submit Chain is complete: `Mt5TerminalClient.submit_order()` now runs `order_check` before `order_send`, failed or unavailable checks return structured rejections, and fake-module tests cover check/send paths
   - stale project-memory paths were updated to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
   - Pydantic warning cleanup was completed for logging config field naming and domain model JSON config
   - repository-wide `pytest` passed in the available Python 3.9.6 environment with `109 passed` and no Pydantic warnings before P0.2
-  - repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `161 passed`
+  - repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `165 passed`
   - pure execution reconciliation helpers were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
   - reconciliation is now wired into `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/runtime.py` health and metrics surfaces
   - broker snapshot contract and internal execution state tracker were added under `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/snapshots.py`

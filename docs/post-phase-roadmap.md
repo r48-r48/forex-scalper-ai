@@ -14,7 +14,7 @@ Read this file after:
 
 ## Source Inputs
 
-- Current repository state: PHASE 1-12 complete, `.venv/bin/pytest` passed with `161 passed` on 2026-04-28 in the Python 3.12.13 target-validation environment.
+- Current repository state: PHASE 1-12 complete, `.venv/bin/pytest` passed with `165 passed` on 2026-04-28 in the Python 3.12.13 target-validation environment.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
 
@@ -57,7 +57,7 @@ Already implemented:
 Known gaps:
 - MT5 non-empty history/deal normalization and controlled demo-order behavior still need explicit approval and validation
 - Docker/Compose runtime image exists but still needs validation in an environment with Docker installed
-- no network alert transport or OpenTelemetry trace path yet
+- HTTP webhook alert transport exists; deployment-specific routing and OpenTelemetry trace path remain pending
 - full-repo Ruff/mypy cleanup baseline exists; cleanup is being retired in small batches
 
 ## Roadmap Status
@@ -81,6 +81,7 @@ Known gaps:
 - Local JSONL alert transport: completed on 2026-04-28 for health snapshot alerts.
 - First scripts Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `511` to `496`.
 - Config-layer Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `496` to `434`.
+- HTTP webhook alert transport: completed on 2026-04-28 with config/env fields and fake-opener unit coverage.
 - Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream
@@ -405,7 +406,7 @@ Definition of done:
 Completed implementation notes:
 - Added `docs/alert-rules.md` for broker disconnect, stale data, reconciliation drift, reject burst, and kill switch activation.
 - Added `docs/platform-roadmap.md` with Docker/Compose first, service boundaries later, and Kubernetes/Helm/Argo deferred.
-- Alert transport and OpenTelemetry remain intentionally deferred until service boundaries exist.
+- Added local JSONL and HTTP webhook alert transports for health snapshot alerts; OpenTelemetry remains intentionally deferred until service boundaries exist.
 
 ### P2.3 — Release Runbooks
 
@@ -455,7 +456,7 @@ Recommended next MT5 slice:
 If further MT5 validation is paused, the next non-MT5 work is platform cleanup:
 1. Validate the Docker/Compose runtime image in a Docker-enabled environment.
 2. Retire the full-repo Ruff/mypy baseline in small cleanup batches.
-3. Wire alert-rule documents to a network transport after the runtime topology is fixed.
+3. Wire the HTTP webhook alert transport into the concrete runtime topology when the target alert endpoint is chosen.
 
 Then run:
 

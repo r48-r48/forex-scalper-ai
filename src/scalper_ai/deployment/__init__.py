@@ -4,6 +4,7 @@ from scalper_ai.deployment.alerts import (
     AlertEvent,
     AlertSeverity,
     JsonlAlertTransport,
+    WebhookAlertTransport,
     alerts_from_health_snapshot,
 )
 from scalper_ai.deployment.entrypoints import bootstrap_runtime
@@ -31,6 +32,7 @@ __all__ = [
     "MetricSample",
     "MetricsRegistry",
     "Mt5PreflightReport",
+    "WebhookAlertTransport",
     "alerts_from_health_snapshot",
     "resolve_live_adapter_factory",
     "RuntimeLifecycleState",

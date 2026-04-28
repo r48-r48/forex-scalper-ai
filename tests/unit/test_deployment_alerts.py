@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import Any
+from urllib.request import Request
+
+import pytest
 
 from scalper_ai.deployment import (
     AlertSeverity,
@@ -11,6 +15,7 @@ from scalper_ai.deployment import (
     HealthSnapshot,
     HealthStatus,
     JsonlAlertTransport,
+    WebhookAlertTransport,
     alerts_from_health_snapshot,
 )
 
@@ -87,6 +92,69 @@ def test_jsonl_alert_transport_appends_alert_events(tmp_path) -> None:
     assert payload["raised_at"] == "2026-04-28T12:00:00+00:00"
 
 
+def test_webhook_alert_transport_posts_alert_batch_json() -> None:
+    snapshot = _snapshot(
+        effective_mode="paper",
+        overall_status=HealthStatus.WARN,
+        checks=(
+            HealthCheckResult(
+                name="runtime_state",
+                status=HealthStatus.WARN,
+                summary="Runtime is running in degraded paper-safe mode.",
+                details={"reason": "paper_fallback"},
+            ),
+        ),
+    )
+    opener = _RecordingOpener(status=202)
+    transport = WebhookAlertTransport(
+        "https://alerts.example.test/hooks/scalper",
+        timeout_seconds=2.5,
+        headers={"X-Alert-Route": "ops"},
+        opener=opener,
+    )
+
+    written = transport.write_alerts(alerts_from_health_snapshot(snapshot))
+
+    assert written == 1
+    assert opener.timeouts == [2.5]
+    request = opener.requests[0]
+    assert request.full_url == "https://alerts.example.test/hooks/scalper"
+    assert request.get_method() == "POST"
+    assert request.get_header("X-alert-route") == "ops"
+    assert request.data is not None
+    payload = json.loads(request.data.decode("utf-8"))
+    assert payload["event_type"] == "scalper_ai_alert_batch"
+    assert payload["alert_count"] == 1
+    assert payload["alerts"][0]["rule_id"] == "health_runtime_state"
+
+
+def test_webhook_alert_transport_raises_on_error_status() -> None:
+    snapshot = _snapshot(
+        effective_mode="live",
+        overall_status=HealthStatus.FAIL,
+        checks=(
+            HealthCheckResult(
+                name="broker_connectivity",
+                status=HealthStatus.FAIL,
+                summary="Broker connectivity check reports the broker dependency as unavailable.",
+                details={"connected": False},
+            ),
+        ),
+    )
+    transport = WebhookAlertTransport(
+        "https://alerts.example.test/hooks/scalper",
+        opener=_RecordingOpener(status=500),
+    )
+
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        transport.write_alerts(alerts_from_health_snapshot(snapshot))
+
+
+def test_webhook_alert_transport_rejects_non_http_urls() -> None:
+    with pytest.raises(ValueError, match="HTTP"):
+        WebhookAlertTransport("file:///tmp/alerts.json")
+
+
 def _snapshot(
     *,
     effective_mode: str,
@@ -102,3 +170,24 @@ def _snapshot(
         overall_status=overall_status,
         checks=checks,
     )
+
+
+class _FakeResponse:
+    def __init__(self, status: int) -> None:
+        self.status = status
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _RecordingOpener:
+    def __init__(self, status: int) -> None:
+        self._status = status
+        self.requests: list[Request] = []
+        self.timeouts: list[float] = []
+
+    def __call__(self, request: Request, timeout: float) -> Any:
+        self.requests.append(request)
+        self.timeouts.append(timeout)
+        return _FakeResponse(self._status)

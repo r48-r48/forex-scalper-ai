@@ -1,13 +1,16 @@
-"""Alert event rendering and file transport for deployment health surfaces."""
+"""Alert event rendering and transports for deployment health surfaces."""
 
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from scalper_ai.deployment.health import HealthCheckResult, HealthSnapshot, HealthStatus
 
@@ -78,6 +81,56 @@ class JsonlAlertTransport:
         return len(alerts)
 
 
+UrlOpener = Callable[[Request, float], Any]
+
+
+class WebhookAlertTransport:
+    """Post alert batches to an HTTP webhook endpoint."""
+
+    def __init__(
+        self,
+        url: str,
+        *,
+        timeout_seconds: float = 5.0,
+        headers: Mapping[str, str] | None = None,
+        opener: UrlOpener | None = None,
+    ) -> None:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("Alert webhook URL must be an absolute HTTP(S) URL.")
+        if timeout_seconds <= 0:
+            raise ValueError("Alert webhook timeout must be positive.")
+        self._url = url
+        self._timeout_seconds = timeout_seconds
+        self._headers = dict(headers or {})
+        self._opener = opener or _default_url_opener
+
+    def write_alerts(self, alerts: tuple[AlertEvent, ...]) -> int:
+        """Post alerts and return the number of submitted events."""
+
+        if not alerts:
+            return 0
+
+        payload = json.dumps(_alert_batch_payload(alerts), sort_keys=True).encode("utf-8")
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "scalper-ai-alerts/0.1",
+            **self._headers,
+        }
+        request = Request(self._url, data=payload, headers=headers, method="POST")
+        response = self._opener(request, self._timeout_seconds)
+        try:
+            status_code = _response_status_code(response)
+            if status_code is not None and status_code >= 400:
+                raise RuntimeError(f"Alert webhook returned HTTP {status_code}.")
+        finally:
+            close = getattr(response, "close", None)
+            if callable(close):
+                close()
+        return len(alerts)
+
+
 def alerts_from_health_snapshot(
     snapshot: HealthSnapshot,
     *,
@@ -139,3 +192,26 @@ def _alert_id(snapshot: HealthSnapshot, rule_id: str, check: HealthCheckResult) 
             snapshot.checked_at.isoformat(),
         )
     )
+
+
+def _alert_batch_payload(alerts: tuple[AlertEvent, ...]) -> dict[str, Any]:
+    return {
+        "event_type": "scalper_ai_alert_batch",
+        "alert_count": len(alerts),
+        "alerts": [alert.to_dict() for alert in alerts],
+    }
+
+
+def _default_url_opener(request: Request, timeout_seconds: float) -> Any:
+    return urlopen(request, timeout=timeout_seconds)
+
+
+def _response_status_code(response: Any) -> int | None:
+    status_code = getattr(response, "status", None)
+    if status_code is None:
+        getcode = getattr(response, "getcode", None)
+        if callable(getcode):
+            status_code = getcode()
+    if status_code is None:
+        return None
+    return int(status_code)

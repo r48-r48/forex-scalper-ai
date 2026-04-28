@@ -137,6 +137,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/config/models.py`
   - targeted Ruff is now green for `src/scalper_ai/config` and `tests/unit/test_config_loader.py`
   - full Ruff baseline dropped from `496` to `434` issues
+- 2026-04-28 completed HTTP webhook alert transport:
+  - extended `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/alerts.py`
+  - exported `WebhookAlertTransport` from `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/__init__.py`
+  - added config/env fields for `monitoring.alert_webhook_url`, timeout, and warning inclusion
+  - tests use a fake opener, so no real network request is made
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -147,7 +152,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - The test now uses the current UTC timestamp instead of a stale fixed `2026-03-28` timestamp, so broker connectivity health is not downgraded to `WARN` only because time has passed.
 - Full repository-wide `python3 -m pytest` passed again in the available host environment with `109 passed` before P0.2.
 - PHASE 12 deployment/runtime layer is implemented.
-- Full repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `161 passed`.
+- Full repository-wide `.venv/bin/pytest` now passes in the Python 3.12.13 target runtime with `165 passed`.
 - Added pure execution reconciliation helpers in:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/reconciliation.py`
 - Wired reconciliation into deployment/runtime health and metrics in:
@@ -252,7 +257,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `434` historical issues after config cleanup
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after config cleanup
 - 2026-04-28: `.venv/bin/pytest` -> `161 passed` after config cleanup
-- `.venv/bin/pytest` -> `161 passed`
+- 2026-04-28: `.venv/bin/ruff check src/scalper_ai/deployment/alerts.py src/scalper_ai/deployment/__init__.py tests/unit/test_deployment_alerts.py src/scalper_ai/config tests/unit/test_config_loader.py` -> passed after webhook alert transport
+- 2026-04-28: `.venv/bin/pytest tests/unit/test_deployment_alerts.py tests/unit/test_config_loader.py` -> `13 passed` after webhook alert transport
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after webhook alert transport
+- 2026-04-28: `.venv/bin/pytest` -> `165 passed` after webhook alert transport
+- `.venv/bin/pytest` -> `165 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`

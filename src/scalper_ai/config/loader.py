@@ -56,6 +56,9 @@ _ENV_FIELD_ALIASES = {
     "monitoring_health_enabled": "MONITORING_HEALTH_ENABLED",
     "monitoring_metrics_enabled": "MONITORING_METRICS_ENABLED",
     "monitoring_service_name": "MONITORING_SERVICE_NAME",
+    "monitoring_alert_webhook_url": "MONITORING_ALERT_WEBHOOK_URL",
+    "monitoring_alert_webhook_timeout_seconds": "MONITORING_ALERT_WEBHOOK_TIMEOUT_SECONDS",
+    "monitoring_alert_include_warnings": "MONITORING_ALERT_INCLUDE_WARNINGS",
     "deployment_create_directories_on_startup": "DEPLOYMENT_CREATE_DIRECTORIES_ON_STARTUP",
     "deployment_fallback_to_paper_on_live_failure": "DEPLOYMENT_FALLBACK_TO_PAPER_ON_LIVE_FAILURE",
     "deployment_require_live_confirmation": "DEPLOYMENT_REQUIRE_LIVE_CONFIRMATION",
@@ -135,6 +138,18 @@ class _EnvOverridesMixin:
         alias="MONITORING_METRICS_ENABLED",
     )
     monitoring_service_name: str | None = Field(default=None, alias="MONITORING_SERVICE_NAME")
+    monitoring_alert_webhook_url: str | None = Field(
+        default=None,
+        alias="MONITORING_ALERT_WEBHOOK_URL",
+    )
+    monitoring_alert_webhook_timeout_seconds: float | None = Field(
+        default=None,
+        alias="MONITORING_ALERT_WEBHOOK_TIMEOUT_SECONDS",
+    )
+    monitoring_alert_include_warnings: bool | None = Field(
+        default=None,
+        alias="MONITORING_ALERT_INCLUDE_WARNINGS",
+    )
     deployment_create_directories_on_startup: bool | None = Field(
         default=None,
         alias="DEPLOYMENT_CREATE_DIRECTORIES_ON_STARTUP",
@@ -238,6 +253,18 @@ class _EnvOverridesMixin:
             ] = self.monitoring_metrics_enabled
         if self.monitoring_service_name is not None:
             overrides.setdefault("monitoring", {})["service_name"] = self.monitoring_service_name
+        if self.monitoring_alert_webhook_url is not None:
+            overrides.setdefault("monitoring", {})[
+                "alert_webhook_url"
+            ] = self.monitoring_alert_webhook_url
+        if self.monitoring_alert_webhook_timeout_seconds is not None:
+            overrides.setdefault("monitoring", {})[
+                "alert_webhook_timeout_seconds"
+            ] = self.monitoring_alert_webhook_timeout_seconds
+        if self.monitoring_alert_include_warnings is not None:
+            overrides.setdefault("monitoring", {})[
+                "alert_include_warnings"
+            ] = self.monitoring_alert_include_warnings
         if self.deployment_create_directories_on_startup is not None:
             overrides.setdefault("deployment", {})[
                 "create_directories_on_startup"

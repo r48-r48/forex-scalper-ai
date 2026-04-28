@@ -66,6 +66,9 @@ monitoring:
   health_enabled: true
   metrics_enabled: true
   service_name: scalper_ai_runtime
+  alert_webhook_url: null
+  alert_webhook_timeout_seconds: 5.0
+  alert_include_warnings: true
 
 deployment:
   create_directories_on_startup: true

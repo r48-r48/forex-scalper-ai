@@ -175,6 +175,9 @@ class MonitoringConfig(BaseModel):
     metrics_enabled: bool = True
     service_name: str = "scalper_ai_runtime"
     broker_snapshot_stale_after_seconds: float = Field(default=30.0, gt=0)
+    alert_webhook_url: str | None = None
+    alert_webhook_timeout_seconds: float = Field(default=5.0, gt=0)
+    alert_include_warnings: bool = True
 
     @field_validator("service_name")
     @classmethod
@@ -182,6 +185,18 @@ class MonitoringConfig(BaseModel):
         normalized = value.strip()
         if not normalized:
             raise ValueError("service_name must be non-empty.")
+        return normalized
+
+    @field_validator("alert_webhook_url")
+    @classmethod
+    def validate_alert_webhook_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("alert_webhook_url must be non-empty when provided.")
+        if not (normalized.startswith("http://") or normalized.startswith("https://")):
+            raise ValueError("alert_webhook_url must use http:// or https://.")
         return normalized
 
 
