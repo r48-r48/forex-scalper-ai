@@ -1,5 +1,7 @@
 """Runtime bootstrap entrypoint with operational summary, health, and metrics surfaces."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +9,6 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = SCRIPT_ROOT / "src"
@@ -15,6 +16,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from scalper_ai.deployment import bootstrap_runtime
+
 
 def parse_args() -> argparse.Namespace:
     """Parse CLI arguments."""

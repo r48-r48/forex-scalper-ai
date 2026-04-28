@@ -1,11 +1,19 @@
 """Replay tick collection script writing canonical raw data to Parquet."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import Annotated
 
 import typer
+
+SCRIPT_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = SCRIPT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 from scalper_ai.config import load_app_config
 from scalper_ai.data import BufferedBatchWriter, RawParquetWriter, ReplayCollector, ReplayTickSource
@@ -16,11 +24,20 @@ app = typer.Typer(add_completion=False, help="Collect canonical tick data from r
 
 @app.command()
 def main(
-    input_path: Path = typer.Argument(..., exists=True, readable=True, help="Replay JSONL or Parquet file."),
-    config_name: str = typer.Option("research", help="Config overlay to load."),
-    output_dir: Optional[Path] = typer.Option(None, help="Optional raw output root override."),
-    batch_size: Optional[int] = typer.Option(None, help="Optional batch size override."),
-    dataset_name: str = typer.Option("ticks", help="Dataset partition name under raw storage."),
+    input_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Replay JSONL or Parquet file."),
+    ],
+    config_name: Annotated[str, typer.Option(help="Config overlay to load.")] = "research",
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(help="Optional raw output root override."),
+    ] = None,
+    batch_size: Annotated[int | None, typer.Option(help="Optional batch size override.")] = None,
+    dataset_name: Annotated[
+        str,
+        typer.Option(help="Dataset partition name under raw storage."),
+    ] = "ticks",
 ) -> None:
     """Collect replay ticks into the raw Parquet dataset."""
 

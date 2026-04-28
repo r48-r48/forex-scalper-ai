@@ -79,6 +79,7 @@ Known gaps:
 - Paper-safe Docker/Compose runtime packaging: completed on 2026-04-28 as source/config; Docker build/run validation remains pending in a Docker-enabled environment.
 - Full-repo Ruff/mypy cleanup baseline: completed on 2026-04-28 as measurement and cleanup plan in `docs/lint-typecheck-baseline.md`.
 - Local JSONL alert transport: completed on 2026-04-28 for health snapshot alerts.
+- First scripts Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `511` to `496`.
 - Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream

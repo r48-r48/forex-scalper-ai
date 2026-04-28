@@ -125,6 +125,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_deployment_alerts.py`
   - warning/failing health checks can now be rendered as alert events with UTC timestamps, runtime mode, source check, rule id, severity, and details
   - `JsonlAlertTransport` appends alerts to local JSONL for incident evidence without network dependencies
+- 2026-04-28 completed first scripts Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/collect_ticks.py`
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/handoff.py`
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/mt5_smoke.py`
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
+  - `collect_ticks.py --help` now works without editable install because it bootstraps `src/`
+  - full Ruff baseline dropped from `511` to `496` issues
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -229,6 +236,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/pytest tests/unit/test_deployment_alerts.py` -> `3 passed`
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after alert transport wiring
 - 2026-04-28: `.venv/bin/pytest` -> `161 passed` after alert transport wiring
+- 2026-04-28: `.venv/bin/ruff check scripts/collect_ticks.py scripts/handoff.py scripts/mt5_smoke.py scripts/run_runtime.py` -> passed after scripts cleanup
+- 2026-04-28: `.venv/bin/python scripts/collect_ticks.py --help`, `scripts/handoff.py prompt`, and `scripts/run_runtime.py describe --config-name paper` -> passed after scripts cleanup
+- 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `496` historical issues after scripts cleanup
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after scripts cleanup
+- 2026-04-28: `.venv/bin/pytest` -> `161 passed` after scripts cleanup
 - `.venv/bin/pytest` -> `161 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`

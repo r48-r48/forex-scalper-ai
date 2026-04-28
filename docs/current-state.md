@@ -170,6 +170,10 @@
 - `.venv/bin/pytest tests/unit/test_deployment_alerts.py` passed on 2026-04-28 with `3 passed`.
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after alert transport wiring.
 - `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after alert transport wiring.
+- Script-entrypoint Ruff cleanup batch passed on 2026-04-28: targeted Ruff is green for `scripts/collect_ticks.py`, `scripts/handoff.py`, `scripts/mt5_smoke.py`, and `scripts/run_runtime.py`; full Ruff baseline dropped from `511` to `496` issues.
+- `.venv/bin/python scripts/collect_ticks.py --help`, `scripts/handoff.py prompt`, and `scripts/run_runtime.py describe --config-name paper` passed on 2026-04-28 after scripts cleanup.
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after scripts cleanup.
+- `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after scripts cleanup.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.

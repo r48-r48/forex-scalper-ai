@@ -29,6 +29,7 @@
 - paper-safe Docker/Compose runtime packaging around the PHASE 12 runtime — completed on 2026-04-28 as source/config; Docker build/run validation remains pending on a Docker-enabled host
 - full-repo Ruff/mypy cleanup baseline — completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`; cleanup remains pending
 - local JSONL alert transport for health snapshots — completed on 2026-04-28; network alert transport remains pending after runtime topology validation
+- first scripts Ruff cleanup batch — completed on 2026-04-28; full Ruff backlog reduced from `511` to `496`
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for Docker/Compose runtime validation, network alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics

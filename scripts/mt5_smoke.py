@@ -1,5 +1,7 @@
 """Read-only MT5 connectivity and account smoke check."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
@@ -73,7 +75,9 @@ def main() -> None:
 
     if not preflight.ready_for_connection:
         payload["connection_attempted"] = False
-        payload["connection_error"] = "MT5 preflight failed. Resolve the reported errors before retrying."
+        payload["connection_error"] = (
+            "MT5 preflight failed. Resolve the reported errors before retrying."
+        )
         print(json.dumps(payload, indent=2, sort_keys=True))
         raise SystemExit(1)
 

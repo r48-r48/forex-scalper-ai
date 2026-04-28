@@ -17,31 +17,33 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result:
+Current result after the first scripts cleanup batch:
 
 ```text
-Found 511 errors.
-331 fixable with --fix.
+Found 496 errors.
+327 fixable with --fix.
 ```
 
 Statistics:
 
 ```text
-156 UP045 non-pep604-annotation-optional
-148 E501  line-too-long
+154 UP045 non-pep604-annotation-optional
+144 E501  line-too-long
 107 UP017 datetime-timezone-utc
- 27 I001  unsorted-imports
+ 26 I001  unsorted-imports
  18 UP035 deprecated-import
  16 UP042 replace-str-enum
  14 UP037 quoted-annotation
   6 B009  get-attr-with-constant
   6 B905  zip-without-explicit-strict
-  5 E402  module-import-not-at-top-of-file
-  3 F401  unused-import
-  2 B008  function-call-in-default-argument
+  2 F401  unused-import
   2 UP007 non-pep604-annotation-union
   1 B007  unused-loop-control-variable
 ```
+
+Completed cleanup batches:
+
+- 2026-04-28: scripts entrypoints cleanup removed script-level `B008`, `E402`, several `E501`, one `I001`, one `F401`, and two `UP045` issues. `collect_ticks.py --help` now works without editable install by bootstrapping `src/` like the other scripts.
 
 Recommended cleanup order:
 

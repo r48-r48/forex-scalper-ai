@@ -33,7 +33,8 @@ def build_resume_prompt() -> str:
     todo_next_path = repo_root() / "docs" / "todo-next.md"
     checkpoint = checkpoint_path()
     return (
-        f"Read `{agents_path}`, `{path}`, `{current_state_path}`, `{todo_next_path}`, and `{checkpoint}`. "
+        f"Read `{agents_path}`, `{path}`, `{current_state_path}`, "
+        f"`{todo_next_path}`, and `{checkpoint}`. "
         "Then inspect the repository and continue from the current phase only. "
         "Follow the existing phased format, keep the implementation production-minded, "
         "and do not redo already completed phases unless a blocking bug is found."
@@ -70,7 +71,9 @@ def show_checkpoint() -> None:
 def main() -> None:
     """CLI entrypoint."""
 
-    parser = argparse.ArgumentParser(description="Session handoff helper for the forex-scalper-ai repo.")
+    parser = argparse.ArgumentParser(
+        description="Session handoff helper for the forex-scalper-ai repo."
+    )
     parser.add_argument(
         "action",
         choices=("path", "show", "prompt", "status", "checkpoint-path", "checkpoint"),
