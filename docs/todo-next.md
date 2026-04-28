@@ -36,6 +36,7 @@
 - journal Ruff cleanup batch — completed on 2026-04-28; full Ruff backlog reduced from `433` to `416`
 - OMS Ruff cleanup batch — completed on 2026-04-28; full Ruff backlog reduced from `416` to `409`
 - validation Ruff cleanup batch — completed on 2026-04-28; full Ruff backlog reduced from `409` to `402`
+- models Ruff cleanup batch — completed on 2026-04-28; full Ruff backlog reduced from `402` to `392`
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for Docker/Compose runtime validation, network alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics

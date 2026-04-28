@@ -86,6 +86,7 @@ Known gaps:
 - Journal Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `433` to `416`.
 - OMS Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `416` to `409`.
 - Validation Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `409` to `402`.
+- Models Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `402` to `392`.
 - Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream

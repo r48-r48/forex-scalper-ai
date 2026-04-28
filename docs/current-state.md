@@ -120,6 +120,7 @@
   - journal Ruff cleanup was completed, reducing the full Ruff backlog from `433` to `416`
   - OMS Ruff cleanup was completed, reducing the full Ruff backlog from `416` to `409`
   - validation Ruff cleanup was completed, reducing the full Ruff backlog from `409` to `402`
+  - models Ruff cleanup was completed, reducing the full Ruff backlog from `402` to `392`
   - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `165 passed`
 
 ## Current Problem / Current Focus
@@ -206,6 +207,10 @@
 - `.venv/bin/pytest tests/unit/test_validation_metrics.py tests/unit/test_validation_gate.py tests/unit/test_validation_shadow.py tests/integration/test_validation_walk_forward.py tests/integration/test_baseline_walk_forward_suite.py tests/integration/test_supervised_filter_walk_forward.py` passed on 2026-04-28 with `11 passed` after validation cleanup.
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after validation cleanup.
 - `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after validation cleanup.
+- Models Ruff cleanup passed on 2026-04-28: targeted Ruff is green for `src/scalper_ai/models` and selected model tests; full Ruff baseline dropped from `402` to `392` issues.
+- `.venv/bin/pytest tests/unit/test_models_transformer.py tests/unit/test_models_tensorizer.py tests/unit/test_models_baseline_filter.py tests/integration/test_model_dataset_bridge.py` passed on 2026-04-28 with `8 passed` after models cleanup.
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after models cleanup.
+- `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after models cleanup.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import pandas as pd
 import torch
@@ -59,7 +58,7 @@ class TransformerSignalModel(nn.Module):
         self,
         inputs: torch.Tensor,
         *,
-        padding_mask: Optional[torch.Tensor] = None,
+        padding_mask: torch.Tensor | None = None,
     ) -> SignalModelOutput:
         """Run a forward pass over [batch, time, feature] inputs."""
 
@@ -68,11 +67,13 @@ class TransformerSignalModel(nn.Module):
         batch_size, context_length, input_size = inputs.shape
         if context_length != self.config.context_length:
             raise ValueError(
-                f"inputs time dimension {context_length} does not match context_length {self.config.context_length}."
+                f"inputs time dimension {context_length} does not match "
+                f"context_length {self.config.context_length}."
             )
         if input_size != self.config.input_size:
             raise ValueError(
-                f"inputs feature dimension {input_size} does not match input_size {self.config.input_size}."
+                f"inputs feature dimension {input_size} does not match "
+                f"input_size {self.config.input_size}."
             )
         if padding_mask is not None and padding_mask.shape != (batch_size, context_length):
             raise ValueError("padding_mask must have shape [batch, time].")
@@ -101,7 +102,7 @@ class TransformerSignalPredictor:
         model: TransformerSignalModel,
         tensorizer: LaggedFeatureTensorizer,
         *,
-        device: Optional[torch.device | str] = None,
+        device: torch.device | str | None = None,
     ) -> None:
         self._model = model
         self._tensorizer = tensorizer
@@ -124,7 +125,7 @@ class TransformerSignalPredictor:
 def causal_attention_mask(
     context_length: int,
     *,
-    device: Optional[torch.device | str] = None,
+    device: torch.device | str | None = None,
 ) -> torch.Tensor:
     """Return an additive causal mask for transformer attention."""
 

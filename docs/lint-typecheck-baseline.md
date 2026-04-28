@@ -17,21 +17,21 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result after the scripts, config-layer, logging-utils, journal, OMS, and validation cleanup batches:
+Current result after scripts, config, logging, journal, OMS, validation, and models cleanup batches:
 
 ```text
-Found 402 errors.
-249 fixable with --fix.
+Found 392 errors.
+244 fixable with --fix.
 ```
 
 Statistics:
 
 ```text
-130 E501  line-too-long
- 99 UP045 non-pep604-annotation-optional
+125 E501  line-too-long
+ 95 UP045 non-pep604-annotation-optional
  94 UP017 datetime-timezone-utc
  22 I001  unsorted-imports
- 17 UP035 deprecated-import
+ 16 UP035 deprecated-import
  14 UP042 replace-str-enum
   9 UP037 quoted-annotation
   6 B009  get-attr-with-constant
@@ -49,6 +49,7 @@ Completed cleanup batches:
 - 2026-04-28: journal cleanup converted `JournalEventType` to `StrEnum`, modernized optional annotations, removed quoted annotations, and switched tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/journal` and journal tests.
 - 2026-04-28: OMS cleanup converted `OmsOrderStatus` to `StrEnum`, modernized optional annotations, removed quoted annotations, and switched tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/services` and OMS tests.
 - 2026-04-28: validation cleanup sorted imports, moved `Sequence` to `collections.abc`, wrapped long walk-forward expressions, and switched validation tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/validation` and selected validation tests.
+- 2026-04-28: models cleanup modernized tensorizer/transformer annotations, moved `Sequence` to `collections.abc`, and wrapped long tensorizer/transformer expressions. Targeted Ruff is green for `src/scalper_ai/models` and selected model tests.
 
 Recommended cleanup order:
 

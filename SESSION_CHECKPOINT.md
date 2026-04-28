@@ -162,6 +162,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated validation tests to use `datetime.UTC`
   - targeted Ruff is now green for `src/scalper_ai/validation` and selected validation tests
   - full Ruff baseline dropped from `409` to `402` issues
+- 2026-04-28 completed models Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/models/tensorizer.py`
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/models/transformer.py`
+  - targeted Ruff is now green for `src/scalper_ai/models` and selected model tests
+  - full Ruff baseline dropped from `402` to `392` issues
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -301,6 +306,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `402` historical issues after validation cleanup
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after validation cleanup
 - 2026-04-28: `.venv/bin/pytest` -> `165 passed` after validation cleanup
+- 2026-04-28: `.venv/bin/ruff check src/scalper_ai/models tests/unit/test_models_transformer.py tests/unit/test_models_tensorizer.py tests/unit/test_models_baseline_filter.py tests/integration/test_model_dataset_bridge.py` -> passed after models cleanup
+- 2026-04-28: `.venv/bin/pytest tests/unit/test_models_transformer.py tests/unit/test_models_tensorizer.py tests/unit/test_models_baseline_filter.py tests/integration/test_model_dataset_bridge.py` -> `8 passed` after models cleanup
+- 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `392` historical issues after models cleanup
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after models cleanup
+- 2026-04-28: `.venv/bin/pytest` -> `165 passed` after models cleanup
 - `.venv/bin/pytest` -> `165 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`

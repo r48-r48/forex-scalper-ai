@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -60,7 +60,9 @@ class LaggedFeatureTensorizer:
             if column_name not in feature_frame.columns
         ]
         if missing:
-            raise ValueError(f"Feature frame is missing required lagged columns: {', '.join(missing)}")
+            raise ValueError(
+                f"Feature frame is missing required lagged columns: {', '.join(missing)}"
+            )
 
         batch_size = int(len(feature_frame))
         array = np.empty(
@@ -69,8 +71,13 @@ class LaggedFeatureTensorizer:
         )
         for lag in range(self._max_lag, -1, -1):
             time_index = self._max_lag - lag
-            column_names = [self._column_map[(lag, feature_name)] for feature_name in self._feature_names]
-            array[:, time_index, :] = feature_frame.loc[:, column_names].to_numpy(dtype=np.float32, copy=True)
+            column_names = [
+                self._column_map[(lag, feature_name)] for feature_name in self._feature_names
+            ]
+            array[:, time_index, :] = feature_frame.loc[:, column_names].to_numpy(
+                dtype=np.float32,
+                copy=True,
+            )
         return array
 
     def transform_targets(self, targets: Sequence[float] | pd.Series) -> np.ndarray:
@@ -84,7 +91,7 @@ class LaggedFeatureTensorizer:
         feature_frame: pd.DataFrame,
         *,
         targets: Sequence[float] | pd.Series | None = None,
-        device: Optional[torch.device | str] = None,
+        device: torch.device | str | None = None,
         dtype: torch.dtype = torch.float32,
     ) -> SignalModelBatch:
         """Build a tensor batch from a lagged feature frame."""
