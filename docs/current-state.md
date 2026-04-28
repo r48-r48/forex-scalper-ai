@@ -114,6 +114,7 @@
   - paper-safe Docker/Compose runtime packaging was added around the PHASE 12 runtime without live credentials or live order submission
   - full-repo Ruff/mypy cleanup baseline was captured in `docs/lint-typecheck-baseline.md`
   - local alert transport wiring was added to convert health snapshots into JSONL alert events
+  - config-layer Ruff cleanup was completed for `src/scalper_ai/config` and `tests/unit/test_config_loader.py`, reducing the full Ruff backlog from `496` to `434`
   - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `161 passed`
 
 ## Current Problem / Current Focus
@@ -174,6 +175,11 @@
 - `.venv/bin/python scripts/collect_ticks.py --help`, `scripts/handoff.py prompt`, and `scripts/run_runtime.py describe --config-name paper` passed on 2026-04-28 after scripts cleanup.
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after scripts cleanup.
 - `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after scripts cleanup.
+- Config-layer Ruff cleanup batch passed on 2026-04-28: targeted Ruff is green for `src/scalper_ai/config` and `tests/unit/test_config_loader.py`; full Ruff baseline dropped from `496` to `434` issues.
+- `.venv/bin/pytest tests/unit/test_config_loader.py` passed on 2026-04-28 with `6 passed` after config cleanup.
+- `.venv/bin/python scripts/run_runtime.py describe --config-name paper` passed on 2026-04-28 after config cleanup.
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after config cleanup.
+- `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after config cleanup.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.

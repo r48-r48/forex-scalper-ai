@@ -132,6 +132,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
   - `collect_ticks.py --help` now works without editable install because it bootstraps `src/`
   - full Ruff baseline dropped from `511` to `496` issues
+- 2026-04-28 completed config-layer Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/config/loader.py`
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/config/models.py`
+  - targeted Ruff is now green for `src/scalper_ai/config` and `tests/unit/test_config_loader.py`
+  - full Ruff baseline dropped from `496` to `434` issues
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -241,6 +246,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `496` historical issues after scripts cleanup
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after scripts cleanup
 - 2026-04-28: `.venv/bin/pytest` -> `161 passed` after scripts cleanup
+- 2026-04-28: `.venv/bin/ruff check src/scalper_ai/config tests/unit/test_config_loader.py` -> passed after config cleanup
+- 2026-04-28: `.venv/bin/pytest tests/unit/test_config_loader.py` -> `6 passed` after config cleanup
+- 2026-04-28: `.venv/bin/python scripts/run_runtime.py describe --config-name paper` -> passed after config cleanup
+- 2026-04-28: `.venv/bin/ruff check src tests scripts --statistics` -> `434` historical issues after config cleanup
+- 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after config cleanup
+- 2026-04-28: `.venv/bin/pytest` -> `161 passed` after config cleanup
 - `.venv/bin/pytest` -> `161 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`

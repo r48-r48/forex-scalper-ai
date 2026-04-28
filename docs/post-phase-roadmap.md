@@ -58,7 +58,7 @@ Known gaps:
 - MT5 non-empty history/deal normalization and controlled demo-order behavior still need explicit approval and validation
 - Docker/Compose runtime image exists but still needs validation in an environment with Docker installed
 - no network alert transport or OpenTelemetry trace path yet
-- full-repo Ruff/mypy cleanup baseline exists; cleanup remains pending
+- full-repo Ruff/mypy cleanup baseline exists; cleanup is being retired in small batches
 
 ## Roadmap Status
 
@@ -80,6 +80,7 @@ Known gaps:
 - Full-repo Ruff/mypy cleanup baseline: completed on 2026-04-28 as measurement and cleanup plan in `docs/lint-typecheck-baseline.md`.
 - Local JSONL alert transport: completed on 2026-04-28 for health snapshot alerts.
 - First scripts Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `511` to `496`.
+- Config-layer Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `496` to `434`.
 - Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
 
 ## P0 Workstream

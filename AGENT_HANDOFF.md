@@ -324,7 +324,7 @@ Current repository status:
 - Safe Windows MT5 broker probe completed on 2026-04-28 through the normalized client with account/terminal/symbol/tick/history diagnostics, EURUSD FOK `order_check` retcode `0` / `Done`, and no `order_send`
 - MT5 Python bridge order-comment limit was validated at `29` characters; `Mt5TerminalClient` now sanitizes and clamps comments before `order_check` or `order_send`
 - Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config: `Dockerfile`, `.dockerignore`, Compose `paper-runtime`, Makefile targets, and `docs/docker-runtime.md`; Docker build/run validation remains pending because this local environment has no `docker` binary
-- Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff has `511` historical issues, mypy has `51` errors in `30` files
+- Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `434`; mypy has `51` errors in `30` files
 - Local JSONL alert transport completed on 2026-04-28: `scalper_ai.deployment.alerts` converts warning/failing health snapshots into alert events and appends them through `JsonlAlertTransport`
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
@@ -360,6 +360,11 @@ Current repository status:
 - `.venv/bin/python scripts/collect_ticks.py --help`, `scripts/handoff.py prompt`, and `scripts/run_runtime.py describe --config-name paper` passed on 2026-04-28 after scripts cleanup
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after scripts cleanup
 - `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after scripts cleanup
+- Config-layer Ruff cleanup passed on 2026-04-28: targeted Ruff is green for `src/scalper_ai/config` and `tests/unit/test_config_loader.py`; full Ruff baseline dropped from `496` to `434` issues
+- `.venv/bin/pytest tests/unit/test_config_loader.py` passed on 2026-04-28 with `6 passed` after config cleanup
+- `.venv/bin/python scripts/run_runtime.py describe --config-name paper` passed on 2026-04-28 after config cleanup
+- `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after config cleanup
+- `.venv/bin/pytest` passed on 2026-04-28 with `161 passed` after config cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -396,7 +401,7 @@ Current repository status:
   - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, safe broker probe, empty history polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
-  - Full-repo Ruff/mypy cleanup baseline is documented; retire it in small batches rather than mixing broad style churn with trading behavior changes
+  - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `434` Ruff issues after scripts/config cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
   - Local JSONL alert transport is implemented; network alert transport remains pending after Docker/runtime topology validation
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics

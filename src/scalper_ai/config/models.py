@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -109,10 +109,10 @@ class Mt5BrokerConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    terminal_path: Optional[Path] = None
-    login: Optional[int] = Field(default=None, ge=0)
-    password: Optional[str] = None
-    server: Optional[str] = None
+    terminal_path: Path | None = None
+    login: int | None = Field(default=None, ge=0)
+    password: str | None = None
+    server: str | None = None
     timeout_milliseconds: int = Field(default=10_000, gt=0)
     magic_number: int = Field(default=4_242_001, ge=0)
     deviation_points: int = Field(default=20, ge=0)
@@ -126,7 +126,7 @@ class Mt5BrokerConfig(BaseModel):
 
     @field_validator("password", "server", "order_comment_prefix")
     @classmethod
-    def validate_optional_text(cls, value: Optional[str]) -> Optional[str]:
+    def validate_optional_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized = value.strip()

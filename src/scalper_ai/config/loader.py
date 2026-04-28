@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, MutableMapping
 import json
 import os
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,7 +19,6 @@ except ModuleNotFoundError:  # pragma: no cover - exercised only in reduced loca
 
 from scalper_ai.config.models import AppConfig
 from scalper_ai.utils.paths import resolve_repo_root
-
 
 _ENV_FIELD_ALIASES = {
     "env": "ENV",
@@ -74,78 +73,87 @@ def _load_env_override_payload() -> dict[str, Any]:
 
 
 class _EnvOverridesMixin:
-    env: Optional[str] = Field(default=None, alias="ENV")
-    config_dir: Optional[Path] = Field(default=None, alias="CONFIG_DIR")
-    log_level: Optional[str] = Field(default=None, alias="LOG_LEVEL")
-    log_json: Optional[bool] = Field(default=None, alias="LOG_JSON")
-    runtime_mode: Optional[str] = Field(default=None, alias="RUNTIME_MODE")
-    paper_trading_default: Optional[bool] = Field(default=None, alias="PAPER_TRADING_DEFAULT")
-    redis_host: Optional[str] = Field(default=None, alias="REDIS_HOST")
-    redis_port: Optional[int] = Field(default=None, alias="REDIS_PORT")
-    redis_db: Optional[int] = Field(default=None, alias="REDIS_DB")
-    max_position_size: Optional[float] = Field(default=None, alias="MAX_POSITION_SIZE")
-    max_daily_drawdown: Optional[float] = Field(default=None, alias="MAX_DAILY_DRAWDOWN")
-    kill_switch_enabled: Optional[bool] = Field(default=None, alias="KILL_SWITCH_ENABLED")
-    data_raw_dir: Optional[Path] = Field(default=None, alias="DATA_RAW_DIR")
-    data_processed_dir: Optional[Path] = Field(default=None, alias="DATA_PROCESSED_DIR")
-    data_artifacts_dir: Optional[Path] = Field(default=None, alias="DATA_ARTIFACTS_DIR")
-    broker_live_enabled: Optional[bool] = Field(default=None, alias="BROKER_LIVE_ENABLED")
-    broker_live_adapter: Optional[str] = Field(default=None, alias="BROKER_LIVE_ADAPTER")
-    broker_allow_live_without_kill_switch: Optional[bool] = Field(
+    env: str | None = Field(default=None, alias="ENV")
+    config_dir: Path | None = Field(default=None, alias="CONFIG_DIR")
+    log_level: str | None = Field(default=None, alias="LOG_LEVEL")
+    log_json: bool | None = Field(default=None, alias="LOG_JSON")
+    runtime_mode: str | None = Field(default=None, alias="RUNTIME_MODE")
+    paper_trading_default: bool | None = Field(default=None, alias="PAPER_TRADING_DEFAULT")
+    redis_host: str | None = Field(default=None, alias="REDIS_HOST")
+    redis_port: int | None = Field(default=None, alias="REDIS_PORT")
+    redis_db: int | None = Field(default=None, alias="REDIS_DB")
+    max_position_size: float | None = Field(default=None, alias="MAX_POSITION_SIZE")
+    max_daily_drawdown: float | None = Field(default=None, alias="MAX_DAILY_DRAWDOWN")
+    kill_switch_enabled: bool | None = Field(default=None, alias="KILL_SWITCH_ENABLED")
+    data_raw_dir: Path | None = Field(default=None, alias="DATA_RAW_DIR")
+    data_processed_dir: Path | None = Field(default=None, alias="DATA_PROCESSED_DIR")
+    data_artifacts_dir: Path | None = Field(default=None, alias="DATA_ARTIFACTS_DIR")
+    broker_live_enabled: bool | None = Field(default=None, alias="BROKER_LIVE_ENABLED")
+    broker_live_adapter: str | None = Field(default=None, alias="BROKER_LIVE_ADAPTER")
+    broker_allow_live_without_kill_switch: bool | None = Field(
         default=None,
         alias="BROKER_ALLOW_LIVE_WITHOUT_KILL_SWITCH",
     )
-    broker_mt5_terminal_path: Optional[Path] = Field(default=None, alias="BROKER_MT5_TERMINAL_PATH")
-    broker_mt5_login: Optional[int] = Field(default=None, alias="BROKER_MT5_LOGIN")
-    broker_mt5_password: Optional[str] = Field(default=None, alias="BROKER_MT5_PASSWORD")
-    broker_mt5_server: Optional[str] = Field(default=None, alias="BROKER_MT5_SERVER")
-    broker_mt5_timeout_milliseconds: Optional[int] = Field(
+    broker_mt5_terminal_path: Path | None = Field(default=None, alias="BROKER_MT5_TERMINAL_PATH")
+    broker_mt5_login: int | None = Field(default=None, alias="BROKER_MT5_LOGIN")
+    broker_mt5_password: str | None = Field(default=None, alias="BROKER_MT5_PASSWORD")
+    broker_mt5_server: str | None = Field(default=None, alias="BROKER_MT5_SERVER")
+    broker_mt5_timeout_milliseconds: int | None = Field(
         default=None,
         alias="BROKER_MT5_TIMEOUT_MILLISECONDS",
     )
-    broker_mt5_magic_number: Optional[int] = Field(default=None, alias="BROKER_MT5_MAGIC_NUMBER")
-    broker_mt5_deviation_points: Optional[int] = Field(default=None, alias="BROKER_MT5_DEVIATION_POINTS")
-    broker_mt5_base_units_per_lot: Optional[float] = Field(
+    broker_mt5_magic_number: int | None = Field(default=None, alias="BROKER_MT5_MAGIC_NUMBER")
+    broker_mt5_deviation_points: int | None = Field(
+        default=None,
+        alias="BROKER_MT5_DEVIATION_POINTS",
+    )
+    broker_mt5_base_units_per_lot: float | None = Field(
         default=None,
         alias="BROKER_MT5_BASE_UNITS_PER_LOT",
     )
-    broker_mt5_min_volume_lots: Optional[float] = Field(default=None, alias="BROKER_MT5_MIN_VOLUME_LOTS")
-    broker_mt5_volume_step_lots: Optional[float] = Field(
+    broker_mt5_min_volume_lots: float | None = Field(
+        default=None,
+        alias="BROKER_MT5_MIN_VOLUME_LOTS",
+    )
+    broker_mt5_volume_step_lots: float | None = Field(
         default=None,
         alias="BROKER_MT5_VOLUME_STEP_LOTS",
     )
-    broker_mt5_history_lookback_hours: Optional[int] = Field(
+    broker_mt5_history_lookback_hours: int | None = Field(
         default=None,
         alias="BROKER_MT5_HISTORY_LOOKBACK_HOURS",
     )
-    broker_mt5_account_mode: Optional[str] = Field(default=None, alias="BROKER_MT5_ACCOUNT_MODE")
-    broker_mt5_order_comment_prefix: Optional[str] = Field(
+    broker_mt5_account_mode: str | None = Field(default=None, alias="BROKER_MT5_ACCOUNT_MODE")
+    broker_mt5_order_comment_prefix: str | None = Field(
         default=None,
         alias="BROKER_MT5_ORDER_COMMENT_PREFIX",
     )
-    broker_mt5_symbol_map_json: Optional[str] = Field(default=None, alias="BROKER_MT5_SYMBOL_MAP_JSON")
-    monitoring_health_enabled: Optional[bool] = Field(default=None, alias="MONITORING_HEALTH_ENABLED")
-    monitoring_metrics_enabled: Optional[bool] = Field(default=None, alias="MONITORING_METRICS_ENABLED")
-    monitoring_service_name: Optional[str] = Field(default=None, alias="MONITORING_SERVICE_NAME")
-    deployment_create_directories_on_startup: Optional[bool] = Field(
+    broker_mt5_symbol_map_json: str | None = Field(default=None, alias="BROKER_MT5_SYMBOL_MAP_JSON")
+    monitoring_health_enabled: bool | None = Field(default=None, alias="MONITORING_HEALTH_ENABLED")
+    monitoring_metrics_enabled: bool | None = Field(
+        default=None,
+        alias="MONITORING_METRICS_ENABLED",
+    )
+    monitoring_service_name: str | None = Field(default=None, alias="MONITORING_SERVICE_NAME")
+    deployment_create_directories_on_startup: bool | None = Field(
         default=None,
         alias="DEPLOYMENT_CREATE_DIRECTORIES_ON_STARTUP",
     )
-    deployment_fallback_to_paper_on_live_failure: Optional[bool] = Field(
+    deployment_fallback_to_paper_on_live_failure: bool | None = Field(
         default=None,
         alias="DEPLOYMENT_FALLBACK_TO_PAPER_ON_LIVE_FAILURE",
     )
-    deployment_require_live_confirmation: Optional[bool] = Field(
+    deployment_require_live_confirmation: bool | None = Field(
         default=None,
         alias="DEPLOYMENT_REQUIRE_LIVE_CONFIRMATION",
     )
-    deployment_live_confirmation_phrase: Optional[str] = Field(
+    deployment_live_confirmation_phrase: str | None = Field(
         default=None,
         alias="DEPLOYMENT_LIVE_CONFIRMATION_PHRASE",
     )
 
     @classmethod
-    def load(cls) -> "_EnvOverridesMixin":
+    def load(cls) -> _EnvOverridesMixin:
         return cls()  # type: ignore[call-arg]
 
     def to_nested_dict(self) -> dict[str, Any]:
@@ -160,7 +168,9 @@ class _EnvOverridesMixin:
         if self.runtime_mode is not None:
             overrides.setdefault("runtime", {})["mode"] = self.runtime_mode
         if self.paper_trading_default is not None:
-            overrides.setdefault("runtime", {})["paper_trading_default"] = self.paper_trading_default
+            overrides.setdefault("runtime", {})[
+                "paper_trading_default"
+            ] = self.paper_trading_default
         if self.redis_host is not None:
             overrides.setdefault("redis", {})["host"] = self.redis_host
         if self.redis_port is not None:
@@ -219,9 +229,13 @@ class _EnvOverridesMixin:
         if not mt5_overrides:
             overrides["broker"].pop("mt5", None)
         if self.monitoring_health_enabled is not None:
-            overrides.setdefault("monitoring", {})["health_enabled"] = self.monitoring_health_enabled
+            overrides.setdefault("monitoring", {})[
+                "health_enabled"
+            ] = self.monitoring_health_enabled
         if self.monitoring_metrics_enabled is not None:
-            overrides.setdefault("monitoring", {})["metrics_enabled"] = self.monitoring_metrics_enabled
+            overrides.setdefault("monitoring", {})[
+                "metrics_enabled"
+            ] = self.monitoring_metrics_enabled
         if self.monitoring_service_name is not None:
             overrides.setdefault("monitoring", {})["service_name"] = self.monitoring_service_name
         if self.deployment_create_directories_on_startup is not None:
@@ -257,7 +271,7 @@ if BaseSettings is not None:
         )
 
         @classmethod
-        def load(cls) -> "EnvOverrides":
+        def load(cls) -> EnvOverrides:
             return cls.model_validate(_load_env_override_payload())
 
 else:
@@ -268,7 +282,7 @@ else:
         model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
         @classmethod
-        def load(cls) -> "EnvOverrides":
+        def load(cls) -> EnvOverrides:
             return cls.model_validate(_load_env_override_payload())
 
 
@@ -300,13 +314,15 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     return dict(payload)
 
 
-def load_app_config(config_name: Optional[str] = None, config_dir: Optional[Path] = None) -> AppConfig:
+def load_app_config(config_name: str | None = None, config_dir: Path | None = None) -> AppConfig:
     """Load the application config from base YAML, overlay YAML, and env overrides."""
 
     repo_root = resolve_repo_root()
     env_overrides = EnvOverrides.load()
 
-    resolved_config_dir = (config_dir or env_overrides.config_dir or (repo_root / "configs")).resolve()
+    resolved_config_dir = (
+        config_dir or env_overrides.config_dir or (repo_root / "configs")
+    ).resolve()
     selected_config = config_name or env_overrides.env or "research"
 
     merged: dict[str, Any] = load_yaml_file(resolved_config_dir / "base.yaml")
