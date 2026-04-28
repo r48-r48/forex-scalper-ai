@@ -51,12 +51,13 @@ Already implemented:
 - Windows MT5 terminal connection and broker-side order_check smoke against an authorized demo session, without order_send
 - safe MT5 broker probe through the normalized client, including account/terminal/symbol/tick/history diagnostics and FOK order_check, without order_send
 - MT5 Python bridge comment-limit discovery and client-side comment sanitization/clamping at 29 characters
+- same-Mac Parallels Windows 11 MT5 validation against Dukascopy demo: EURUSD IOC order_check passes, FOK is rejected as unsupported, one-year history remains empty, and terminal-side trading permission is disabled
 - paper-safe Dockerfile and Compose `paper-runtime` profile around the PHASE 12 runtime
 - local JSONL alert transport for warning/failing health snapshots
 
 Known gaps:
-- MT5 non-empty history/deal normalization and controlled demo-order behavior still need explicit approval and validation
-- Docker/Compose runtime image exists but still needs validation in an environment with Docker installed
+- MT5 non-empty history/deal normalization and controlled demo-order behavior still need explicit approval and validation after a controlled demo fill or imported broker history exists
+- Docker/Compose runtime image exists but still needs validation in an environment with Docker installed; Docker is absent on the current macOS Codex host and Parallels Windows VM
 - HTTP webhook alert transport exists; deployment-specific routing and OpenTelemetry trace path remain pending
 - full-repo Ruff/mypy cleanup baseline exists; cleanup is being retired in small batches
 
@@ -88,7 +89,8 @@ Known gaps:
 - Validation Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `409` to `402`.
 - Models Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `402` to `392`.
 - Risk Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `392` to `374`.
-- Current next task: deeper MT5 demo validation after explicit operator approval for demo-order behavior or, if paused, platform cleanup.
+- Parallels MT5 read-only validation and runtime availability check: completed on 2026-04-28 without order_send; IOC is required for Dukascopy EURUSD, one-year history is empty, terminal-side trading permission is disabled, Docker is unavailable locally, and local paper runtime describe/health/metrics passed.
+- Current next task: controlled MT5 demo-order validation only after explicit operator approval and terminal permission enablement, or platform cleanup on a Docker-enabled host.
 
 ## P0 Workstream
 
@@ -454,9 +456,9 @@ Completed implementation notes:
 Continue MT5 demo validation when the Windows terminal is available.
 
 Recommended next MT5 slice:
-1. Add explicit terminal-path/env documentation for the validated Windows terminal.
-2. Validate history/order/deal polling and normalization against demo terminal history.
-3. Exercise a controlled demo-order path only after explicit operator approval.
+1. Validate history/order/deal polling and normalization after a controlled demo fill or imported broker history exists.
+2. Keep Dukascopy EURUSD on IOC unless a fresh broker probe shows different symbol metadata.
+3. Exercise a controlled demo-order path only after explicit operator approval and a fresh terminal permission check.
 4. Reconcile the resulting order/deal/position state back through the existing snapshot contracts.
 
 If further MT5 validation is paused, the next non-MT5 work is platform cleanup:

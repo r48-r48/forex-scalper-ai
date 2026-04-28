@@ -353,6 +353,8 @@ Current repository status:
 - Windows MT5 safe broker probe passed on 2026-04-28: `accepted=true`, `retcode=0`, `comment=Done`, zero open orders/positions, zero raw history counts, and `order_send_called=false`
 - Parallels Windows 11 MT5 smoke passed on 2026-04-28: connected to Dukascopy Bank SA demo account `610769553` on `Dukascopy-demo-mt5-1`, zero open orders/positions, and no order submission
 - Parallels Windows 11 MT5 broker probe passed on 2026-04-28 with EURUSD IOC: `order_check.accepted=true`, `retcode=0`, `comment=Done`, and `order_send_called=false`; EURUSD FOK returned safe rejection `retcode=10030`, `Unsupported filling mode`
+- Parallels Windows 11 deeper MT5 history/permission check passed on 2026-04-28 without order submission: one-year raw history is still empty, account trading permissions are enabled, and terminal-side trading permission remains disabled
+- Docker/runtime availability check passed on 2026-04-28 as far as this host allows: Docker is absent on local macOS Codex and Parallels Windows, Compose YAML parses, and local paper runtime describe/health/metrics pass
 - `.venv/bin/python scripts/run_runtime.py describe --config-name paper`, `health --config-name paper`, and `metrics --config-name paper` passed on 2026-04-28 after Docker/Compose packaging
 - `docker-compose.yml` parsed successfully with PyYAML on 2026-04-28 after Docker/Compose packaging
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after Docker/Compose packaging
@@ -438,6 +440,8 @@ Current repository status:
   - P1.3 Unified Validation Report is complete: `scalper_ai.validation.gate` provides pass/warn/fail validation reports, thresholds, risk flags, latency/slippage summaries, regime breakdown, and JSON artifact persistence
   - Windows MT5 validation has started for real: demo terminal connection, account/symbol/tick polling, safe broker probe, empty history polling, and FOK order_check passed; order_send remains untested and blocked pending explicit operator approval
   - Same-Mac Parallels Windows 11 MT5 validation is working through `prlctl exec --current-user`: Dukascopy demo account `610769553` connects, EURUSD IOC `order_check` passes, FOK is rejected as unsupported filling mode, and `order_send` remains untested/blocked pending explicit operator approval plus a fresh trade-permission check
+  - Parallels deeper MT5 validation confirmed one-year raw history is empty and terminal-side trading permission is disabled, so non-empty deal normalization requires a later controlled demo fill or imported broker history
+  - Docker/Compose runtime build/run remains pending on a Docker-enabled host; current host and Parallels VM both lack Docker, while local paper runtime describe/health/metrics still pass
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
   - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `374` Ruff issues after scripts/config/logging/journal/OMS/validation/models/risk cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes

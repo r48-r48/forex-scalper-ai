@@ -2,7 +2,7 @@
 
 Snapshot date: 2026-04-28
 
-## Environment
+## Windows Notebook Environment
 
 - Host: Windows notebook accessed through SSH on the local network.
 - Repository path: `C:\Users\PC\projects\forex-scalper-ai`
@@ -11,6 +11,17 @@ Snapshot date: 2026-04-28
 - MT5 Python package: installed and importable.
 - Terminal: MetaTrader 5, build `5834`.
 - Broker session: MetaQuotes demo session already authorized in the terminal.
+
+## Parallels Windows 11 Environment
+
+- Host: same-Mac Parallels VM accessed through `prlctl exec "Windows 11" --current-user`.
+- SSH is not required for this VM.
+- Repository path: `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai`
+- MT5 terminal: `C:\Program Files\MetaTrader 5\terminal64.exe`
+- Python: `3.12.10`
+- MT5 Python package: `5.0.5735`
+- Terminal: MetaTrader 5, build `5836`.
+- Broker session: Dukascopy Bank SA demo account `610769553` on `Dukascopy-demo-mt5-1`.
 
 ## Checks Run
 
@@ -38,7 +49,7 @@ Additional direct broker-side probe:
 
 No `order_send()` call was made.
 
-## Results
+## Windows Notebook Results
 
 - Connection succeeded.
 - Account snapshot was available.
@@ -58,11 +69,37 @@ No `order_send()` call was made.
 - A real terminal check found the MetaTrader5 Python bridge rejects order comments at `30+` characters; the client now sanitizes comments to ASCII alphanumeric/underscore and clamps them to `29` characters.
 - `SCALPER_AI_LIVE_CONFIRMATION` was not set, so true live runtime remains blocked by design.
 
+## Parallels Results
+
+Safe smoke:
+
+- `scripts\mt5_smoke.py --config-name mt5` connected to Dukascopy demo account `610769553`.
+- Balance and equity were both `100000.0`.
+- Account currency was `TRY`.
+- Leverage was `100`.
+- Open orders: `0`.
+- Open positions: `0`.
+- No `order_send()` call was made.
+
+Safe broker probe:
+
+- `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --history-lookback-hours 8760 --include-raw-samples`
+- EURUSD IOC `order_check` returned `accepted=true`, retcode `0`, and comment `Done`.
+- EURUSD FOK `order_check` returned retcode `10030` and comment `Unsupported filling mode`.
+- EURUSD symbol metadata reported `filling_mode=2`, minimum volume `0.01`, volume step `0.01`, and floating spread.
+- Raw history remained empty even with a one-year lookback: `0` historical orders and `0` historical deals.
+- `terminal_info().tradeapi_disabled` was `false`.
+- `account_info().trade_allowed` and `account_info().trade_expert` were `true`.
+- `terminal_info().trade_allowed` was `false`, so terminal-side trading/AutoTrading is still disabled for API order submission.
+- No `order_send()` call was made.
+
 ## Follow-Up
 
-- Keep using FOK for this demo broker/symbol unless symbol metadata changes.
+- Treat MT5 filling mode as broker and symbol specific. The Windows notebook MetaQuotes demo accepted FOK for EURUSD, while the Parallels Dukascopy demo accepted IOC and rejected FOK.
+- Use IOC for Dukascopy EURUSD unless symbol metadata changes.
+- Use FOK for the previous Windows notebook MetaQuotes demo only if a fresh broker probe still accepts it.
 - Keep MT5 order comments at `29` characters or shorter.
 - Configure explicit terminal path and broker env vars only when moving beyond saved terminal-session smoke checks.
 - Enable and document live confirmation only for an intentionally approved live-safe run.
 - Validate non-empty history/deal normalization after a controlled demo fill or imported broker history is available.
-- Keep `order_send()` disabled until the operator explicitly approves a demo-order test.
+- Keep `order_send()` disabled until the operator explicitly approves a demo-order test and a fresh terminal permission check shows terminal-side trading is enabled.

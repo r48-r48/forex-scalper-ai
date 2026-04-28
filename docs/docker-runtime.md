@@ -49,6 +49,20 @@ docker compose --profile paper run --rm paper-runtime health --config-name paper
 docker compose --profile paper run --rm paper-runtime metrics --config-name paper
 ```
 
+## Current Validation Status
+
+Checked on 2026-04-28:
+
+- Local macOS Codex environment: no `docker` binary was available.
+- Parallels Windows 11 VM: no `docker` command was available.
+- `docker-compose.yml` parsed successfully with PyYAML.
+- Local paper runtime fallback passed without Docker:
+  - `.venv/bin/python scripts/run_runtime.py describe --config-name paper`
+  - `.venv/bin/python scripts/run_runtime.py health --config-name paper`
+  - `.venv/bin/python scripts/run_runtime.py metrics --config-name paper`
+
+Docker image build and Compose execution remain pending on a Docker-enabled host.
+
 ## Safety Notes
 
 - Do not bake `.env`, broker credentials, or live confirmation tokens into the image.

@@ -181,6 +181,16 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --include-raw-samples` returned `order_check.accepted=true`, `retcode=0`, `comment=Done`, `order_send_called=false`, spread `2`, and live tick visibility
   - EURUSD FOK probe returned `retcode=10030`, `Unsupported filling mode`; use IOC for Dukascopy EURUSD unless broker symbol metadata changes
   - Terminal reports `tradeapi_disabled=false`; `terminal.trade_allowed=false` was observed, so actual demo-order behavior still requires explicit operator approval plus a fresh trade-permission check before any `order_send`
+- 2026-04-28 completed deeper Parallels MT5 read-only validation:
+  - one-year lookback via `--history-lookback-hours 8760` still returned `raw_order_count=0` and `raw_deal_count=0`
+  - non-empty history/deal normalization remains blocked until there is a controlled demo fill or imported broker history
+  - `account_info().trade_allowed=true` and `account_info().trade_expert=true`
+  - `terminal_info().trade_allowed=false` and `tradeapi_disabled=false`, so terminal-side trading/AutoTrading is the remaining permission gate before any approved demo `order_send`
+- 2026-04-28 completed Docker/runtime availability check:
+  - local macOS Codex environment has no `docker` binary
+  - Parallels Windows 11 has no `docker` command
+  - `docker-compose.yml` parsed successfully with PyYAML
+  - local paper runtime `describe`, `health`, and `metrics` commands passed through `.venv/bin/python`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -334,6 +344,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: Parallels Windows 11 `scripts\mt5_smoke.py --config-name mt5` -> connected to Dukascopy Bank SA demo account `610769553`, zero open orders/positions, no order submission
 - 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force fok --include-raw-samples` -> rejected safely with `retcode=10030`, `Unsupported filling mode`, `order_send_called=false`
 - 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --include-raw-samples` -> `order_check.accepted=true`, `retcode=0`, `comment=Done`, `order_send_called=false`
+- 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --history-lookback-hours 8760 --include-raw-samples` -> `raw_order_count=0`, `raw_deal_count=0`, `order_check.accepted=true`, `order_send_called=false`
+- 2026-04-28: local runtime hardening fallback -> `.venv/bin/python scripts/run_runtime.py describe/health/metrics --config-name paper` passed; Docker itself is unavailable locally and in Parallels
 - `.venv/bin/pytest` -> `165 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
@@ -353,7 +365,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 ## Recommended Next Move
 
 Continue MT5 demo validation when the Windows terminal is available:
-- validate non-empty history/deal normalization
+- validate non-empty history/deal normalization after a controlled demo fill or imported broker history exists
 - lock in broker-specific IOC behavior for Dukascopy EURUSD
 - exercise a controlled demo-order path only after explicit operator approval and a fresh trade-permission check
 - reconcile resulting order/deal/position state through existing snapshot contracts

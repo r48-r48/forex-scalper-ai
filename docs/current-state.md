@@ -221,6 +221,8 @@
 - Parallels MT5 smoke passed on 2026-04-28: `scripts\mt5_smoke.py --config-name mt5` connected to Dukascopy Bank SA demo account `610769553` on `Dukascopy-demo-mt5-1`, balance/equity `100000.0`, leverage `100`, zero open orders, zero open positions, and ping around `4 ms`; no order submission was attempted.
 - Parallels MT5 safe broker probe passed on 2026-04-28 with EURUSD IOC: `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --include-raw-samples` returned `order_check.accepted=true`, `retcode=0`, `comment=Done`, margin `527.7`, zero raw orders/deals in the 24-hour window, `order_send_called=false`, EURUSD `filling_mode=2`, spread `2`, and live tick visibility.
 - Parallels MT5 FOK probe on Dukascopy EURUSD returned `retcode=10030`, `Unsupported filling mode`; use IOC for this broker/symbol unless future symbol metadata changes.
+- Parallels MT5 deeper history/permission check on 2026-04-28 used a one-year lookback and still found `0` raw historical orders/deals; non-empty history/deal normalization is blocked until a controlled demo fill or imported broker history exists. Account permissions report `trade_allowed=true` and `trade_expert=true`, but terminal-side `trade_allowed=false`, so AutoTrading/trading permission must be enabled and rechecked before any approved demo `order_send`.
+- Docker/runtime hardening check on 2026-04-28 confirmed no `docker` binary is available in either the local macOS Codex environment or the Parallels Windows VM; `docker-compose.yml` still parses successfully, and local paper runtime `describe`, `health`, and `metrics` commands pass without Docker.
 - `python3 -m pytest tests/unit/test_backtesting_baselines.py tests/unit/test_validation_baseline_suite.py tests/integration/test_baseline_walk_forward_suite.py` passed on 2026-04-28 with `7 passed`.
 - `python3 -m pytest tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py` passed on 2026-04-27 with `6 passed`.
 - `python3 -m pytest tests/unit/test_services_oms.py tests/unit/test_risk_engine.py` passed on 2026-04-27 with `17 passed`.
@@ -254,5 +256,5 @@
 ## Exact Next Step
 
 Move to post-phase hardening:
-- continue MT5 demo validation beyond connection/order_check/broker-probe: optional env credentials, non-empty history/deal normalization, IOC execution settings for Dukascopy EURUSD, and controlled demo-order behavior only after explicit operator approval
-- if further MT5 validation is paused, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`
+- continue MT5 demo validation beyond connection/order_check/broker-probe: optional env credentials, non-empty history/deal normalization after a controlled demo fill or imported broker history, IOC execution settings for Dukascopy EURUSD, and controlled demo-order behavior only after explicit operator approval plus terminal trade-permission recheck
+- if further MT5 validation is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`

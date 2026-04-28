@@ -42,13 +42,13 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
 | Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `165 passed` |
-| Real MT5 terminal smoke | partial pass | Windows notebook, Python 3.12.10, package installed, terminal/account snapshot, EURUSD tick, FOK order_check, safe broker probe, and comment-limit validation passed against demo session; no order_send |
-| Docker/Compose paper runtime | source added, not run locally | `Dockerfile`, `.dockerignore`, `paper-runtime` Compose profile, and Makefile targets exist; this local environment has no `docker` binary |
+| Real MT5 terminal smoke | partial pass | Windows notebook and same-Mac Parallels VM both connect to demo terminals without `order_send`; Windows/MetaQuotes accepted EURUSD FOK, while Parallels/Dukascopy accepted EURUSD IOC and rejected FOK |
+| Docker/Compose paper runtime | source added, Docker unavailable locally | `Dockerfile`, `.dockerignore`, `paper-runtime` Compose profile, and Makefile targets exist; local macOS Codex and Parallels Windows have no Docker command; Compose YAML parse and local paper runtime describe/health/metrics passed |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
 
 ## Test Risk Notes
 
-- MT5 unit tests use fake modules, while the Windows broker probe now proves connection, symbol/tick polling, empty history polling, FOK `order_check`, and 29-character comment clamping against a real authorized demo terminal without `order_send`.
+- MT5 unit tests use fake modules, while the Windows/Parallels broker probes now prove connection, symbol/tick polling, empty history polling, broker-specific filling-mode handling, and 29-character comment clamping against real authorized demo terminals without `order_send`.
 - Webhook alert transport tests use a fake opener and do not send real network requests.
 - Backtesting V1 models immediate market fills with explicit costs; execution-aware V2 now covers latency, queue position, partial fills, stale/closed markets, and cancel/replace races with forced-scenario tests.
 - Baseline strategies are deterministic and report explicit costs, but they still rely on replayed feature-frame quality and do not prove live broker profitability.

@@ -6,7 +6,7 @@
 
 ## Current Next Step
 
-- Continue MT5 demo validation beyond the completed Windows/Parallels terminal connection/order_check/broker-probe smoke: optional env credentials, non-empty history/deal normalization, IOC execution settings for Dukascopy EURUSD, and controlled demo-order behavior only after explicit operator approval.
+- Continue MT5 demo validation beyond the completed Windows/Parallels terminal connection/order_check/broker-probe smoke: optional env credentials, non-empty history/deal normalization after a controlled demo fill or imported broker history, IOC execution settings for Dukascopy EURUSD, and controlled demo-order behavior only after explicit operator approval plus terminal trade-permission recheck.
 - If further MT5 work is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
 
 ## Deliverables
@@ -39,6 +39,8 @@
 - models Ruff cleanup batch — completed on 2026-04-28; full Ruff backlog reduced from `402` to `392`
 - risk Ruff cleanup batch — completed on 2026-04-28; full Ruff backlog reduced from `392` to `374`
 - Parallels Windows 11 MT5 environment and Dukascopy demo validation — completed on 2026-04-28 without SSH and without `order_send`: `mt5_smoke.py` connected to account `610769553`; EURUSD IOC `order_check` passed with `retcode=0`; EURUSD FOK was rejected as unsupported filling mode
+- Parallels deeper MT5 history/permission check — completed on 2026-04-28 without `order_send`: one-year raw history is empty, account trading permissions are enabled, terminal-side trading permission is disabled
+- Docker/runtime availability check — completed on 2026-04-28: Docker is unavailable on local macOS Codex and Parallels Windows; Compose YAML parse plus local paper runtime describe/health/metrics passed
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for Docker/Compose runtime validation, network alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics
