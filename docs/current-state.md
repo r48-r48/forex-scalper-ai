@@ -124,12 +124,13 @@
   - risk Ruff cleanup was completed, reducing the full Ruff backlog from `392` to `374`
   - repository-wide `pytest` passes in the Python 3.12.13 target-validation environment with `165 passed`
   - Parallels Windows 11 MT5 validation was completed on the same Mac through `prlctl exec` without SSH: MT5, Python 3.12.10, the project, and `MetaTrader5==5.0.5735` are installed in the VM; `mt5_smoke.py` connected to Dukascopy demo account `610769553`; `mt5_broker_probe.py` confirmed EURUSD tick/symbol/account diagnostics and accepted IOC `order_check`; FOK was rejected by the broker as an unsupported filling mode; no `order_send` call was made
+  - the 2026-04-30 external live-readiness audit was reviewed and persisted as `docs/external-audit-2026-04-30.md`; it confirmed that the next P0 work is mandatory Risk/OMS runtime wiring, durable recovery, broker-source-of-truth MT5 sizing, hedging-aware reconciliation, deal-based accounting, and protective order management
 
 ## Current Problem / Current Focus
 
 - PHASE 1-12 are now implemented.
 - The repository now has research, validation, baseline strategies, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, OMS/RiskEngine layers, validation gates, shadow reports, supervised baseline filtering, and operational runbooks.
-- The next work should focus on deeper MT5 demo validation after explicit operator approval for demo-order behavior, non-empty history/deal normalization, Docker runtime validation on a Docker-enabled host, network alert transport, and retiring the full-repo lint/typecheck baseline in small batches.
+- The next work should focus first on turning the existing RiskEngine and OMS from optional modules into the mandatory runtime submit path, then continue with durable state/recovery, broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, deal-based accounting, protective order management, non-empty history/deal normalization, Docker runtime validation on a Docker-enabled host, and retiring the full-repo lint/typecheck baseline in small batches.
 
 ## Important Constraints
 

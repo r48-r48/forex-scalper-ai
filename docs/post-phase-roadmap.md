@@ -17,6 +17,7 @@ Read this file after:
 - Current repository state: PHASE 1-12 complete, `.venv/bin/pytest` passed with `165 passed` on 2026-04-28 in the Python 3.12.13 target-validation environment.
 - External report: `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
 - External report: `/Users/dzhabrailtalkanov/Downloads/мм.md`
+- External report triage: `/Users/dzhabrailtalkanov/Downloads/deep-research-report (1).md`, persisted as `docs/external-audit-2026-04-30.md`
 
 The reports agree on the main direction:
 - do not treat the project as a black-box AI model
@@ -57,6 +58,12 @@ Already implemented:
 - local JSONL alert transport for warning/failing health snapshots
 
 Known gaps:
+- RiskEngine and OMS exist, but are not yet mandatory in `DeploymentRuntime.submit_order()`, which still calls the execution router directly
+- durable state storage and startup recovery are still absent; live state is currently process-local
+- MT5 live sizing still needs broker-source-of-truth refresh before target-position/reduce-only decisions
+- live accounting still needs deal-level commission/fee/swap attribution
+- protective TP/SL/bracket management is not yet implemented as a production order-management mechanism
+- symbol-specific capability discovery and conservative quantization are still pending
 - MT5 non-empty history/deal normalization is still unresolved because Dukascopy history APIs returned zero rows even after controlled demo fills
 - MT5 execution/reconciliation needs hedging-aware behavior for accounts with `margin_mode=2`
 - Docker/Compose runtime image exists but still needs validation in an environment with Docker installed; Docker is absent on the current macOS Codex host and Parallels Windows VM
@@ -93,7 +100,7 @@ Known gaps:
 - Risk Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `392` to `374`.
 - Parallels MT5 read-only validation and runtime availability check: completed on 2026-04-28 without order_send; IOC is required for Dukascopy EURUSD, one-year history is empty, terminal-side trading permission is disabled, Docker is unavailable locally, and local paper runtime describe/health/metrics passed.
 - Controlled Parallels MT5 demo-order validation: completed on 2026-04-29 with explicit operator approval, minimum EURUSD IOC demo fill, ticket-specific flattening, and zero remaining open positions.
-- Current next task: hedging-aware MT5 execution/reconciliation and history API investigation, or platform cleanup on a Docker-enabled host.
+- Current next task: wire RiskEngine + OMS into `DeploymentRuntime.submit_order()` as the mandatory execution gate, then continue with durable recovery, broker-source-of-truth MT5 sizing, hedging-aware MT5 execution/reconciliation, and history API investigation.
 
 ## P0 Workstream
 
@@ -456,7 +463,16 @@ Completed implementation notes:
 
 ## Immediate Next Task
 
-Continue MT5 demo validation when the Windows terminal is available.
+Implement the first external-audit P0 slice: mandatory RiskEngine + OMS runtime gating.
+
+Recommended runtime-gating slice:
+1. Build a `RiskContext` for every `DeploymentRuntime.submit_order()` call.
+2. Evaluate the order with `RiskEngine` before touching the router or broker.
+3. Create and transition an `OmsOrderRecord` through checked/sent/final states.
+4. Journal risk and OMS/order events through the existing journal contracts.
+5. Return a normalized rejected execution update when risk blocks an order, without broker submission.
+
+Then continue MT5 demo validation when the Windows terminal is available.
 
 Recommended next MT5 slice:
 1. Investigate why Dukascopy `history_orders_get` and `history_deals_get` return zero rows after controlled demo fills.

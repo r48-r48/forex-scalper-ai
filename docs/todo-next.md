@@ -6,8 +6,9 @@
 
 ## Current Next Step
 
-- Continue MT5 demo validation beyond the completed Windows/Parallels terminal connection/order_check/broker-probe/demo-order smoke: add hedging-aware MT5 reconciliation/close handling for Dukascopy `margin_mode=2`, investigate why broker history APIs remain empty after filled demo orders, and keep IOC execution settings for Dukascopy EURUSD.
-- If further MT5 work is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
+- Act on the 2026-04-30 external audit triage: first wire RiskEngine + OMS into `DeploymentRuntime.submit_order()` as the mandatory execution gate, then continue with durable state/startup recovery, broker-source-of-truth MT5 sizing, hedging-aware position handling, deal-based accounting, and protective TP/SL/bracket handling.
+- Keep the completed Parallels MT5 demo-order findings in scope while doing this work: Dukascopy `margin_mode=2` behaved as hedging, IOC is required for EURUSD, and `history_orders_get` / `history_deals_get` still returned zero rows after controlled demo fills.
+- If further MT5 work is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
 
 ## Deliverables
 
@@ -42,6 +43,7 @@
 - Parallels deeper MT5 history/permission check — completed on 2026-04-28 without `order_send`: one-year raw history is empty, account trading permissions are enabled, terminal-side trading permission is disabled
 - Docker/runtime availability check — completed on 2026-04-28: Docker is unavailable on local macOS Codex and Parallels Windows; Compose YAML parse plus local paper runtime describe/health/metrics passed
 - Controlled Parallels MT5 demo-order validation — completed on 2026-04-29 after explicit operator approval: minimum-volume EURUSD IOC order filled, initial auto-flatten exposed hedging behavior, position-ticket flatten closed all remaining EURUSD positions, final smoke showed zero open orders/positions, and raw history APIs still returned zero orders/deals
+- External live-readiness audit triage — completed on 2026-04-30 as `docs/external-audit-2026-04-30.md`; confirmed P0 gaps are mandatory Risk/OMS runtime wiring, durable state/recovery, broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, deal-based accounting, and protective order management
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for Docker/Compose runtime validation, network alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics

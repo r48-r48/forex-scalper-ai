@@ -6,6 +6,7 @@
 - Root path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
 - Goal: production-grade AI Forex scalping agent with tick/M1/L2 support, Transformer forecasting, DRL policy layer, execution adapters, validation, and deployment.
 - Persistent same-window checkpoint: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/SESSION_CHECKPOINT.md`
+- Latest external audit triage: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md`
 
 ## Completed Phases
 

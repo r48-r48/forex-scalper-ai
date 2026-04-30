@@ -199,6 +199,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `scripts\mt5_flatten_positions.py --config-name mt5 --symbol EURUSD --expected-login 610769553 --expected-server Dukascopy-demo-mt5-1 --time-in-force ioc --i-understand-this-closes-demo-positions` closed both remaining positions via orders `156757226` and `156757227`
   - final `scripts\mt5_smoke.py --config-name mt5 --include-orders --include-positions` returned `order_count=0`, `position_count=0`, balance/equity `99941.09 TRY`
   - post-demo `mt5_broker_probe.py` still reported `raw_order_count=0` and `raw_deal_count=0`; broker history normalization remains unresolved for this Dukascopy session
+- 2026-04-30 reviewed `/Users/dzhabrailtalkanov/Downloads/deep-research-report (1).md` and persisted the triage in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md`:
+  - the audit was verified against current code and is directionally correct
+  - confirmed P0 gaps are mandatory Risk/OMS runtime gating, durable state/startup recovery, broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, deal-based accounting, and protective TP/SL/bracket management
+  - recommended immediate next implementation slice is wiring `RiskEngine` + `OmsOrderRecord` into `DeploymentRuntime.submit_order()` before router/broker submission
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
