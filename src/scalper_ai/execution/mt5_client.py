@@ -1015,7 +1015,7 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             sorted(
                 (
                     self._normalize_deal_record(deal)
-                    for deal in self._history_deals_get(ticket=ticket)
+                    for deal in self._history_deals_for_order(ticket)
                 ),
                 key=lambda deal: (deal.timestamp, deal.broker_deal_id),
             )
@@ -1030,6 +1030,22 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         if total_volume <= 0:
             return 0.0, None, deals
         return total_volume, weighted_notional / total_volume, deals
+
+    def _history_deals_for_order(self, ticket: int) -> tuple[Any, ...]:
+        deals: list[Any] = []
+        for deal in self._history_deals_get(ticket=ticket):
+            payload = self._coerce_mapping(deal)
+            raw_order_id = self._coerce_int(payload.get("order"))
+            if raw_order_id is not None and raw_order_id != ticket:
+                continue
+            volume_lots = self._coerce_float(payload.get("volume"))
+            price = self._coerce_float(payload.get("price"))
+            if volume_lots is None or volume_lots <= 0:
+                continue
+            if price is None or price <= 0:
+                continue
+            deals.append(deal)
+        return tuple(deals)
 
     def _orders_get(self, **kwargs: Any) -> tuple[Any, ...]:
         try:

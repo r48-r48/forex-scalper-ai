@@ -88,7 +88,7 @@ Safe broker probe:
 - EURUSD IOC `order_check` returned `accepted=true`, retcode `0`, and comment `Done`.
 - EURUSD FOK `order_check` returned retcode `10030` and comment `Unsupported filling mode`.
 - EURUSD symbol metadata reported `filling_mode=2`, minimum volume `0.01`, volume step `0.01`, and floating spread.
-- Raw history remained empty even with a one-year lookback: `0` historical orders and `0` historical deals.
+- Raw history returned no rows during the initial safe probe stage; the follow-up explicit-terminal-path / 8760-hour read-only probe below resolved historical order/deal visibility after the controlled demo fills existed.
 - `terminal_info().tradeapi_disabled` was `false`.
 - `account_info().trade_allowed` and `account_info().trade_expert` were `true`.
 - `terminal_info().trade_allowed` was `false`, so terminal-side trading/AutoTrading is still disabled for API order submission.
@@ -103,7 +103,9 @@ Controlled demo-order test after terminal trading was enabled:
 - `scripts\mt5_flatten_positions.py` was added and used to close both remaining EURUSD positions by position ticket via orders `156757226` and `156757227`.
 - Final smoke returned `0` open orders and `0` open positions.
 - Balance/equity settled at `99941.09 TRY` after spread/execution costs.
-- Post-demo `history_orders_get` and `history_deals_get` still returned `0` rows in the 24-hour probe window, so history/deal normalization remains unresolved for this broker/session.
+- Post-demo `history_orders_get` and `history_deals_get` returned `0` rows in the original 24-hour probe window because the controlled fills were outside that window.
+- Follow-up validation on `2026-04-30` with `scripts\mt5_history_probe.py`, explicit `BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe`, and an `8760` hour lookback found `4` EURUSD historical orders and `4` EURUSD trade deals, plus the account deposit deal.
+- The normalized broker probe then returned `4` normalized historical EURUSD orders with per-order deals after the client was hardened to ignore non-trade/deposit deals with zero volume.
 
 ## Follow-Up
 
@@ -114,5 +116,5 @@ Controlled demo-order test after terminal trading was enabled:
 - Keep MT5 order comments at `29` characters or shorter.
 - Configure explicit terminal path and broker env vars only when moving beyond saved terminal-session smoke checks.
 - Enable and document live confirmation only for an intentionally approved live-safe run.
-- Investigate why non-empty order/deal history is still unavailable through `history_orders_get` and `history_deals_get` after controlled demo fills.
-- Keep `order_send()` disabled until the operator explicitly approves a demo-order test and a fresh terminal permission check shows terminal-side trading is enabled.
+- Use an explicit terminal path and a sufficient MT5 history lookback when investigating historical orders/deals; the normalized client now handles zero-volume deposit deals safely.
+- Keep `order_send()` disabled by default; use it only for an explicitly approved demo-order test after a fresh terminal permission check shows terminal-side trading is enabled.

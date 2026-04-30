@@ -772,7 +772,22 @@ class _FakeMetaTrader5Module:
         return () if order is None else (order,)
 
     def history_deals_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
+        deposit_deal = SimpleNamespace(
+            ticket=9900,
+            order=0,
+            symbol="",
+            type=self.DEAL_TYPE_BUY,
+            volume=0.0,
+            price=0.0,
+            commission=0.0,
+            fee=0.0,
+            swap=0.0,
+            position_id=0,
+            time=1_774_670_399,
+        )
         ticket = kwargs.get("ticket")
         if ticket is None:
-            return tuple(deal for deals in self._deals.values() for deal in deals)
-        return tuple(self._deals.get(int(ticket), ()))
+            return (deposit_deal,) + tuple(
+                deal for deals in self._deals.values() for deal in deals
+            )
+        return (deposit_deal,) + tuple(self._deals.get(int(ticket), ()))

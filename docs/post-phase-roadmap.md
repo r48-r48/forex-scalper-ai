@@ -52,7 +52,7 @@ Already implemented:
 - Windows MT5 terminal connection and broker-side order_check smoke against an authorized demo session, without order_send
 - safe MT5 broker probe through the normalized client, including account/terminal/symbol/tick/history diagnostics and FOK order_check, without order_send
 - MT5 Python bridge comment-limit discovery and client-side comment sanitization/clamping at 29 characters
-- same-Mac Parallels Windows 11 MT5 validation against Dukascopy demo: EURUSD IOC order_check passes, FOK is rejected as unsupported, one-year history remains empty, and terminal-side trading permission is disabled
+- same-Mac Parallels Windows 11 MT5 validation against Dukascopy demo: EURUSD IOC order_check passes, FOK is rejected as unsupported, controlled demo order_send/flattening has been exercised, and explicit-terminal-path / 8760-hour read-only history probing sees the historical fills
 - controlled Parallels MT5 demo-order validation: minimum EURUSD IOC order filled, Dukascopy hedging behavior was exposed via `margin_mode=2`, ticket-specific flattening closed remaining positions, and final smoke returned zero open orders/positions
 - paper-safe Dockerfile and Compose `paper-runtime` profile around the PHASE 12 runtime
 - local JSONL alert transport for warning/failing health snapshots
@@ -61,10 +61,10 @@ Known gaps:
 - RiskEngine and OMS are now mandatory in `DeploymentRuntime.submit_order()` for the first runtime gate slice
 - first durable state storage and startup recovery wiring exists through `SqliteExecutionStateStore`, but deeper live recovery fault injection still needs broker-side scenarios for open orders, broker-only positions, and missing/partial history
 - first broker-source-of-truth MT5 sizing and hedging-aware ticket handling exists; remaining work includes multi-ticket close workflows, richer protection workflows, symbol specs, and live fault injection
-- first deal-based live accounting slice exists with normalized MT5 deal records and deal-id fill creation; remaining work includes real-broker non-empty history validation, richer per-deal attribution in durable state/journal, and account-currency cost semantics
+- first deal-based live accounting slice exists with normalized MT5 deal records and deal-id fill creation; read-only Parallels history validation now confirms real-broker historical fill visibility, while remaining work includes richer per-deal attribution in durable state/journal and account-currency cost semantics
 - first protective TP/SL slice exists with domain fields, MT5 native `sl`/`tp` payload/state mapping, configurable missing-protection rejection, and reconciliation checks; remaining work includes true bracket/OCO lifecycle management and flatten/fail-safe handling when broker-side protection disappears after fill
 - symbol-specific capability discovery and conservative quantization are still pending
-- MT5 non-empty history/deal normalization is still unresolved because Dukascopy history APIs returned zero rows even after controlled demo fills
+- MT5 non-empty history/deal normalization is resolved for the Dukascopy demo read-only path when using explicit `BROKER_MT5_TERMINAL_PATH` and sufficient lookback; controlled future work should focus on fault injection, partial fills, and durable attribution rather than basic visibility
 - MT5 execution/reconciliation needs hedging-aware behavior for accounts with `margin_mode=2`
 - Docker/Compose runtime image exists but still needs validation in an environment with Docker installed; Docker is absent on the current macOS Codex host and Parallels Windows VM
 - HTTP webhook alert transport exists; deployment-specific routing and OpenTelemetry trace path remain pending
@@ -98,13 +98,13 @@ Known gaps:
 - Validation Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `409` to `402`.
 - Models Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `402` to `392`.
 - Risk Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `392` to `374`.
-- Parallels MT5 read-only validation and runtime availability check: completed on 2026-04-28 without order_send; IOC is required for Dukascopy EURUSD, one-year history is empty, terminal-side trading permission is disabled, Docker is unavailable locally, and local paper runtime describe/health/metrics passed.
+- Parallels MT5 read-only validation and runtime availability check: initial 2026-04-28 probe completed without order_send; follow-up 2026-04-30 explicit-terminal-path / 8760-hour probe sees historical fills, IOC is required for Dukascopy EURUSD, Docker is unavailable locally, and local paper runtime describe/health/metrics passed.
 - Controlled Parallels MT5 demo-order validation: completed on 2026-04-29 with explicit operator approval, minimum EURUSD IOC demo fill, ticket-specific flattening, and zero remaining open positions.
 - P0.B Durable State Store And Startup Recovery first slice: completed on 2026-04-30 with SQLite state persistence, runtime reload, duplicate-intent recovery, and open-live-order startup blocking.
 - P0.C Broker-Source-Of-Truth MT5 Position Handling first slice: completed on 2026-04-30 with broker-position refresh before sizing, hedging ticket tracking, gross exposure reconciliation, ticket-specific reduce-only close payloads, ambiguous multi-ticket close rejection, and `182 passed` full pytest validation.
 - P0.D Deal-Based Live Accounting first slice: completed on 2026-04-30 with `Mt5DealState`, deal records on `Mt5OrderState`, unseen-deal-id fill creation, commission/fee/swap cost propagation into fill commissions, script JSON serialization, and `183 passed` full pytest validation.
 - P0.E Protective Order / Bracket Management first slice: completed on 2026-04-30 with `OrderIntent.stop_loss_price`/`take_profit_price`, MT5 native `sl`/`tp` mapping, optional config enforcement for exposure-increasing orders, broker protective-price reconciliation, script serialization, targeted Ruff, `43 passed` targeted pytest validation, compileall, and `188 passed` full pytest validation.
-- Current next task: continue with richer bracket/OCO protection workflows, deeper broker-side startup recovery, symbol-specific quantization, durable/journal deal attribution, and real-broker history API investigation.
+- Current next task: continue with richer bracket/OCO protection workflows, deeper broker-side startup recovery, symbol-specific quantization, durable/journal deal attribution, alert/operator routing, Docker host validation, and controlled pending-order modify validation when a deliberately safe demo scenario is prepared.
 
 ## P0 Workstream
 

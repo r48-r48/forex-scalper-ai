@@ -198,7 +198,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added `scripts/mt5_flatten_positions.py` to close demo positions by explicit MT5 position ticket
   - `scripts\mt5_flatten_positions.py --config-name mt5 --symbol EURUSD --expected-login 610769553 --expected-server Dukascopy-demo-mt5-1 --time-in-force ioc --i-understand-this-closes-demo-positions` closed both remaining positions via orders `156757226` and `156757227`
   - final `scripts\mt5_smoke.py --config-name mt5 --include-orders --include-positions` returned `order_count=0`, `position_count=0`, balance/equity `99941.09 TRY`
-  - post-demo `mt5_broker_probe.py` still reported `raw_order_count=0` and `raw_deal_count=0`; broker history normalization remains unresolved for this Dukascopy session
+  - the original post-demo `mt5_broker_probe.py` short-window history read still reported `raw_order_count=0` and `raw_deal_count=0`; the later 2026-04-30 explicit-terminal-path / 8760-hour read-only probe resolved history visibility and normalized deal attribution for this Dukascopy session
 - 2026-04-30 reviewed `/Users/dzhabrailtalkanov/Downloads/deep-research-report (1).md` and persisted the triage in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md`:
   - the audit was verified against current code and is directionally correct
   - confirmed P0 gaps are mandatory Risk/OMS runtime gating, durable state/startup recovery, broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, deal-based accounting, and protective TP/SL/bracket management
@@ -570,6 +570,20 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - targeted Ruff for runtime, supervisor, MT5 live/client/export, new script, and touched tests passed
   - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
   - full `.venv/bin/pytest` passed with `236 passed`
+- 2026-04-30 completed real read-only Parallels MT5 history/deal validation after the new probe:
+  - direct `prlctl exec` without `--current-user` works; the shared Mac repo path is visible in the VM as `C:\Mac\Home\Desktop\forex-scalper-ai`
+  - first probe without explicit terminal path failed with `MT5 initialize failed: -10003:IPC initialize failed, MetaTrader 5 x64 not found`
+  - setting `BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe` connected to Dukascopy demo account `610769553` and found `orders_window=4`, `deals_window_group=4`, `orders_ticket=1`, and `deals_position=2` with `order_send_called=false`
+  - setting `BROKER_MT5_HISTORY_LOOKBACK_HOURS=8760` exposed a normalized-client bug: the raw history includes a zero-volume deposit deal, which previously caused `MT5 deal payload is missing positive volume`
+  - `Mt5TerminalClient._deal_fill_summary()` now filters history deals by order id and skips zero-volume / non-priced records before normalizing per-order trade deals
+  - follow-up `mt5_broker_probe.py --skip-order-check` returned `normalized_order_count=4`, each order carrying the expected normalized EURUSD trade deal and non-negative execution cost; no orders or positions were open
+  - `.venv/bin/pytest tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/unit/test_scripts_mt5_history_probe.py` passed with `39 passed`, targeted Ruff passed for the MT5 client/test, and full `.venv/bin/pytest` passed with `236 passed`
+- 2026-04-30 completed final consistency sweep for the MT5 history/deal fix:
+  - stale docs that still said Parallels history/deal normalization was empty or unresolved were updated to the actual explicit-terminal-path / 8760-hour result
+  - `git diff --check` passed
+  - `.venv/bin/ruff check src/scalper_ai/execution/mt5_client.py tests/unit/test_execution_mt5_client.py scripts/mt5_history_probe.py tests/unit/test_scripts_mt5_history_probe.py` passed
+  - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `236 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -588,8 +602,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 ## Recommended Next Move
 
 Continue remaining live hardening:
-- run the new read-only `scripts/mt5_history_probe.py` against the Parallels Dukascopy demo terminal after the Windows copy is updated, to investigate why previous history APIs returned no raw orders/deals after controlled fills
 - add controlled broker-side pending-order modify validation only when a safe demo pending-order scenario is explicitly prepared
+- keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
 - continue alert routing/operator automation, concrete volatility/news/model/feature health providers, Docker validation on a Docker-enabled host, and small-batch Ruff/mypy cleanup
 
 If further MT5 validation is paused:
