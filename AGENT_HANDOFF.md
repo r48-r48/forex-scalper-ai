@@ -435,6 +435,7 @@ Current repository status:
 - Session updated on: 2026-04-30
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - Post-repair reset / pending-order modify / MT5 history-probe / runtime supervisor slice is complete: runtime can clear a session kill-switch only after explicit-token clean reconciliation, MT5 pending orders support `TRADE_ACTION_MODIFY` through `order_check -> order_send` with adapter-side stops/freeze/trade-mode guardrails, `scripts/mt5_history_probe.py` provides read-only multi-shape history/deal diagnostics, `RuntimeSupervisor` schedules health/metrics polling through the existing reconciliation surface, targeted Ruff passed, targeted pytest passed with `71 passed`, compileall passed, and full `.venv/bin/pytest` passed with `236 passed`
   - MT5 Protective Repair / Modify first slice is complete: added `Mt5ProtectionUpdateRequest`, `Mt5TerminalClient.modify_position_protection()` using `TRADE_ACTION_SLTP` with `order_check` before `order_send`, adapter-side symbol trade-mode/stops/freeze validation before repair, ticket-scoped position refresh, runtime `repair_unprotected_positions()` with explicit live confirmation token, targeted MT5/client/runtime validation with `60 passed`, broader validation with `85 passed`, compileall, and full `.venv/bin/pytest` with `225 passed`
   - P0.E Protective Order / Bracket Management first slice is complete: `OrderIntent` carries optional `stop_loss_price` and `take_profit_price`, MT5 requests/states map those fields to native `sl`/`tp`, MT5 live config can require stop loss and/or take profit for exposure-increasing orders, broker reconciliation flags missing/mismatched protective prices after acknowledgement, scripts serialize protective fields, targeted Ruff passed, targeted pytest passed with `43 passed`, compileall passed, and full `.venv/bin/pytest` passed with `188 passed`
   - P0.D Deal-Based Live Accounting first slice is complete: MT5 deals are normalized as `Mt5DealState`, order states carry deal records, the live adapter tracks seen deal ids and creates fills from unseen deals with commission/fee/swap charges before falling back to cumulative deltas, scripts serialize deal payloads safely, and full `.venv/bin/pytest` passed with `183 passed`
@@ -483,7 +484,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue real-broker history/deal investigation, pending-order modify permission coverage, daemon-level reconnect orchestration/operator circuit reset, post-repair kill-switch reset workflow, and Docker/runtime validation where available
+  - run the new read-only `scripts/mt5_history_probe.py` against the Parallels Dukascopy demo terminal after the Windows project copy is updated, then continue alert routing/operator automation, concrete health providers, and Docker/runtime validation where available
   - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## Constraints To Preserve
@@ -500,7 +501,7 @@ Current repository status:
 
 ## Post-Phase Focus
 
-- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, especially broker-source-of-truth sizing, hedging-aware reconciliation, non-empty history/deal normalization, and demo-order behavior only after explicit approval
+- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, especially non-empty history/deal normalization with the new read-only probe and controlled pending-order modify behavior only when a safe demo pending-order scenario is prepared
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
 - validate Docker/Compose runtime packaging, retire lint/typecheck baseline in small batches, then add network alert transport wiring, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface

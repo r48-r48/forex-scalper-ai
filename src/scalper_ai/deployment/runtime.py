@@ -595,6 +595,65 @@ class DeploymentRuntime:
 
         return tuple(repaired_positions)
 
+    def reset_session_kill_switch_after_reconciliation(
+        self,
+        *,
+        approval_token: str,
+        reset_at: datetime | None = None,
+    ) -> ReconciliationReport:
+        """Clear a session kill-switch only after an explicit clean reconciliation."""
+
+        self._validate_position_protection_action_approval(
+            approval_token,
+            action_name="kill-switch reset",
+        )
+        if self.effective_mode != "live":
+            raise RuntimeError("Session kill-switch reset is only available in live mode.")
+
+        report_provider = self._resolved_reconciliation_report_provider()
+        if report_provider is None:
+            raise RuntimeError("Cannot reset session kill-switch without reconciliation.")
+        try:
+            report = report_provider()
+        except Exception as exc:
+            raise RuntimeError(
+                "Cannot reset session kill-switch because reconciliation failed."
+            ) from exc
+        if report is None:
+            raise RuntimeError(
+                "Cannot reset session kill-switch without a reconciliation report."
+            )
+
+        self._last_reconciliation_report = report
+        if report.has_errors:
+            self._activate_reconciliation_fail_safe(
+                report,
+                default_reason="post_repair_reconciliation_error_drift",
+            )
+            raise RuntimeError(
+                "Cannot reset session kill-switch while reconciliation has error drift."
+            )
+
+        timestamp = reset_at or datetime.now(UTC)
+        self._session_kill_switch_enabled = False
+        if self._state_store is not None:
+            self._state_store.save_kill_switch_state(
+                KillSwitchState(
+                    scope=KillSwitchScope.SESSION,
+                    enabled=False,
+                    updated_at=timestamp,
+                    reason="clean_reconciliation_reset",
+                )
+            )
+        self._record_session_kill_switch_reset_event(report, reset_at=timestamp)
+        if self.config.monitoring.metrics_enabled:
+            self._metrics.increment(
+                "scalper_ai_session_kill_switch_resets_total",
+                requested_mode=self.requested_mode,
+                effective_mode=self.effective_mode,
+            )
+        return report
+
     def _submit_risk_approved_order(
         self,
         intent: OrderIntent,
@@ -1042,6 +1101,32 @@ class DeploymentRuntime:
                 payload_type="PositionProtectionRepair",
                 correlation_id=target.position_id,
                 symbol=target.symbol,
+            )
+        )
+
+    def _record_session_kill_switch_reset_event(
+        self,
+        report: ReconciliationReport,
+        *,
+        reset_at: datetime,
+    ) -> None:
+        self._record_journal_event(
+            JournalEvent.from_payload(
+                event_id=f"session-kill-switch-reset-{len(self._journal_events) + 1}",
+                event_type=JournalEventType.RISK,
+                payload={
+                    "scope": KillSwitchScope.SESSION.value,
+                    "enabled": False,
+                    "reason": "clean_reconciliation_reset",
+                    "reconciliation_checked_at": report.checked_at,
+                    "reconciliation_error_count": report.error_count,
+                    "reconciliation_warning_count": report.warning_count,
+                },
+                recorded_at=reset_at,
+                source="deployment_runtime",
+                event_timestamp=reset_at,
+                payload_type="KillSwitchReset",
+                correlation_id="session",
             )
         )
 

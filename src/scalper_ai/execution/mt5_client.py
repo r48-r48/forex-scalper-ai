@@ -17,6 +17,7 @@ from scalper_ai.execution.mt5_live import (
     Mt5ExecutionClientProtocol,
     Mt5OrderRequest,
     Mt5OrderState,
+    Mt5PendingOrderModifyRequest,
     Mt5PositionState,
     Mt5ProtectionUpdateRequest,
     Mt5SymbolSpec,
@@ -492,6 +493,54 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             )
         return refreshed_position
 
+    def modify_pending_order(
+        self,
+        request: Mt5PendingOrderModifyRequest,
+    ) -> Mt5OrderState:
+        """Modify one open MT5 pending order after broker-side order_check."""
+
+        self._ensure_initialized()
+        self._ensure_symbol_selected(request.broker_symbol)
+        current_state = self.get_order(request.broker_order_id)
+        if current_state is None:
+            raise KeyError(f"Unknown MT5 pending order: {request.broker_order_id}")
+
+        payload = self._build_pending_order_modify_payload(request)
+        check = self._normalize_order_check_result(
+            self._module.order_check(payload),
+            fallback_timestamp=request.submitted_at,
+        )
+        if not check.accepted:
+            raise RuntimeError(
+                check.rejection_reason
+                or "MT5 order_check rejected pending order modification."
+            )
+
+        result = self._module.order_send(payload)
+        if result is None or not self._retcode_is_success(getattr(result, "retcode", None)):
+            raise RuntimeError(self._result_comment(result) or self._last_error_message())
+
+        refreshed_state = self.get_order(request.broker_order_id)
+        if refreshed_state is not None:
+            return refreshed_state
+
+        return Mt5OrderState(
+            broker_order_id=current_state.broker_order_id,
+            broker_symbol=current_state.broker_symbol,
+            status=current_state.status,
+            submitted_at=current_state.submitted_at,
+            updated_at=self._result_timestamp(result, fallback=request.submitted_at),
+            requested_volume_lots=current_state.requested_volume_lots,
+            filled_volume_lots=current_state.filled_volume_lots,
+            remaining_volume_lots=current_state.remaining_volume_lots,
+            limit_price=request.limit_price,
+            stop_price=request.stop_price,
+            stop_loss_price=request.stop_loss_price,
+            take_profit_price=request.take_profit_price,
+            average_fill_price=current_state.average_fill_price,
+            deals=current_state.deals,
+        )
+
     def get_order(self, broker_order_id: str) -> Mt5OrderState | None:
         """Return one current or recent MT5 order state if available."""
 
@@ -724,6 +773,35 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             payload["tp"] = request.take_profit_price
         return payload
 
+    def _build_pending_order_modify_payload(
+        self,
+        request: Mt5PendingOrderModifyRequest,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "action": getattr(self._module, "TRADE_ACTION_MODIFY", 7),
+            "order": int(request.broker_order_id),
+            "symbol": request.broker_symbol,
+            "price": self._pending_order_price_values(
+                order_type=request.order_type,
+                limit_price=request.limit_price,
+                stop_price=request.stop_price,
+            ),
+            "type_time": self._time_policy_code(request.time_in_force),
+            "magic": self._config.magic_number,
+            "comment": self._comment_for("modify"),
+        }
+        if request.order_type is OrderType.STOP_LIMIT:
+            payload["stoplimit"] = request.limit_price
+        if request.stop_loss_price is not None:
+            payload["sl"] = request.stop_loss_price
+        else:
+            payload["sl"] = 0.0
+        if request.take_profit_price is not None:
+            payload["tp"] = request.take_profit_price
+        else:
+            payload["tp"] = 0.0
+        return payload
+
     def _build_position_protection_payload(
         self,
         request: Mt5ProtectionUpdateRequest,
@@ -750,19 +828,32 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
 
     @staticmethod
     def _pending_order_price(request: Mt5OrderRequest) -> float:
-        if request.order_type is OrderType.LIMIT:
-            if request.limit_price is None:
+        return Mt5TerminalClient._pending_order_price_values(
+            order_type=request.order_type,
+            limit_price=request.limit_price,
+            stop_price=request.stop_price,
+        )
+
+    @staticmethod
+    def _pending_order_price_values(
+        *,
+        order_type: OrderType,
+        limit_price: float | None,
+        stop_price: float | None,
+    ) -> float:
+        if order_type is OrderType.LIMIT:
+            if limit_price is None:
                 raise ValueError("Limit orders require limit_price.")
-            return request.limit_price
-        if request.order_type is OrderType.STOP:
-            if request.stop_price is None:
+            return limit_price
+        if order_type is OrderType.STOP:
+            if stop_price is None:
                 raise ValueError("Stop orders require stop_price.")
-            return request.stop_price
-        if request.order_type is OrderType.STOP_LIMIT:
-            if request.stop_price is None or request.limit_price is None:
+            return stop_price
+        if order_type is OrderType.STOP_LIMIT:
+            if stop_price is None or limit_price is None:
                 raise ValueError("Stop-limit orders require stop_price and limit_price.")
-            return request.stop_price
-        raise ValueError(f"Unsupported pending order type: {request.order_type}")
+            return stop_price
+        raise ValueError(f"Unsupported pending order type: {order_type}")
 
     def _normalize_order_record(self, raw_order: Any, *, historical: bool) -> Mt5OrderState:
         payload = self._coerce_mapping(raw_order)
@@ -811,6 +902,7 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             if status is ExecutionOrderStatus.CANCELED
             else None
         )
+        limit_price, stop_price = self._pending_order_prices_from_payload(payload)
         return Mt5OrderState(
             broker_order_id=broker_order_id,
             broker_symbol=broker_symbol,
@@ -820,6 +912,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             requested_volume_lots=requested_volume_lots,
             filled_volume_lots=fill_quantity_lots,
             remaining_volume_lots=remaining_volume_lots,
+            limit_price=limit_price,
+            stop_price=stop_price,
             stop_loss_price=self._coerce_positive_optional_float(payload.get("sl")),
             take_profit_price=self._coerce_positive_optional_float(payload.get("tp")),
             average_fill_price=average_fill_price,
@@ -827,6 +921,32 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             cancel_reason=cancel_reason,
             deals=deals,
         )
+
+    def _pending_order_prices_from_payload(
+        self,
+        payload: Mapping[str, Any],
+    ) -> tuple[float | None, float | None]:
+        order_type = payload.get("type")
+        entry_price = self._coerce_positive_optional_float(
+            payload.get("price_open", payload.get("price"))
+        )
+        stop_limit_price = self._coerce_positive_optional_float(payload.get("price_stoplimit"))
+        if order_type in {
+            getattr(self._module, "ORDER_TYPE_BUY_LIMIT", 2),
+            getattr(self._module, "ORDER_TYPE_SELL_LIMIT", 3),
+        }:
+            return entry_price, None
+        if order_type in {
+            getattr(self._module, "ORDER_TYPE_BUY_STOP", 4),
+            getattr(self._module, "ORDER_TYPE_SELL_STOP", 5),
+        }:
+            return None, entry_price
+        if order_type in {
+            getattr(self._module, "ORDER_TYPE_BUY_STOP_LIMIT", 6),
+            getattr(self._module, "ORDER_TYPE_SELL_STOP_LIMIT", 7),
+        }:
+            return stop_limit_price, entry_price
+        return None, None
 
     def _normalize_position_record(self, raw_position: Any) -> Mt5PositionState:
         payload = self._coerce_mapping(raw_position)
@@ -1017,6 +1137,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             requested_volume_lots=request.volume_lots,
             filled_volume_lots=0.0,
             remaining_volume_lots=request.volume_lots,
+            limit_price=request.limit_price,
+            stop_price=request.stop_price,
             stop_loss_price=request.stop_loss_price,
             take_profit_price=request.take_profit_price,
             rejection_reason=reason,
@@ -1043,6 +1165,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             requested_volume_lots=request.volume_lots,
             filled_volume_lots=filled_volume_lots,
             remaining_volume_lots=remaining_volume_lots,
+            limit_price=request.limit_price,
+            stop_price=request.stop_price,
             stop_loss_price=request.stop_loss_price,
             take_profit_price=request.take_profit_price,
             average_fill_price=average_fill_price,

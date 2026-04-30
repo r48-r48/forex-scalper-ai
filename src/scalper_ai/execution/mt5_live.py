@@ -200,6 +200,48 @@ class Mt5ProtectionUpdateRequest:
 
 
 @dataclass(frozen=True)
+class Mt5PendingOrderModifyRequest:
+    """Broker-specific request to modify one open MT5 pending order."""
+
+    broker_order_id: str
+    broker_symbol: str
+    side: OrderSide
+    order_type: OrderType
+    submitted_at: datetime
+    time_in_force: TimeInForce | None = None
+    limit_price: float | None = None
+    stop_price: float | None = None
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
+
+    def __post_init__(self) -> None:
+        if not self.broker_order_id.strip():
+            raise ValueError("broker_order_id must be non-empty.")
+        if not self.broker_symbol.strip():
+            raise ValueError("broker_symbol must be non-empty.")
+        if self.submitted_at.tzinfo is None or self.submitted_at.utcoffset() is None:
+            raise ValueError("submitted_at must be timezone-aware.")
+        if self.order_type is OrderType.MARKET:
+            raise ValueError("Only pending orders can be modified with TRADE_ACTION_MODIFY.")
+        for value_name, value in {
+            "limit_price": self.limit_price,
+            "stop_price": self.stop_price,
+            "stop_loss_price": self.stop_loss_price,
+            "take_profit_price": self.take_profit_price,
+        }.items():
+            if value is not None and (value <= 0 or not math.isfinite(value)):
+                raise ValueError(f"{value_name} must be positive and finite when provided.")
+        if self.order_type is OrderType.LIMIT and self.limit_price is None:
+            raise ValueError("Limit order modify requests require limit_price.")
+        if self.order_type is OrderType.STOP and self.stop_price is None:
+            raise ValueError("Stop order modify requests require stop_price.")
+        if self.order_type is OrderType.STOP_LIMIT and (
+            self.stop_price is None or self.limit_price is None
+        ):
+            raise ValueError("Stop-limit modify requests require stop_price and limit_price.")
+
+
+@dataclass(frozen=True)
 class Mt5DealState:
     """Normalized MT5 deal/fill record used for live accounting."""
 
@@ -261,6 +303,8 @@ class Mt5OrderState:
     requested_volume_lots: float
     filled_volume_lots: float
     remaining_volume_lots: float
+    limit_price: float | None = None
+    stop_price: float | None = None
     stop_loss_price: float | None = None
     take_profit_price: float | None = None
     average_fill_price: float | None = None
@@ -280,6 +324,8 @@ class Mt5OrderState:
         if self.remaining_volume_lots < 0:
             raise ValueError("remaining_volume_lots must be non-negative.")
         for value_name, value in {
+            "limit_price": self.limit_price,
+            "stop_price": self.stop_price,
             "stop_loss_price": self.stop_loss_price,
             "take_profit_price": self.take_profit_price,
         }.items():
@@ -417,6 +463,12 @@ class Mt5ExecutionClientProtocol(Protocol):
         request: Mt5ProtectionUpdateRequest,
     ) -> Mt5PositionState:
         """Modify broker-side stop-loss / take-profit protection for one position."""
+
+    def modify_pending_order(
+        self,
+        request: Mt5PendingOrderModifyRequest,
+    ) -> Mt5OrderState:
+        """Modify one open broker-side pending order."""
 
     def get_order(self, broker_order_id: str) -> Mt5OrderState | None:
         """Return one order state if the broker still knows about it."""
@@ -621,6 +673,117 @@ class Mt5ExecutionAdapter:
         self._remember_quote(quote)
         state = self._client.cancel_order(broker_order_id, timestamp=timestamp)
         return self._sync_order_state(existing_order.intent, state, quote=quote)
+
+    def modify_pending_order(
+        self,
+        broker_order_id: str,
+        *,
+        quote: ExecutionQuote,
+        timestamp: datetime | None = None,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        stop_loss_price: float | None = None,
+        take_profit_price: float | None = None,
+        time_in_force: TimeInForce | None = None,
+    ) -> ExecutionUpdate:
+        """Modify an open MT5 pending order with broker stops/freeze guardrails."""
+
+        existing_order = self._orders.get(broker_order_id)
+        if existing_order is None:
+            raise KeyError(f"Unknown broker_order_id: {broker_order_id}")
+        if not existing_order.is_open:
+            raise ValueError("Only open pending orders can be modified.")
+        intent = existing_order.intent
+        if intent.order_type is OrderType.MARKET:
+            raise ValueError("Only pending orders can be modified.")
+        if quote.symbol != intent.symbol:
+            raise ValueError("Modify quote symbol must match the pending order symbol.")
+
+        self._remember_quote(quote)
+        broker_symbol = self._broker_symbol_for(intent.symbol)
+        current_state = self._client.get_order(broker_order_id)
+        if current_state is None:
+            raise KeyError(f"MT5 broker no longer exposes pending order: {broker_order_id}")
+
+        spec = self._symbol_spec_for(broker_symbol)
+        broker_position = aggregate_mt5_positions(
+            self._broker_positions_for_symbol(intent.symbol),
+            broker_symbol=broker_symbol,
+            position_mode=self._config.account_mode,
+        )
+        effective_intent = intent.model_copy(
+            update={
+                "limit_price": (
+                    limit_price
+                    if limit_price is not None
+                    else current_state.limit_price or intent.limit_price
+                ),
+                "stop_price": (
+                    stop_price
+                    if stop_price is not None
+                    else current_state.stop_price or intent.stop_price
+                ),
+                "stop_loss_price": (
+                    stop_loss_price
+                    if stop_loss_price is not None
+                    else current_state.stop_loss_price or intent.stop_loss_price
+                ),
+                "take_profit_price": (
+                    take_profit_price
+                    if take_profit_price is not None
+                    else current_state.take_profit_price or intent.take_profit_price
+                ),
+                "time_in_force": (
+                    time_in_force if time_in_force is not None else intent.time_in_force
+                ),
+            }
+        )
+        trade_rejection = self._symbol_trade_rejection(
+            effective_intent,
+            spec,
+            requested_quantity=existing_order.remaining_quantity,
+            broker_position=broker_position,
+        )
+        if trade_rejection is not None:
+            raise ValueError(trade_rejection)
+
+        prepared_prices = self._prepare_symbol_constrained_prices(
+            effective_intent,
+            quote=quote,
+            spec=spec,
+        )
+        _validate_pending_entry_distance_for_level(
+            effective_intent,
+            quote=quote,
+            spec=spec,
+            prices=prepared_prices,
+            minimum_distance=_minimum_freeze_distance(spec),
+            level_name="freeze",
+        )
+        _validate_protective_distances_for_side(
+            effective_intent.side,
+            quote=quote,
+            spec=spec,
+            stop_loss_price=prepared_prices.stop_loss_price,
+            take_profit_price=prepared_prices.take_profit_price,
+            minimum_distance=_minimum_freeze_distance(spec),
+            level_name="freeze",
+        )
+
+        modify_request = Mt5PendingOrderModifyRequest(
+            broker_order_id=broker_order_id,
+            broker_symbol=broker_symbol,
+            side=effective_intent.side,
+            order_type=effective_intent.order_type,
+            submitted_at=timestamp or quote.received_timestamp,
+            time_in_force=prepared_prices.time_in_force,
+            limit_price=prepared_prices.limit_price,
+            stop_price=prepared_prices.stop_price,
+            stop_loss_price=prepared_prices.stop_loss_price,
+            take_profit_price=prepared_prices.take_profit_price,
+        )
+        state = self._client.modify_pending_order(modify_request)
+        return self._sync_order_state(intent, state, quote=quote)
 
     def repair_position_protection(
         self,
@@ -1625,7 +1788,25 @@ def _validate_pending_entry_distance(
     spec: Mt5SymbolSpec,
     prices: _PreparedMt5Prices,
 ) -> None:
-    minimum_distance = _minimum_stop_distance(spec)
+    _validate_pending_entry_distance_for_level(
+        intent,
+        quote=quote,
+        spec=spec,
+        prices=prices,
+        minimum_distance=_minimum_stop_distance(spec),
+        level_name="stops",
+    )
+
+
+def _validate_pending_entry_distance_for_level(
+    intent: OrderIntent,
+    *,
+    quote: ExecutionQuote,
+    spec: Mt5SymbolSpec,
+    prices: _PreparedMt5Prices,
+    minimum_distance: float | None,
+    level_name: str,
+) -> None:
     if minimum_distance is None:
         return
     if intent.order_type is OrderType.LIMIT:
@@ -1636,11 +1817,12 @@ def _validate_pending_entry_distance(
             if intent.side is OrderSide.BUY
             else prices.limit_price - quote.bid
         )
-        _raise_if_inside_stops_level(
+        _raise_if_inside_broker_level(
             "limit_price",
             distance=distance,
             minimum_distance=minimum_distance,
             broker_symbol=spec.broker_symbol,
+            level_name=level_name,
         )
     elif intent.order_type in {OrderType.STOP, OrderType.STOP_LIMIT}:
         if prices.stop_price is None:
@@ -1650,11 +1832,12 @@ def _validate_pending_entry_distance(
             if intent.side is OrderSide.BUY
             else quote.bid - prices.stop_price
         )
-        _raise_if_inside_stops_level(
+        _raise_if_inside_broker_level(
             "stop_price",
             distance=distance,
             minimum_distance=minimum_distance,
             broker_symbol=spec.broker_symbol,
+            level_name=level_name,
         )
 
 

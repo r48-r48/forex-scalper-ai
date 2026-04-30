@@ -17,6 +17,11 @@ from scalper_ai.deployment.live_factory import (
 from scalper_ai.deployment.metrics import MetricSample, MetricsRegistry
 from scalper_ai.deployment.mt5_preflight import Mt5PreflightReport, build_mt5_preflight_report
 from scalper_ai.deployment.runtime import DeploymentRuntime, RuntimeLifecycleState, RuntimeSummary
+from scalper_ai.deployment.supervisor import (
+    RuntimeSupervisor,
+    RuntimeSupervisorConfig,
+    RuntimeSupervisorIteration,
+)
 
 __all__ = [
     "AlertEvent",
@@ -37,5 +42,8 @@ __all__ = [
     "resolve_live_adapter_factory",
     "RuntimeLifecycleState",
     "RuntimeSummary",
+    "RuntimeSupervisor",
+    "RuntimeSupervisorConfig",
+    "RuntimeSupervisorIteration",
     "bootstrap_runtime",
 ]

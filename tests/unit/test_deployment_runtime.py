@@ -949,6 +949,156 @@ def test_live_runtime_approved_repair_updates_position_protection_from_reconcili
     assert "scalper_ai_position_protection_repairs_total" in runtime.metrics_text()
 
 
+def test_live_runtime_resets_session_kill_switch_after_clean_reconciliation(
+    tmp_path,
+) -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    timestamp = datetime(2026, 4, 30, 12, 15, tzinfo=UTC)
+    clean_report = ReconciliationReport(checked_at=timestamp, issues=())
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+    store.save_kill_switch_state(
+        KillSwitchState(
+            scope=KillSwitchScope.SESSION,
+            enabled=True,
+            updated_at=timestamp,
+            reason="position_protection_reconciliation_failed",
+        )
+    )
+    adapter = _RecordingFlattenAdapter()
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: adapter,
+        reconciliation_report_provider=lambda: clean_report,
+        live_confirmation_token="ENABLE_ME",
+        state_store=store,
+    )
+    runtime.start()
+
+    report = runtime.reset_session_kill_switch_after_reconciliation(
+        approval_token="ENABLE_ME",
+        reset_at=timestamp,
+    )
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="allowed-after-clean-reset",
+            strategy_id="runtime-reset-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=1.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1001,
+            venue="broker-feed",
+        ),
+    )
+
+    assert report is clean_report
+    assert update.order.status is ExecutionOrderStatus.FILLED
+    assert adapter.submit_count == 1
+    assert any(
+        state.scope is KillSwitchScope.SESSION
+        and not state.enabled
+        and state.reason == "clean_reconciliation_reset"
+        for state in store.list_kill_switch_states()
+    )
+    assert any(
+        event.payload_type == "KillSwitchReset"
+        and event.payload["reason"] == "clean_reconciliation_reset"
+        for event in runtime.journal_events
+    )
+    assert "scalper_ai_session_kill_switch_resets_total" in runtime.metrics_text()
+
+
+def test_live_runtime_refuses_kill_switch_reset_when_reconciliation_has_errors(
+    tmp_path,
+) -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    timestamp = datetime(2026, 4, 30, 12, 20, tzinfo=UTC)
+    clean_report = ReconciliationReport(checked_at=timestamp, issues=())
+    dirty_report = ReconciliationReport(
+        checked_at=timestamp,
+        issues=(
+            ReconciliationIssue(
+                scope="position",
+                reference_id="EURUSD",
+                severity=ReconciliationSeverity.ERROR,
+                code="broker_only_position",
+                message="Broker has exposure that is absent from runtime state.",
+            ),
+        ),
+    )
+    reports = [clean_report, dirty_report]
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+    store.save_kill_switch_state(
+        KillSwitchState(
+            scope=KillSwitchScope.SESSION,
+            enabled=True,
+            updated_at=timestamp,
+            reason="startup_reconciliation_error_drift",
+        )
+    )
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=LiveExecutionStubAdapter,
+        reconciliation_report_provider=lambda: reports.pop(0),
+        live_confirmation_token="ENABLE_ME",
+        state_store=store,
+    )
+    runtime.start()
+
+    with pytest.raises(RuntimeError, match="error drift"):
+        runtime.reset_session_kill_switch_after_reconciliation(
+            approval_token="ENABLE_ME",
+            reset_at=timestamp,
+        )
+
+    assert any(
+        state.scope is KillSwitchScope.SESSION
+        and state.enabled
+        and state.reason == "post_repair_reconciliation_error_drift"
+        for state in store.list_kill_switch_states()
+    )
+
+
 def test_live_runtime_approved_flatten_requires_confirmation_phrase(tmp_path) -> None:
     config = AppConfig.model_validate(
         {

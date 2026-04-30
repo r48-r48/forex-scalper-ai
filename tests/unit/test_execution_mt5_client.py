@@ -15,7 +15,11 @@ from scalper_ai.execution.mt5_client import (
     Mt5TerminalClientConfig,
     discover_mt5_terminal_path,
 )
-from scalper_ai.execution.mt5_live import Mt5OrderRequest, Mt5ProtectionUpdateRequest
+from scalper_ai.execution.mt5_live import (
+    Mt5OrderRequest,
+    Mt5PendingOrderModifyRequest,
+    Mt5ProtectionUpdateRequest,
+)
 
 
 def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission() -> None:
@@ -412,6 +416,87 @@ def test_mt5_terminal_client_does_not_modify_when_protection_precheck_rejects() 
     assert module.order_send_call_count == 0
 
 
+def test_mt5_terminal_client_modifies_pending_order_with_precheck() -> None:
+    module = _FakeMetaTrader5Module()
+    module._open_orders[6601] = SimpleNamespace(
+        ticket=6601,
+        symbol="EURUSD",
+        type=module.ORDER_TYPE_BUY_LIMIT,
+        state=module.ORDER_STATE_PLACED,
+        volume_initial=0.01,
+        volume_current=0.01,
+        price_open=1.0990,
+        sl=0.0,
+        tp=0.0,
+        time_setup=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.modify_pending_order(
+        Mt5PendingOrderModifyRequest(
+            broker_order_id="6601",
+            broker_symbol="EURUSD",
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            limit_price=1.0985,
+            stop_loss_price=1.0950,
+            take_profit_price=1.1050,
+        )
+    )
+
+    assert module.last_order_check_payload["action"] == module.TRADE_ACTION_MODIFY
+    assert module.last_order_check_payload["order"] == 6601
+    assert module.last_order_send_payload["action"] == module.TRADE_ACTION_MODIFY
+    assert module.last_order_send_payload["price"] == 1.0985
+    assert module.last_order_send_payload["sl"] == 1.0950
+    assert module.last_order_send_payload["tp"] == 1.1050
+    assert state.broker_order_id == "6601"
+    assert state.limit_price == pytest.approx(1.0985)
+    assert state.stop_loss_price == pytest.approx(1.0950)
+    assert state.take_profit_price == pytest.approx(1.1050)
+
+
+def test_mt5_terminal_client_does_not_modify_pending_order_when_precheck_rejects() -> None:
+    module = _FakeMetaTrader5Module()
+    module._open_orders[6601] = SimpleNamespace(
+        ticket=6601,
+        symbol="EURUSD",
+        type=module.ORDER_TYPE_BUY_LIMIT,
+        state=module.ORDER_STATE_PLACED,
+        volume_initial=0.01,
+        volume_current=0.01,
+        price_open=1.0990,
+        time_setup=1_774_670_400,
+    )
+    module.order_check_result = SimpleNamespace(
+        retcode=10016,
+        comment="invalid price",
+        time=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    with pytest.raises(RuntimeError, match="invalid price"):
+        client.modify_pending_order(
+            Mt5PendingOrderModifyRequest(
+                broker_order_id="6601",
+                broker_symbol="EURUSD",
+                side=OrderSide.BUY,
+                order_type=OrderType.LIMIT,
+                submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+                limit_price=1.0985,
+            )
+        )
+
+    assert module.order_send_call_count == 0
+
+
 def test_mt5_terminal_client_normalizes_symbol_spec() -> None:
     module = _FakeMetaTrader5Module()
     client = Mt5TerminalClient(
@@ -456,6 +541,7 @@ class _FakeMetaTrader5Module:
     TRADE_ACTION_DEAL = 1
     TRADE_ACTION_PENDING = 5
     TRADE_ACTION_SLTP = 6
+    TRADE_ACTION_MODIFY = 7
     TRADE_ACTION_REMOVE = 8
     TRADE_RETCODE_DONE = 10009
     TRADE_RETCODE_PLACED = 10008
@@ -473,6 +559,7 @@ class _FakeMetaTrader5Module:
     ORDER_FILLING_FOK = 0
     ORDER_FILLING_IOC = 1
     ORDER_FILLING_RETURN = 2
+    ORDER_STATE_PLACED = 1
     ORDER_STATE_PARTIAL = 2
     ORDER_STATE_FILLED = 4
     ORDER_STATE_CANCELED = 5
@@ -506,6 +593,7 @@ class _FakeMetaTrader5Module:
         )
         self.use_default_order_send = True
         self.order_send_result: SimpleNamespace | None = None
+        self._open_orders: dict[int, SimpleNamespace] = {}
         self._history_orders: dict[int, SimpleNamespace] = {}
         self._deals: dict[int, list[SimpleNamespace]] = {}
         self._positions: dict[str, SimpleNamespace] = {
@@ -585,6 +673,19 @@ class _FakeMetaTrader5Module:
         self.last_order_send_payload = dict(request)
         if not self.use_default_order_send:
             return self.order_send_result
+        if request["action"] == self.TRADE_ACTION_MODIFY:
+            order_id = int(request["order"])
+            order = self._open_orders[order_id]
+            order.price_open = request["price"]
+            order.price_stoplimit = request.get("stoplimit", 0.0)
+            order.sl = request.get("sl", 0.0)
+            order.tp = request.get("tp", 0.0)
+            return SimpleNamespace(
+                retcode=self.TRADE_RETCODE_DONE,
+                order=order_id,
+                comment="done",
+                time=1_774_670_400,
+            )
         if request["action"] == self.TRADE_ACTION_SLTP:
             position_ticket = int(request["position"])
             for position in self._positions.values():
@@ -651,7 +752,11 @@ class _FakeMetaTrader5Module:
         )
 
     def orders_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
-        return ()
+        ticket = kwargs.get("ticket")
+        if ticket is None:
+            return tuple(self._open_orders.values())
+        order = self._open_orders.get(int(ticket))
+        return () if order is None else (order,)
 
     def positions_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
         symbol = kwargs.get("symbol")

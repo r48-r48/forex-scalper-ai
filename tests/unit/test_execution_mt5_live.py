@@ -15,6 +15,7 @@ from scalper_ai.execution import (
     Mt5ExecutionConfig,
     Mt5OrderRequest,
     Mt5OrderState,
+    Mt5PendingOrderModifyRequest,
     Mt5PositionState,
     Mt5ProtectionUpdateRequest,
     Mt5SymbolSpec,
@@ -596,6 +597,101 @@ def test_mt5_execution_adapter_rejects_fok_for_pending_order() -> None:
     )
 
 
+def test_mt5_execution_adapter_modifies_pending_order_with_guardrails() -> None:
+    client = _PendingModifyMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            point=0.0001,
+            stops_level_points=10,
+            freeze_level_points=5,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.1000,
+        ask=1.1002,
+        venue="broker-feed",
+    )
+
+    accepted = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-pending-modify",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            quantity=100_000.0,
+            limit_price=1.0980,
+            paper=False,
+        ),
+        quote,
+    )
+    modified = adapter.modify_pending_order(
+        accepted.order.broker_order_id,
+        quote=quote,
+        timestamp=timestamp,
+        limit_price=1.0975,
+        stop_loss_price=1.0950,
+        take_profit_price=1.1050,
+    )
+
+    assert len(client.modify_requests) == 1
+    assert client.modify_requests[0].broker_order_id == accepted.order.broker_order_id
+    assert client.modify_requests[0].limit_price == pytest.approx(1.0975)
+    assert client.modify_requests[0].stop_loss_price == pytest.approx(1.0950)
+    assert client.modify_requests[0].take_profit_price == pytest.approx(1.1050)
+    assert modified.order.status is ExecutionOrderStatus.ACCEPTED
+
+
+def test_mt5_execution_adapter_rejects_pending_modify_inside_freeze_level() -> None:
+    client = _PendingModifyMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            point=0.0001,
+            freeze_level_points=10,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.1000,
+        ask=1.1002,
+        venue="broker-feed",
+    )
+    accepted = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-pending-freeze",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            quantity=100_000.0,
+            limit_price=1.0980,
+            paper=False,
+        ),
+        quote,
+    )
+
+    with pytest.raises(ValueError, match="broker freeze level"):
+        adapter.modify_pending_order(
+            accepted.order.broker_order_id,
+            quote=quote,
+            timestamp=timestamp,
+            limit_price=1.0997,
+        )
+
+    assert client.modify_requests == []
+
+
 def test_mt5_execution_adapter_repairs_position_protection_preserving_existing_target() -> None:
     timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
     client = _RepairableProtectionMt5Client(
@@ -879,6 +975,54 @@ class _SymbolSpecMt5Client(_ImmediateFillMt5Client):
     def get_symbol_spec(self, broker_symbol: str) -> Mt5SymbolSpec:
         assert broker_symbol == self._spec.broker_symbol
         return self._spec
+
+
+class _PendingModifyMt5Client(_SymbolSpecMt5Client):
+    def __init__(self, spec: Mt5SymbolSpec) -> None:
+        super().__init__(spec)
+        self.modify_requests: list[Mt5PendingOrderModifyRequest] = []
+
+    def submit_order(self, request: Mt5OrderRequest) -> Mt5OrderState:
+        self.requests.append(request)
+        state = Mt5OrderState(
+            broker_order_id="mt5-pending-1",
+            broker_symbol=request.broker_symbol,
+            status=ExecutionOrderStatus.ACCEPTED,
+            submitted_at=request.submitted_at,
+            updated_at=request.submitted_at,
+            requested_volume_lots=request.volume_lots,
+            filled_volume_lots=0.0,
+            remaining_volume_lots=request.volume_lots,
+            limit_price=request.limit_price,
+            stop_price=request.stop_price,
+            stop_loss_price=request.stop_loss_price,
+            take_profit_price=request.take_profit_price,
+        )
+        self._orders[state.broker_order_id] = state
+        return state
+
+    def modify_pending_order(
+        self,
+        request: Mt5PendingOrderModifyRequest,
+    ) -> Mt5OrderState:
+        self.modify_requests.append(request)
+        state = self._orders[request.broker_order_id]
+        updated = Mt5OrderState(
+            broker_order_id=state.broker_order_id,
+            broker_symbol=state.broker_symbol,
+            status=state.status,
+            submitted_at=state.submitted_at,
+            updated_at=request.submitted_at,
+            requested_volume_lots=state.requested_volume_lots,
+            filled_volume_lots=state.filled_volume_lots,
+            remaining_volume_lots=state.remaining_volume_lots,
+            limit_price=request.limit_price,
+            stop_price=request.stop_price,
+            stop_loss_price=request.stop_loss_price,
+            take_profit_price=request.take_profit_price,
+        )
+        self._orders[request.broker_order_id] = updated
+        return updated
 
 
 class _DealFillMt5Client(_ImmediateFillMt5Client):

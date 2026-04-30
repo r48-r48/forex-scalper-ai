@@ -561,6 +561,15 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - broader MT5/runtime/config/preflight pytest passed with `85 passed`
   - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
   - full `.venv/bin/pytest` passed with `225 passed`
+- 2026-04-30 completed the post-repair reset / pending-order modify / MT5 history-probe / runtime supervisor slice:
+  - `DeploymentRuntime.reset_session_kill_switch_after_reconciliation()` now requires the live confirmation phrase, runs fresh reconciliation, refuses reset if error drift remains, persists a disabled session kill-switch after clean reconciliation, journals the reset, and emits a reset metric
+  - MT5 pending order modification now uses `Mt5PendingOrderModifyRequest`, `Mt5TerminalClient.modify_pending_order()` with `TRADE_ACTION_MODIFY` and `order_check -> order_send`, and `Mt5ExecutionAdapter.modify_pending_order()` with symbol trade-mode, stops-level, freeze-level, price quantization, and protective-price guardrails
+  - `scripts/mt5_history_probe.py` was added as a read-only diagnostic for `history_orders_get` / `history_deals_get` time-window, symbol group, order-ticket, and position-ticket call shapes with `last_error` capture and raw samples
+  - `scalper_ai.deployment.supervisor` was added for deterministic scheduled runtime health/metrics polling, reusing the existing reconciliation and broker-connectivity checks instead of duplicating live logic
+  - `.venv/bin/pytest tests/unit/test_deployment_runtime.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_scripts_mt5_history_probe.py tests/unit/test_deployment_supervisor.py` passed with `71 passed`
+  - targeted Ruff for runtime, supervisor, MT5 live/client/export, new script, and touched tests passed
+  - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `236 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -579,9 +588,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 ## Recommended Next Move
 
 Continue remaining live hardening:
-- investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
-- add pending-order modify permission coverage and controlled repair validation when an explicit demo repair action is approved
-- add daemon-level MT5 reconnect orchestration, operator circuit-reset/post-repair reset workflow, alert routing, and connect real volatility/news/model/feature health providers into the new risk guard fields
+- run the new read-only `scripts/mt5_history_probe.py` against the Parallels Dukascopy demo terminal after the Windows copy is updated, to investigate why previous history APIs returned no raw orders/deals after controlled fills
+- add controlled broker-side pending-order modify validation only when a safe demo pending-order scenario is explicitly prepared
+- continue alert routing/operator automation, concrete volatility/news/model/feature health providers, Docker validation on a Docker-enabled host, and small-batch Ruff/mypy cleanup
 
 If further MT5 validation is paused:
 - validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
