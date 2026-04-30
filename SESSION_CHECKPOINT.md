@@ -262,7 +262,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - the report remains directionally correct, but its original P0 runtime/Risk/OMS, durable-state, broker-source, deal-accounting, and native protective-order findings are now partly stale because first production slices are implemented
   - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md` so future context does not treat P0.A as still fully open
   - verification passed: `.venv/bin/python -m compileall src tests scripts`, targeted safety pytest with `56 passed`, and full `.venv/bin/pytest` with `188 passed`
-  - next confirmed work order remains: MT5 history investigation, richer protective-order repair/modify support, daemon supervision, post-reconnect reconciliation scheduling, and fuller symbol metadata enforcement
+  - next confirmed work order remains: MT5 history investigation, richer protective-order repair/modify support, daemon supervision, post-reconnect reconciliation scheduling, and freeze/order-mode metadata follow-up
 - 2026-04-30 completed the first P1 risk-config guard slice:
   - `RiskRejectCode` now includes max spread, loss cooldown, volatility guard, news guard, stale features, and model health reject reasons
   - `RiskLimits.from_risk_config()` now wires `max_spread_pips`, `cooldown_after_loss_burst_seconds`, `volatility_filter_enabled`, and `news_filter_enabled`
@@ -284,6 +284,18 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - combined targeted safety/MT5 pytest passed with `61 passed`
   - `.venv/bin/python -m compileall src tests scripts` passed
   - full `.venv/bin/pytest` passed with `199 passed`
+- 2026-04-30 completed the first MT5 symbol metadata enforcement slice:
+  - `Mt5TerminalClient.get_symbol_spec()` now also captures broker `trade_mode`, `filling_mode`, and `trade_exemode`
+  - `Mt5ExecutionAdapter` quantizes limit/stop/SL/TP request prices to broker `point`/`digits`
+  - entry and protective prices inside broker `stops_level_points` are rejected before client submission
+  - symbol trade mode now blocks disabled/long-only/short-only/close-only exposure-increasing requests
+  - market orders choose broker-supported IOC/FOK when symbol `filling_mode` is known, and explicit unsupported FOK/IOC requests are rejected
+  - pending orders reject FOK/IOC before broker submission because MT5 pending orders require Return filling
+  - targeted Ruff passed for MT5 live/client and touched MT5 tests
+  - `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py` passed with `32 passed`
+  - `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py tests/unit/test_config_loader.py tests/unit/test_deployment_mt5_preflight.py` passed with `67 passed`
+  - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `220 passed`
 - 2026-04-30 completed the P0.E position-protection fail-safe slice:
   - `BrokerPositionSnapshot` and `Mt5PositionState` now carry optional `stop_loss_price` and `take_profit_price`
   - `Mt5TerminalClient` normalizes MT5 position `sl`/`tp` into broker-source position state
@@ -534,6 +546,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `.venv/bin/pytest tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py` -> `51 passed` after broker-side startup recovery/fault-injection slice
 - 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after broker-side startup recovery/fault-injection slice
 - 2026-04-30: `.venv/bin/pytest` -> `214 passed` after broker-side startup recovery/fault-injection slice
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/execution/mt5_live.py src/scalper_ai/execution/mt5_client.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py` -> passed after MT5 symbol metadata enforcement slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py` -> `32 passed` after MT5 symbol metadata enforcement slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py tests/unit/test_config_loader.py tests/unit/test_deployment_mt5_preflight.py` -> `67 passed` after MT5 symbol metadata enforcement slice
+- 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after MT5 symbol metadata enforcement slice
+- 2026-04-30: `.venv/bin/pytest` -> `220 passed` after MT5 symbol metadata enforcement slice
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -553,7 +570,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 Continue remaining live hardening:
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
-- extend symbol-specific metadata enforcement to price precision, stops/freeze levels, trade mode, and filling mode
+- add freeze/order-mode metadata follow-up for broker-side modify/repair workflows and pending-order permissions
 - add daemon-level MT5 reconnect orchestration, operator circuit-reset workflow, alert routing, and connect real volatility/news/model/feature health providers into the new risk guard fields
 
 If further MT5 validation is paused:

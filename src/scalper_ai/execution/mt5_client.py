@@ -504,6 +504,12 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             point=self._coerce_positive_optional_float(payload.get("point")),
             stops_level_points=self._coerce_int(payload.get("trade_stops_level")),
             freeze_level_points=self._coerce_int(payload.get("trade_freeze_level")),
+            trade_mode=self._coerce_int(payload.get("trade_mode")),
+            filling_mode=self._coerce_int(payload.get("filling_mode")),
+            trade_execution_mode=_first_optional_int(
+                self._coerce_int(payload.get("trade_exemode")),
+                self._coerce_int(payload.get("trade_execution_mode")),
+            ),
         )
 
     def get_position(self, broker_symbol: str) -> Mt5PositionState | None:
@@ -1164,3 +1170,10 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             return None
         normalized = str(value).strip()
         return normalized or None
+
+
+def _first_optional_int(*values: int | None) -> int | None:
+    for value in values:
+        if value is not None:
+            return value
+    return None

@@ -6,7 +6,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from decimal import ROUND_DOWN, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import Protocol
 
 from scalper_ai.backtesting.accounting import (
@@ -35,6 +35,17 @@ from scalper_ai.execution.models import (
 from scalper_ai.execution.reconciliation import BrokerOrderSnapshot, BrokerPositionSnapshot
 
 _ZERO_TOLERANCE = 1e-12
+_MT5_TRADE_MODE_DISABLED = 0
+_MT5_TRADE_MODE_LONG_ONLY = 1
+_MT5_TRADE_MODE_SHORT_ONLY = 2
+_MT5_TRADE_MODE_CLOSE_ONLY = 3
+_MT5_TRADE_MODE_FULL = 4
+_MT5_FILLING_FOK_FLAG = 1
+_MT5_FILLING_IOC_FLAG = 2
+_MT5_TRADE_EXECUTION_REQUEST = 0
+_MT5_TRADE_EXECUTION_INSTANT = 1
+_MT5_TRADE_EXECUTION_MARKET = 2
+_MT5_TRADE_EXECUTION_EXCHANGE = 3
 
 
 @dataclass(frozen=True)
@@ -42,6 +53,15 @@ class _ResolvedMt5Sizing:
     requested_quantity: float | None
     rejection_reason: str | None = None
     position_ticket: str | None = None
+
+
+@dataclass(frozen=True)
+class _PreparedMt5Prices:
+    limit_price: float | None
+    stop_price: float | None
+    stop_loss_price: float | None
+    take_profit_price: float | None
+    time_in_force: TimeInForce | None
 
 
 @dataclass(frozen=True)
@@ -96,6 +116,9 @@ class Mt5SymbolSpec:
     point: float | None = None
     stops_level_points: int | None = None
     freeze_level_points: int | None = None
+    trade_mode: int | None = None
+    filling_mode: int | None = None
+    trade_execution_mode: int | None = None
 
     def __post_init__(self) -> None:
         if not self.broker_symbol.strip():
@@ -121,6 +144,13 @@ class Mt5SymbolSpec:
             raise ValueError("stops_level_points must be non-negative when provided.")
         if self.freeze_level_points is not None and self.freeze_level_points < 0:
             raise ValueError("freeze_level_points must be non-negative when provided.")
+        for value_name, value in {
+            "trade_mode": self.trade_mode,
+            "filling_mode": self.filling_mode,
+            "trade_execution_mode": self.trade_execution_mode,
+        }.items():
+            if value is not None and value < 0:
+                raise ValueError(f"{value_name} must be non-negative when provided.")
 
 
 @dataclass(frozen=True)
@@ -409,10 +439,11 @@ class Mt5ExecutionAdapter:
             raise ValueError("ExecutionQuote symbol must match the submitted OrderIntent symbol.")
 
         self._remember_quote(quote)
+        broker_symbol = self._broker_symbol_for(intent.symbol)
         broker_positions = self._broker_positions_for_symbol(intent.symbol)
         broker_position = aggregate_mt5_positions(
             broker_positions,
-            broker_symbol=self._broker_symbol_for(intent.symbol),
+            broker_symbol=broker_symbol,
             position_mode=self._config.account_mode,
         )
         if broker_position is not None:
@@ -460,7 +491,34 @@ class Mt5ExecutionAdapter:
                 ),
             )
 
-        broker_symbol = self._broker_symbol_for(intent.symbol)
+        spec = self._symbol_spec_for(broker_symbol)
+        trade_rejection = self._symbol_trade_rejection(
+            intent,
+            spec,
+            requested_quantity=sizing.requested_quantity,
+            broker_position=broker_position,
+        )
+        if trade_rejection is not None:
+            return self._build_rejected_update(
+                intent,
+                quote=quote,
+                requested_quantity=sizing.requested_quantity,
+                reason=trade_rejection,
+            )
+        try:
+            prepared_prices = self._prepare_symbol_constrained_prices(
+                intent,
+                quote=quote,
+                spec=spec,
+            )
+        except ValueError as exc:
+            return self._build_rejected_update(
+                intent,
+                quote=quote,
+                requested_quantity=sizing.requested_quantity,
+                reason=str(exc),
+            )
+
         try:
             volume_lots = self._base_units_to_lots(
                 sizing.requested_quantity,
@@ -481,15 +539,11 @@ class Mt5ExecutionAdapter:
             order_type=intent.order_type,
             submitted_at=quote.received_timestamp,
             volume_lots=volume_lots,
-            time_in_force=intent.time_in_force,
-            limit_price=None if intent.limit_price is None else float(intent.limit_price),
-            stop_price=None if intent.stop_price is None else float(intent.stop_price),
-            stop_loss_price=(
-                None if intent.stop_loss_price is None else float(intent.stop_loss_price)
-            ),
-            take_profit_price=(
-                None if intent.take_profit_price is None else float(intent.take_profit_price)
-            ),
+            time_in_force=prepared_prices.time_in_force,
+            limit_price=prepared_prices.limit_price,
+            stop_price=prepared_prices.stop_price,
+            stop_loss_price=prepared_prices.stop_loss_price,
+            take_profit_price=prepared_prices.take_profit_price,
             reduce_only=intent.reduce_only,
             position_ticket=sizing.position_ticket,
         )
@@ -1116,6 +1170,64 @@ class Mt5ExecutionAdapter:
         next_quantity = current_quantity + signed_quantity
         return abs(next_quantity) - abs(current_quantity) > _ZERO_TOLERANCE
 
+    def _symbol_trade_rejection(
+        self,
+        intent: OrderIntent,
+        spec: Mt5SymbolSpec,
+        *,
+        requested_quantity: float,
+        broker_position: Mt5PositionState | None,
+    ) -> str | None:
+        if spec.trade_mode is None:
+            return None
+        if spec.trade_mode == _MT5_TRADE_MODE_DISABLED:
+            return "MT5 symbol trade_mode disables trading for this symbol."
+        exposure_increasing = self._trade_increases_exposure(
+            intent,
+            requested_quantity=requested_quantity,
+            broker_position=broker_position,
+        )
+        if (
+            spec.trade_mode == _MT5_TRADE_MODE_LONG_ONLY
+            and intent.side is OrderSide.SELL
+            and exposure_increasing
+        ):
+            return "MT5 symbol trade_mode only allows long exposure increases."
+        if (
+            spec.trade_mode == _MT5_TRADE_MODE_SHORT_ONLY
+            and intent.side is OrderSide.BUY
+            and exposure_increasing
+        ):
+            return "MT5 symbol trade_mode only allows short exposure increases."
+        if spec.trade_mode == _MT5_TRADE_MODE_CLOSE_ONLY and exposure_increasing:
+            return "MT5 symbol trade_mode only allows position-closing orders."
+        if spec.trade_mode in {
+            _MT5_TRADE_MODE_LONG_ONLY,
+            _MT5_TRADE_MODE_SHORT_ONLY,
+            _MT5_TRADE_MODE_CLOSE_ONLY,
+            _MT5_TRADE_MODE_FULL,
+        }:
+            return None
+        return f"Unsupported MT5 symbol trade_mode: {spec.trade_mode}."
+
+    def _prepare_symbol_constrained_prices(
+        self,
+        intent: OrderIntent,
+        *,
+        quote: ExecutionQuote,
+        spec: Mt5SymbolSpec,
+    ) -> _PreparedMt5Prices:
+        prepared = _PreparedMt5Prices(
+            limit_price=_normalize_optional_price(intent.limit_price, spec=spec),
+            stop_price=_normalize_optional_price(intent.stop_price, spec=spec),
+            stop_loss_price=_normalize_optional_price(intent.stop_loss_price, spec=spec),
+            take_profit_price=_normalize_optional_price(intent.take_profit_price, spec=spec),
+            time_in_force=_resolve_time_in_force(intent, spec=spec),
+        )
+        _validate_pending_entry_distance(intent, quote=quote, spec=spec, prices=prepared)
+        _validate_protective_price_distance(intent, quote=quote, spec=spec, prices=prepared)
+        return prepared
+
     @staticmethod
     def _reducible_quantity(current_quantity: float, *, side: OrderSide) -> float:
         if side is OrderSide.BUY and current_quantity < 0:
@@ -1256,6 +1368,188 @@ def _position_is_reduced_by(position: Mt5PositionState, side: OrderSide) -> bool
     if side is OrderSide.SELL and position.net_volume_lots > 0:
         return True
     return False
+
+
+def _normalize_optional_price(value: float | None, *, spec: Mt5SymbolSpec) -> float | None:
+    if value is None:
+        return None
+    price = float(value)
+    if price <= 0 or not math.isfinite(price):
+        raise ValueError("MT5 order prices must be positive and finite.")
+    return _quantize_price(price, spec=spec)
+
+
+def _quantize_price(price: float, *, spec: Mt5SymbolSpec) -> float:
+    tick_size = _price_tick_size(spec)
+    if tick_size is None:
+        return price
+    price_decimal = Decimal(str(price))
+    ticks = (price_decimal / tick_size).to_integral_value(rounding=ROUND_HALF_UP)
+    return float(ticks * tick_size)
+
+
+def _price_tick_size(spec: Mt5SymbolSpec) -> Decimal | None:
+    if spec.point is not None:
+        return Decimal(str(spec.point))
+    if spec.digits is not None:
+        return Decimal("1").scaleb(-spec.digits)
+    return None
+
+
+def _resolve_time_in_force(
+    intent: OrderIntent,
+    *,
+    spec: Mt5SymbolSpec,
+) -> TimeInForce | None:
+    requested = intent.time_in_force
+    if intent.order_type is not OrderType.MARKET:
+        if requested in {TimeInForce.FOK, TimeInForce.IOC}:
+            raise ValueError(
+                "MT5 pending orders require return filling; use GTC, DAY, or unset "
+                "time_in_force."
+            )
+        return requested
+    if requested in {TimeInForce.FOK, TimeInForce.IOC}:
+        if not _symbol_supports_filling(spec, requested):
+            raise ValueError(
+                f"MT5 symbol filling_mode does not support {requested.value}."
+            )
+        return requested
+    if requested is not None:
+        return requested
+    if spec.trade_execution_mode in {
+        _MT5_TRADE_EXECUTION_REQUEST,
+        _MT5_TRADE_EXECUTION_INSTANT,
+        _MT5_TRADE_EXECUTION_EXCHANGE,
+    }:
+        return None
+    if spec.filling_mode is not None:
+        if _symbol_supports_filling(spec, TimeInForce.IOC):
+            return TimeInForce.IOC
+        if _symbol_supports_filling(spec, TimeInForce.FOK):
+            return TimeInForce.FOK
+    if (
+        spec.trade_execution_mode == _MT5_TRADE_EXECUTION_MARKET
+        and spec.filling_mode is not None
+    ):
+        raise ValueError(
+            "MT5 market execution symbol requires a supported FOK or IOC filling mode."
+        )
+    return None
+
+
+def _symbol_supports_filling(spec: Mt5SymbolSpec, time_in_force: TimeInForce) -> bool:
+    if spec.trade_execution_mode in {
+        _MT5_TRADE_EXECUTION_REQUEST,
+        _MT5_TRADE_EXECUTION_INSTANT,
+    }:
+        return True
+    if spec.filling_mode is None:
+        return True
+    if time_in_force is TimeInForce.FOK:
+        return bool(spec.filling_mode & _MT5_FILLING_FOK_FLAG)
+    if time_in_force is TimeInForce.IOC:
+        return bool(spec.filling_mode & _MT5_FILLING_IOC_FLAG)
+    return True
+
+
+def _validate_pending_entry_distance(
+    intent: OrderIntent,
+    *,
+    quote: ExecutionQuote,
+    spec: Mt5SymbolSpec,
+    prices: _PreparedMt5Prices,
+) -> None:
+    minimum_distance = _minimum_stop_distance(spec)
+    if minimum_distance is None:
+        return
+    if intent.order_type is OrderType.LIMIT:
+        if prices.limit_price is None:
+            raise ValueError("Limit orders require limit_price.")
+        distance = (
+            quote.ask - prices.limit_price
+            if intent.side is OrderSide.BUY
+            else prices.limit_price - quote.bid
+        )
+        _raise_if_inside_stops_level(
+            "limit_price",
+            distance=distance,
+            minimum_distance=minimum_distance,
+            broker_symbol=spec.broker_symbol,
+        )
+    elif intent.order_type in {OrderType.STOP, OrderType.STOP_LIMIT}:
+        if prices.stop_price is None:
+            raise ValueError("Stop orders require stop_price.")
+        distance = (
+            prices.stop_price - quote.ask
+            if intent.side is OrderSide.BUY
+            else quote.bid - prices.stop_price
+        )
+        _raise_if_inside_stops_level(
+            "stop_price",
+            distance=distance,
+            minimum_distance=minimum_distance,
+            broker_symbol=spec.broker_symbol,
+        )
+
+
+def _validate_protective_price_distance(
+    intent: OrderIntent,
+    *,
+    quote: ExecutionQuote,
+    spec: Mt5SymbolSpec,
+    prices: _PreparedMt5Prices,
+) -> None:
+    minimum_distance = _minimum_stop_distance(spec)
+    if minimum_distance is None:
+        return
+    if prices.stop_loss_price is not None:
+        distance = (
+            quote.bid - prices.stop_loss_price
+            if intent.side is OrderSide.BUY
+            else prices.stop_loss_price - quote.ask
+        )
+        _raise_if_inside_stops_level(
+            "stop_loss_price",
+            distance=distance,
+            minimum_distance=minimum_distance,
+            broker_symbol=spec.broker_symbol,
+        )
+    if prices.take_profit_price is not None:
+        distance = (
+            prices.take_profit_price - quote.bid
+            if intent.side is OrderSide.BUY
+            else quote.ask - prices.take_profit_price
+        )
+        _raise_if_inside_stops_level(
+            "take_profit_price",
+            distance=distance,
+            minimum_distance=minimum_distance,
+            broker_symbol=spec.broker_symbol,
+        )
+
+
+def _minimum_stop_distance(spec: Mt5SymbolSpec) -> float | None:
+    if spec.stops_level_points is None or spec.stops_level_points <= 0:
+        return None
+    if spec.point is None:
+        return None
+    return float(spec.stops_level_points) * spec.point
+
+
+def _raise_if_inside_stops_level(
+    field_name: str,
+    *,
+    distance: float,
+    minimum_distance: float,
+    broker_symbol: str,
+) -> None:
+    if distance + _ZERO_TOLERANCE >= minimum_distance:
+        return
+    raise ValueError(
+        f"{field_name} is inside broker stops level for {broker_symbol}: "
+        f"distance={distance:.10g}, minimum={minimum_distance:.10g}."
+    )
 
 
 def _quantize_lots_down(raw_lots: Decimal, *, step: float) -> Decimal:

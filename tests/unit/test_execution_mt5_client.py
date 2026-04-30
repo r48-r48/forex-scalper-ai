@@ -368,6 +368,9 @@ def test_mt5_terminal_client_normalizes_symbol_spec() -> None:
     assert spec.point == pytest.approx(0.00001)
     assert spec.stops_level_points == 10
     assert spec.freeze_level_points == 5
+    assert spec.trade_mode == 4
+    assert spec.filling_mode == 2
+    assert spec.trade_execution_mode == 2
 
 
 def test_discover_mt5_terminal_path_finds_macos_bundle_executable(tmp_path: Path) -> None:
@@ -502,6 +505,9 @@ class _FakeMetaTrader5Module:
             point=0.00001,
             trade_stops_level=10,
             trade_freeze_level=5,
+            trade_mode=4,
+            filling_mode=2,
+            trade_exemode=2,
         )
 
     def order_check(self, request: dict[str, object]) -> SimpleNamespace | None:

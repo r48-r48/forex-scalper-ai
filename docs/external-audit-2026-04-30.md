@@ -49,7 +49,8 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 
 1. Symbol specs and quantization are not broker-symbol specific.
    - First symbol-spec slice completed on `2026-04-30`: `Mt5TerminalClient.get_symbol_spec()` now normalizes MT5 `symbol_info`, `Mt5ExecutionAdapter` uses broker symbol specs when available, and lot volume normalization plus broker lot-to-base-unit conversion use symbol contract size with `Decimal` `ROUND_DOWN` against symbol `volume_min`, `volume_step`, and `volume_max`.
-   - Remaining work: apply `digits`, `point`, stop/freeze levels, trade mode, and filling-mode metadata to price/protective-order validation and request construction.
+   - Symbol metadata enforcement follow-up completed on `2026-04-30`: `Mt5SymbolSpec` now includes trade/filling/execution modes, request prices are quantized by broker `point`/`digits`, stops-level distance is enforced for entry/protective prices, trade mode gates exposure-increasing orders, FOK/IOC are selected or rejected from symbol `filling_mode`, and FOK/IOC are rejected for pending orders.
+   - Remaining work: apply freeze-level and order-mode metadata to broker-side modify/repair workflows and pending-order permissions, then validate against a real terminal symbol matrix.
 
 2. Several risk config fields are not wired into enforced live risk decisions.
    - `configs/base.yaml:26` defines max spread, cooldown, volatility filter, and news filter settings.
@@ -168,4 +169,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue remaining live hardening: real broker history investigation, richer protective-order repair/modify support, daemon supervision, post-reconnect reconciliation scheduling, and symbol metadata enforcement for prices/stops/filling on top of the mandatory runtime Risk/OMS, durable recovery/startup reconciliation, broker-source MT5 hedging, deal-accounting/per-deal attribution gates, protective SL/TP gates, position-protection fail-safe, and approved protection-flatten workflow.
+Continue remaining live hardening: real broker history investigation, richer protective-order repair/modify support, daemon supervision, post-reconnect reconciliation scheduling, and freeze/order-mode metadata follow-up on top of the mandatory runtime Risk/OMS, durable recovery/startup reconciliation, broker-source MT5 hedging, deal-accounting/per-deal attribution gates, protective SL/TP gates, position-protection fail-safe, symbol metadata enforcement, and approved protection-flatten workflow.

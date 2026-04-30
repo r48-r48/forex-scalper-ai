@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionMode
+from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionMode, TimeInForce
 from scalper_ai.execution import (
     ExecutionOrderStatus,
     ExecutionQuote,
@@ -368,6 +368,230 @@ def test_mt5_execution_adapter_rejects_symbol_spec_volume_above_maximum() -> Non
     assert update.order.status is ExecutionOrderStatus.REJECTED
     assert update.order.rejection_reason == (
         "Requested base-unit quantity exceeds the broker maximum lot size."
+    )
+
+
+def test_mt5_execution_adapter_quantizes_prices_to_symbol_precision() -> None:
+    client = _SymbolSpecMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            digits=3,
+            point=0.001,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-price-precision",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            stop_loss_price=1.0954,
+            take_profit_price=1.1066,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="broker-feed",
+        ),
+    )
+
+    assert update.order.status is ExecutionOrderStatus.FILLED
+    assert client.requests[0].stop_loss_price == pytest.approx(1.095)
+    assert client.requests[0].take_profit_price == pytest.approx(1.107)
+
+
+def test_mt5_execution_adapter_rejects_protection_inside_stops_level() -> None:
+    client = _SymbolSpecMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            point=0.0001,
+            stops_level_points=10,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-stops-too-close",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            stop_loss_price=1.0995,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="broker-feed",
+        ),
+    )
+
+    assert client.requests == []
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason is not None
+    assert "stop_loss_price is inside broker stops level" in update.order.rejection_reason
+
+
+def test_mt5_execution_adapter_rejects_unsupported_trade_mode_exposure() -> None:
+    client = _SymbolSpecMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            trade_mode=1,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-long-only-sell",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.SELL,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="broker-feed",
+        ),
+    )
+
+    assert client.requests == []
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == (
+        "MT5 symbol trade_mode only allows long exposure increases."
+    )
+
+
+def test_mt5_execution_adapter_uses_ioc_when_symbol_only_allows_ioc() -> None:
+    client = _SymbolSpecMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            filling_mode=2,
+            trade_execution_mode=2,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-ioc-default",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="broker-feed",
+        ),
+    )
+
+    assert update.order.status is ExecutionOrderStatus.FILLED
+    assert client.requests[0].time_in_force is TimeInForce.IOC
+
+
+def test_mt5_execution_adapter_rejects_unsupported_requested_filling_mode() -> None:
+    client = _SymbolSpecMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            filling_mode=2,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-fok-unsupported",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            time_in_force=TimeInForce.FOK,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="broker-feed",
+        ),
+    )
+
+    assert client.requests == []
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "MT5 symbol filling_mode does not support fok."
+
+
+def test_mt5_execution_adapter_rejects_fok_for_pending_order() -> None:
+    client = _SymbolSpecMt5Client(Mt5SymbolSpec(broker_symbol="EURUSD"))
+    adapter = Mt5ExecutionAdapter(client)
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-pending-fok",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            quantity=100_000.0,
+            limit_price=1.0990,
+            time_in_force=TimeInForce.FOK,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="broker-feed",
+        ),
+    )
+
+    assert client.requests == []
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == (
+        "MT5 pending orders require return filling; use GTC, DAY, or unset time_in_force."
     )
 
 
