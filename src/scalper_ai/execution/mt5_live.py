@@ -173,6 +173,33 @@ class Mt5OrderRequest:
 
 
 @dataclass(frozen=True)
+class Mt5ProtectionUpdateRequest:
+    """Broker-specific request to repair native SL/TP protection on one MT5 position."""
+
+    broker_symbol: str
+    position_ticket: str
+    submitted_at: datetime
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
+
+    def __post_init__(self) -> None:
+        if not self.broker_symbol.strip():
+            raise ValueError("broker_symbol must be non-empty.")
+        if not self.position_ticket.strip():
+            raise ValueError("position_ticket must be non-empty.")
+        if self.submitted_at.tzinfo is None or self.submitted_at.utcoffset() is None:
+            raise ValueError("submitted_at must be timezone-aware.")
+        if self.stop_loss_price is None and self.take_profit_price is None:
+            raise ValueError("At least one protective price must be provided.")
+        for value_name, value in {
+            "stop_loss_price": self.stop_loss_price,
+            "take_profit_price": self.take_profit_price,
+        }.items():
+            if value is not None and (value <= 0 or not math.isfinite(value)):
+                raise ValueError(f"{value_name} must be positive and finite when provided.")
+
+
+@dataclass(frozen=True)
 class Mt5DealState:
     """Normalized MT5 deal/fill record used for live accounting."""
 
@@ -385,6 +412,12 @@ class Mt5ExecutionClientProtocol(Protocol):
     def cancel_order(self, broker_order_id: str, *, timestamp: datetime) -> Mt5OrderState:
         """Cancel one live broker order and return the latest broker state."""
 
+    def modify_position_protection(
+        self,
+        request: Mt5ProtectionUpdateRequest,
+    ) -> Mt5PositionState:
+        """Modify broker-side stop-loss / take-profit protection for one position."""
+
     def get_order(self, broker_order_id: str) -> Mt5OrderState | None:
         """Return one order state if the broker still knows about it."""
 
@@ -588,6 +621,103 @@ class Mt5ExecutionAdapter:
         self._remember_quote(quote)
         state = self._client.cancel_order(broker_order_id, timestamp=timestamp)
         return self._sync_order_state(existing_order.intent, state, quote=quote)
+
+    def repair_position_protection(
+        self,
+        symbol: str,
+        *,
+        position_id: str,
+        stop_loss_price: float | None,
+        take_profit_price: float | None,
+        quote: ExecutionQuote,
+        timestamp: datetime | None = None,
+    ) -> BrokerPositionSnapshot:
+        """Repair native broker SL/TP protection for one known MT5 position ticket."""
+
+        if quote.symbol != symbol:
+            raise ValueError("Protection repair quote symbol must match the target symbol.")
+        if not position_id.strip():
+            raise ValueError("position_id must be non-empty for MT5 protection repair.")
+        self._remember_quote(quote)
+
+        broker_symbol = self._broker_symbol_for(symbol)
+        position = self._broker_position_by_ticket(
+            broker_symbol,
+            position_id=position_id,
+        )
+        if position is None:
+            raise KeyError(f"Unknown MT5 position ticket for protection repair: {position_id}")
+        if math.isclose(position.net_volume_lots, 0.0, abs_tol=_ZERO_TOLERANCE):
+            raise ValueError("Cannot repair protection for a flat MT5 position.")
+
+        spec = self._symbol_spec_for(broker_symbol)
+        _validate_symbol_allows_protection_update(spec)
+        resolved_stop_loss = _normalize_optional_price(
+            stop_loss_price if stop_loss_price is not None else position.stop_loss_price,
+            spec=spec,
+        )
+        resolved_take_profit = _normalize_optional_price(
+            (
+                take_profit_price
+                if take_profit_price is not None
+                else position.take_profit_price
+            ),
+            spec=spec,
+        )
+        if resolved_stop_loss is None and resolved_take_profit is None:
+            raise ValueError("Protection repair requires at least one SL/TP target.")
+
+        side = OrderSide.BUY if position.net_volume_lots > 0 else OrderSide.SELL
+        _validate_protective_distances_for_side(
+            side,
+            quote=quote,
+            spec=spec,
+            stop_loss_price=resolved_stop_loss,
+            take_profit_price=resolved_take_profit,
+            minimum_distance=_minimum_stop_distance(spec),
+            level_name="stops",
+        )
+        _validate_protective_distances_for_side(
+            side,
+            quote=quote,
+            spec=spec,
+            stop_loss_price=resolved_stop_loss,
+            take_profit_price=resolved_take_profit,
+            minimum_distance=_minimum_freeze_distance(spec),
+            level_name="freeze",
+        )
+
+        update_request = Mt5ProtectionUpdateRequest(
+            broker_symbol=broker_symbol,
+            position_ticket=position_id,
+            submitted_at=timestamp or quote.received_timestamp,
+            stop_loss_price=resolved_stop_loss,
+            take_profit_price=resolved_take_profit,
+        )
+        updated_position = self._client.modify_position_protection(update_request)
+        self._positions[symbol] = self._position_state_from_broker(
+            symbol,
+            updated_position,
+            quote=quote,
+        )
+        return BrokerPositionSnapshot(
+            symbol=symbol,
+            timestamp=updated_position.timestamp,
+            net_quantity=self._lots_to_base_units(
+                updated_position.net_volume_lots,
+                broker_symbol=updated_position.broker_symbol,
+            ),
+            average_entry_price=updated_position.average_entry_price,
+            position_mode=updated_position.position_mode,
+            position_id=updated_position.position_ticket,
+            gross_quantity=self._lots_to_base_units(
+                updated_position.gross_lots,
+                broker_symbol=updated_position.broker_symbol,
+            ),
+            source_position_ids=updated_position.source_position_tickets,
+            stop_loss_price=updated_position.stop_loss_price,
+            take_profit_price=updated_position.take_profit_price,
+        )
 
     def get_order(self, broker_order_id: str) -> ExecutionOrder | None:
         """Return the latest normalized order state tracked by the adapter."""
@@ -1299,6 +1429,26 @@ class Mt5ExecutionAdapter:
         aggregate_position = self._client.get_position(broker_symbol)
         return () if aggregate_position is None else (aggregate_position,)
 
+    def _broker_position_by_ticket(
+        self,
+        broker_symbol: str,
+        *,
+        position_id: str,
+    ) -> Mt5PositionState | None:
+        for position in self._client.list_positions():
+            if (
+                position.broker_symbol == broker_symbol
+                and position.position_ticket == position_id
+            ):
+                return position
+        aggregate_position = self._client.get_position(broker_symbol)
+        if (
+            aggregate_position is not None
+            and aggregate_position.position_ticket == position_id
+        ):
+            return aggregate_position
+        return None
+
     def _latest_broker_snapshot_timestamp(self) -> datetime | None:
         timestamps = [state.updated_at for state in self._client.list_orders()]
         timestamps.extend(position.timestamp for position in self._client.list_positions())
@@ -1453,6 +1603,21 @@ def _symbol_supports_filling(spec: Mt5SymbolSpec, time_in_force: TimeInForce) ->
     return True
 
 
+def _validate_symbol_allows_protection_update(spec: Mt5SymbolSpec) -> None:
+    if spec.trade_mode is None:
+        return
+    if spec.trade_mode == _MT5_TRADE_MODE_DISABLED:
+        raise ValueError("MT5 symbol trade_mode disables protection updates.")
+    if spec.trade_mode in {
+        _MT5_TRADE_MODE_LONG_ONLY,
+        _MT5_TRADE_MODE_SHORT_ONLY,
+        _MT5_TRADE_MODE_CLOSE_ONLY,
+        _MT5_TRADE_MODE_FULL,
+    }:
+        return
+    raise ValueError(f"Unsupported MT5 symbol trade_mode: {spec.trade_mode}.")
+
+
 def _validate_pending_entry_distance(
     intent: OrderIntent,
     *,
@@ -1500,32 +1665,54 @@ def _validate_protective_price_distance(
     spec: Mt5SymbolSpec,
     prices: _PreparedMt5Prices,
 ) -> None:
-    minimum_distance = _minimum_stop_distance(spec)
+    _validate_protective_distances_for_side(
+        intent.side,
+        quote=quote,
+        spec=spec,
+        stop_loss_price=prices.stop_loss_price,
+        take_profit_price=prices.take_profit_price,
+        minimum_distance=_minimum_stop_distance(spec),
+        level_name="stops",
+    )
+
+
+def _validate_protective_distances_for_side(
+    side: OrderSide,
+    *,
+    quote: ExecutionQuote,
+    spec: Mt5SymbolSpec,
+    stop_loss_price: float | None,
+    take_profit_price: float | None,
+    minimum_distance: float | None,
+    level_name: str,
+) -> None:
     if minimum_distance is None:
         return
-    if prices.stop_loss_price is not None:
+    if stop_loss_price is not None:
         distance = (
-            quote.bid - prices.stop_loss_price
-            if intent.side is OrderSide.BUY
-            else prices.stop_loss_price - quote.ask
+            quote.bid - stop_loss_price
+            if side is OrderSide.BUY
+            else stop_loss_price - quote.ask
         )
-        _raise_if_inside_stops_level(
+        _raise_if_inside_broker_level(
             "stop_loss_price",
             distance=distance,
             minimum_distance=minimum_distance,
             broker_symbol=spec.broker_symbol,
+            level_name=level_name,
         )
-    if prices.take_profit_price is not None:
+    if take_profit_price is not None:
         distance = (
-            prices.take_profit_price - quote.bid
-            if intent.side is OrderSide.BUY
-            else quote.ask - prices.take_profit_price
+            take_profit_price - quote.bid
+            if side is OrderSide.BUY
+            else quote.ask - take_profit_price
         )
-        _raise_if_inside_stops_level(
+        _raise_if_inside_broker_level(
             "take_profit_price",
             distance=distance,
             minimum_distance=minimum_distance,
             broker_symbol=spec.broker_symbol,
+            level_name=level_name,
         )
 
 
@@ -1537,6 +1724,14 @@ def _minimum_stop_distance(spec: Mt5SymbolSpec) -> float | None:
     return float(spec.stops_level_points) * spec.point
 
 
+def _minimum_freeze_distance(spec: Mt5SymbolSpec) -> float | None:
+    if spec.freeze_level_points is None or spec.freeze_level_points <= 0:
+        return None
+    if spec.point is None:
+        return None
+    return float(spec.freeze_level_points) * spec.point
+
+
 def _raise_if_inside_stops_level(
     field_name: str,
     *,
@@ -1544,10 +1739,27 @@ def _raise_if_inside_stops_level(
     minimum_distance: float,
     broker_symbol: str,
 ) -> None:
+    _raise_if_inside_broker_level(
+        field_name,
+        distance=distance,
+        minimum_distance=minimum_distance,
+        broker_symbol=broker_symbol,
+        level_name="stops",
+    )
+
+
+def _raise_if_inside_broker_level(
+    field_name: str,
+    *,
+    distance: float,
+    minimum_distance: float,
+    broker_symbol: str,
+    level_name: str,
+) -> None:
     if distance + _ZERO_TOLERANCE >= minimum_distance:
         return
     raise ValueError(
-        f"{field_name} is inside broker stops level for {broker_symbol}: "
+        f"{field_name} is inside broker {level_name} level for {broker_symbol}: "
         f"distance={distance:.10g}, minimum={minimum_distance:.10g}."
     )
 

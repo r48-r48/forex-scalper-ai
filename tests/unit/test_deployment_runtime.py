@@ -848,6 +848,107 @@ def test_live_runtime_approved_flatten_closes_unprotected_position_after_fail_sa
     )
 
 
+def test_live_runtime_approved_repair_updates_position_protection_from_reconciliation(
+    tmp_path,
+) -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "mt5",
+                "mt5": {"require_stop_loss": True},
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    timestamp = datetime(2026, 4, 30, 11, 45, tzinfo=UTC)
+    report = ReconciliationReport(
+        checked_at=timestamp,
+        issues=(
+            ReconciliationIssue(
+                scope="position",
+                reference_id="position-1",
+                severity=ReconciliationSeverity.ERROR,
+                code="position_stop_loss_missing",
+                message="Broker position is missing expected stop-loss protection.",
+                details={
+                    "symbol": "EURUSD",
+                    "field_name": "stop_loss_price",
+                    "expected_value": 1.0950,
+                    "source_order_ids": ["order-1"],
+                },
+            ),
+        ),
+    )
+    adapter = _RecordingProtectionRepairAdapter()
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+
+    class RepairablePositionProvider:
+        def list_broker_orders(self) -> tuple[BrokerOrderSnapshot, ...]:
+            return ()
+
+        def list_broker_positions(self) -> tuple[BrokerPositionSnapshot, ...]:
+            return (
+                BrokerPositionSnapshot(
+                    symbol="EURUSD",
+                    timestamp=timestamp,
+                    net_quantity=100_000.0,
+                    average_entry_price=1.1000,
+                    position_id="position-1",
+                    source_position_ids=("position-1",),
+                ),
+            )
+
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: adapter,
+        broker_snapshot_provider=RepairablePositionProvider(),
+        reconciliation_report_provider=lambda: report,
+        live_confirmation_token="ENABLE_ME",
+        state_store=store,
+    )
+    runtime.start()
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.1000,
+        ask=1.1001,
+        venue="broker-feed",
+    )
+
+    repaired = runtime.repair_unprotected_positions(
+        {"EURUSD": quote},
+        approval_token="ENABLE_ME",
+        created_at=timestamp,
+    )
+
+    assert len(repaired) == 1
+    assert adapter.repair_calls == [
+        {
+            "symbol": "EURUSD",
+            "position_id": "position-1",
+            "stop_loss_price": 1.0950,
+            "take_profit_price": None,
+        }
+    ]
+    assert repaired[0].stop_loss_price == pytest.approx(1.0950)
+    assert any(
+        event.payload_type == "PositionProtectionRepair"
+        and event.payload["reason"] == "approved_position_protection_repair"
+        for event in runtime.journal_events
+    )
+    assert "scalper_ai_position_protection_repairs_total" in runtime.metrics_text()
+
+
 def test_live_runtime_approved_flatten_requires_confirmation_phrase(tmp_path) -> None:
     config = AppConfig.model_validate(
         {
@@ -1255,6 +1356,41 @@ class _RecordingFlattenAdapter:
         quote: ExecutionQuote | None = None,
     ) -> PositionState | None:
         return None
+
+
+class _RecordingProtectionRepairAdapter(_RecordingFlattenAdapter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.repair_calls: list[dict[str, object]] = []
+
+    def repair_position_protection(
+        self,
+        symbol: str,
+        *,
+        position_id: str,
+        stop_loss_price: float | None,
+        take_profit_price: float | None,
+        quote: ExecutionQuote,
+        timestamp: datetime | None = None,
+    ) -> BrokerPositionSnapshot:
+        self.repair_calls.append(
+            {
+                "symbol": symbol,
+                "position_id": position_id,
+                "stop_loss_price": stop_loss_price,
+                "take_profit_price": take_profit_price,
+            }
+        )
+        return BrokerPositionSnapshot(
+            symbol=symbol,
+            timestamp=timestamp or quote.received_timestamp,
+            net_quantity=100_000.0,
+            average_entry_price=1.1000,
+            position_id=position_id,
+            source_position_ids=(position_id,),
+            stop_loss_price=stop_loss_price,
+            take_profit_price=take_profit_price,
+        )
 
 
 class _RecordingJournalWriter:

@@ -29,6 +29,7 @@ from scalper_ai.execution.mt5_live import (
     Mt5OrderRequest,
     Mt5OrderState,
     Mt5PositionState,
+    Mt5ProtectionUpdateRequest,
     Mt5SymbolSpec,
     aggregate_mt5_positions,
 )
@@ -87,6 +88,7 @@ __all__ = [
     "Mt5OrderRequest",
     "Mt5OrderState",
     "Mt5PositionState",
+    "Mt5ProtectionUpdateRequest",
     "Mt5SymbolSpec",
     "Mt5TerminalClient",
     "Mt5TerminalClientConfig",

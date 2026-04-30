@@ -18,6 +18,7 @@ from scalper_ai.execution.mt5_live import (
     Mt5OrderRequest,
     Mt5OrderState,
     Mt5PositionState,
+    Mt5ProtectionUpdateRequest,
     Mt5SymbolSpec,
     aggregate_mt5_positions,
 )
@@ -385,11 +386,22 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         checked_at = request.submitted_at
         order_payload = dict(payload or self._build_order_payload(request))
         raw_result = self._module.order_check(order_payload)
+        return self._normalize_order_check_result(
+            raw_result,
+            fallback_timestamp=checked_at,
+        )
+
+    def _normalize_order_check_result(
+        self,
+        raw_result: Any,
+        *,
+        fallback_timestamp: datetime,
+    ) -> Mt5OrderCheckResult:
         if raw_result is None:
             return Mt5OrderCheckResult(
                 accepted=False,
                 retcode=None,
-                checked_at=checked_at,
+                checked_at=fallback_timestamp,
                 comment=self._last_error_message(),
             )
 
@@ -398,7 +410,7 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         return Mt5OrderCheckResult(
             accepted=self._check_retcode_is_success(retcode),
             retcode=retcode,
-            checked_at=self._result_timestamp(raw_result, fallback=checked_at),
+            checked_at=self._result_timestamp(raw_result, fallback=fallback_timestamp),
             comment=self._coerce_optional_str(result_payload.get("comment")),
             balance=self._coerce_float(result_payload.get("balance")),
             equity=self._coerce_float(result_payload.get("equity")),
@@ -445,6 +457,40 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             average_fill_price=current_state.average_fill_price,
             cancel_reason="user_requested",
         )
+
+    def modify_position_protection(
+        self,
+        request: Mt5ProtectionUpdateRequest,
+    ) -> Mt5PositionState:
+        """Modify native SL/TP protection for one open MT5 position."""
+
+        self._ensure_initialized()
+        self._ensure_symbol_selected(request.broker_symbol)
+        payload = self._build_position_protection_payload(request)
+        check = self._normalize_order_check_result(
+            self._module.order_check(payload),
+            fallback_timestamp=request.submitted_at,
+        )
+        if not check.accepted:
+            raise RuntimeError(
+                check.rejection_reason
+                or "MT5 order_check rejected position protection update."
+            )
+
+        result = self._module.order_send(payload)
+        if result is None or not self._retcode_is_success(getattr(result, "retcode", None)):
+            raise RuntimeError(self._result_comment(result) or self._last_error_message())
+
+        refreshed_position = self._position_by_ticket(
+            request.broker_symbol,
+            request.position_ticket,
+        )
+        if refreshed_position is None:
+            raise RuntimeError(
+                "MT5 position protection update succeeded but the position could not be "
+                "refreshed by ticket."
+            )
+        return refreshed_position
 
     def get_order(self, broker_order_id: str) -> Mt5OrderState | None:
         """Return one current or recent MT5 order state if available."""
@@ -678,6 +724,20 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             payload["tp"] = request.take_profit_price
         return payload
 
+    def _build_position_protection_payload(
+        self,
+        request: Mt5ProtectionUpdateRequest,
+    ) -> dict[str, Any]:
+        return {
+            "action": getattr(self._module, "TRADE_ACTION_SLTP", 6),
+            "position": int(request.position_ticket),
+            "symbol": request.broker_symbol,
+            "sl": 0.0 if request.stop_loss_price is None else request.stop_loss_price,
+            "tp": 0.0 if request.take_profit_price is None else request.take_profit_price,
+            "magic": self._config.magic_number,
+            "comment": self._comment_for("repair"),
+        }
+
     def _market_price(self, broker_symbol: str, *, side: OrderSide) -> float:
         tick = self._coerce_mapping(self._module.symbol_info_tick(broker_symbol))
         ask = self._coerce_float(tick.get("ask"))
@@ -876,6 +936,24 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
                 for position in positions
                 if self._coerce_mapping(position).get("symbol") == symbol
             )
+
+    def _position_by_ticket(
+        self,
+        broker_symbol: str,
+        position_ticket: str,
+    ) -> Mt5PositionState | None:
+        for raw_position in self._positions_get(symbol=broker_symbol):
+            position = self._normalize_position_record(raw_position)
+            if position.position_ticket == position_ticket:
+                return position
+        for raw_position in self._positions_get():
+            position = self._normalize_position_record(raw_position)
+            if (
+                position.broker_symbol == broker_symbol
+                and position.position_ticket == position_ticket
+            ):
+                return position
+        return None
 
     def _history_orders_get(self, **kwargs: Any) -> tuple[Any, ...]:
         start_time, end_time = self._history_window()

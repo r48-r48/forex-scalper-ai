@@ -132,7 +132,7 @@ Required behavior:
 
 ### P0.E - Protective Order / Bracket Management
 
-Status: first protective-order slice completed on `2026-04-30`.
+Status: first protective-order and repair/modify slices completed on `2026-04-30`.
 
 Goal: ensure every live position has an explicit worst-case exit path.
 
@@ -145,7 +145,8 @@ Required behavior:
 - Completed: activate a durable runtime session kill-switch when required live MT5 position protection is missing.
 - Completed first bracket/OCO lifecycle slice: reconciliation now derives expected position protection from filled internal bracket intents and flags missing, mismatched, or ambiguous broker-side SL/TP protection after fills or reconnects.
 - Completed first approved flatten slice: `DeploymentRuntime.flatten_unprotected_positions()` requires the live confirmation phrase and submits reduce-only market flatten orders only for broker positions tied to position-protection reconciliation drift.
-- Pending: richer parent-child protective-order state tracking, broker-side modify/repair support where supported, and operator UX around flatten approval/audit evidence.
+- Completed first broker-side repair/modify slice: MT5 uses a dedicated `TRADE_ACTION_SLTP` position-protection request with `order_check` before `order_send`, validates stops/freeze levels before repair, refreshes by position ticket, and runtime can apply explicit-token SL/TP repairs only from reconciliation issues with unambiguous expected prices.
+- Pending: richer parent-child protective-order state tracking, pending-order modify permissions, operator reset UX after successful repair, and broader repair audit evidence.
 
 ### P1 - Symbol Specs, Reconnect, And Risk Config Completion
 
@@ -169,4 +170,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue remaining live hardening: real broker history investigation, richer protective-order repair/modify support, daemon supervision, post-reconnect reconciliation scheduling, and freeze/order-mode metadata follow-up on top of the mandatory runtime Risk/OMS, durable recovery/startup reconciliation, broker-source MT5 hedging, deal-accounting/per-deal attribution gates, protective SL/TP gates, position-protection fail-safe, symbol metadata enforcement, and approved protection-flatten workflow.
+Continue remaining live hardening: real broker history investigation, pending-order modify permission coverage, daemon supervision, post-reconnect reconciliation scheduling, and operator reset workflow on top of the mandatory runtime Risk/OMS, durable recovery/startup reconciliation, broker-source MT5 hedging, deal-accounting/per-deal attribution gates, protective SL/TP gates, position-protection fail-safe, symbol metadata enforcement, approved protection-flatten workflow, and first approved protection-repair workflow.

@@ -551,6 +551,16 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py tests/unit/test_config_loader.py tests/unit/test_deployment_mt5_preflight.py` -> `67 passed` after MT5 symbol metadata enforcement slice
 - 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after MT5 symbol metadata enforcement slice
 - 2026-04-30: `.venv/bin/pytest` -> `220 passed` after MT5 symbol metadata enforcement slice
+- 2026-04-30 completed the first MT5 protective repair/modify slice:
+  - added `Mt5ProtectionUpdateRequest` as a dedicated ticket-scoped SL/TP repair request
+  - added `Mt5TerminalClient.modify_position_protection()` using `TRADE_ACTION_SLTP` with `order_check` before `order_send`
+  - `Mt5ExecutionAdapter.repair_position_protection()` validates symbol trade mode, stops level, freeze level, ticket identity, and price quantization before calling the client
+  - `DeploymentRuntime.repair_unprotected_positions()` requires the live confirmation phrase and only repairs reconciliation issues with unambiguous expected SL/TP prices
+  - targeted Ruff passed for MT5 live/client/export, deployment runtime, and touched tests
+  - `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_runtime.py` passed with `60 passed`
+  - broader MT5/runtime/config/preflight pytest passed with `85 passed`
+  - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `225 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -570,8 +580,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 Continue remaining live hardening:
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
-- add freeze/order-mode metadata follow-up for broker-side modify/repair workflows and pending-order permissions
-- add daemon-level MT5 reconnect orchestration, operator circuit-reset workflow, alert routing, and connect real volatility/news/model/feature health providers into the new risk guard fields
+- add pending-order modify permission coverage and controlled repair validation when an explicit demo repair action is approved
+- add daemon-level MT5 reconnect orchestration, operator circuit-reset/post-repair reset workflow, alert routing, and connect real volatility/news/model/feature health providers into the new risk guard fields
 
 If further MT5 validation is paused:
 - validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup

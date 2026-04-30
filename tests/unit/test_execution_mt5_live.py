@@ -16,6 +16,7 @@ from scalper_ai.execution import (
     Mt5OrderRequest,
     Mt5OrderState,
     Mt5PositionState,
+    Mt5ProtectionUpdateRequest,
     Mt5SymbolSpec,
 )
 from scalper_ai.execution.mt5_live import aggregate_mt5_positions
@@ -595,6 +596,93 @@ def test_mt5_execution_adapter_rejects_fok_for_pending_order() -> None:
     )
 
 
+def test_mt5_execution_adapter_repairs_position_protection_preserving_existing_target() -> None:
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+    client = _RepairableProtectionMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            point=0.0001,
+            stops_level_points=10,
+            freeze_level_points=5,
+        ),
+        Mt5PositionState(
+            broker_symbol="EURUSD",
+            timestamp=timestamp,
+            net_volume_lots=0.01,
+            average_entry_price=1.1002,
+            position_ticket="111",
+            source_position_tickets=("111",),
+            take_profit_price=1.1060,
+        ),
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.1000,
+        ask=1.1002,
+        venue="broker-feed",
+    )
+
+    snapshot = adapter.repair_position_protection(
+        "EURUSD",
+        position_id="111",
+        stop_loss_price=1.09504,
+        take_profit_price=None,
+        quote=quote,
+        timestamp=timestamp,
+    )
+
+    assert len(client.protection_requests) == 1
+    assert client.protection_requests[0].position_ticket == "111"
+    assert client.protection_requests[0].stop_loss_price == pytest.approx(1.0950)
+    assert client.protection_requests[0].take_profit_price == pytest.approx(1.1060)
+    assert snapshot.position_id == "111"
+    assert snapshot.stop_loss_price == pytest.approx(1.0950)
+    assert snapshot.take_profit_price == pytest.approx(1.1060)
+
+
+def test_mt5_execution_adapter_rejects_protection_repair_inside_freeze_level() -> None:
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+    client = _RepairableProtectionMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            point=0.0001,
+            freeze_level_points=5,
+        ),
+        Mt5PositionState(
+            broker_symbol="EURUSD",
+            timestamp=timestamp,
+            net_volume_lots=0.01,
+            average_entry_price=1.1002,
+            position_ticket="111",
+            source_position_tickets=("111",),
+        ),
+    )
+    adapter = Mt5ExecutionAdapter(client)
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.1000,
+        ask=1.1002,
+        venue="broker-feed",
+    )
+
+    with pytest.raises(ValueError, match="broker freeze level"):
+        adapter.repair_position_protection(
+            "EURUSD",
+            position_id="111",
+            stop_loss_price=1.0997,
+            take_profit_price=None,
+            quote=quote,
+            timestamp=timestamp,
+        )
+
+    assert client.protection_requests == []
+
+
 def test_mt5_execution_adapter_rejects_ambiguous_hedging_reduce_only() -> None:
     client = _BrokerPositionMt5Client(
         Mt5PositionState(
@@ -829,6 +917,39 @@ class _DealFillMt5Client(_ImmediateFillMt5Client):
             average_entry_price=deal.price,
         )
         return state
+
+
+class _RepairableProtectionMt5Client(_ImmediateFillMt5Client):
+    def __init__(self, spec: Mt5SymbolSpec, position: Mt5PositionState) -> None:
+        super().__init__()
+        self._spec = spec
+        self._positions[position.position_ticket or "net"] = position
+        self.protection_requests: list[Mt5ProtectionUpdateRequest] = []
+
+    def get_symbol_spec(self, broker_symbol: str) -> Mt5SymbolSpec:
+        assert broker_symbol == self._spec.broker_symbol
+        return self._spec
+
+    def modify_position_protection(
+        self,
+        request: Mt5ProtectionUpdateRequest,
+    ) -> Mt5PositionState:
+        self.protection_requests.append(request)
+        position = self._positions[request.position_ticket]
+        updated = Mt5PositionState(
+            broker_symbol=position.broker_symbol,
+            timestamp=request.submitted_at,
+            net_volume_lots=position.net_volume_lots,
+            average_entry_price=position.average_entry_price,
+            position_ticket=position.position_ticket,
+            position_mode=position.position_mode,
+            gross_volume_lots=position.gross_lots,
+            source_position_tickets=position.source_position_tickets,
+            stop_loss_price=request.stop_loss_price,
+            take_profit_price=request.take_profit_price,
+        )
+        self._positions[request.position_ticket] = updated
+        return updated
 
 
 class _BrokerPositionMt5Client:

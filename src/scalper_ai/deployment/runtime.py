@@ -23,6 +23,7 @@ from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionState
 from scalper_ai.execution import (
     BrokerConnectivityProvider,
     BrokerConnectivitySnapshot,
+    BrokerPositionSnapshot,
     BrokerSnapshotProvider,
     ExecutionAdapter,
     ExecutionOrder,
@@ -92,6 +93,12 @@ _POSITION_PROTECTION_ISSUE_CODES = frozenset(
         "position_take_profit_ambiguous",
     }
 )
+_REPAIRABLE_POSITION_PROTECTION_CODES = {
+    "position_stop_loss_missing": "stop_loss_price",
+    "position_stop_loss_mismatch": "stop_loss_price",
+    "position_take_profit_missing": "take_profit_price",
+    "position_take_profit_mismatch": "take_profit_price",
+}
 
 
 class JournalWriterProtocol(Protocol):
@@ -99,6 +106,15 @@ class JournalWriterProtocol(Protocol):
 
     def write(self, event: JournalEvent) -> object:
         """Persist one journal event."""
+
+
+@dataclass(frozen=True)
+class _PositionProtectionRepairTarget:
+    symbol: str
+    position_id: str
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
+    issue_codes: tuple[str, ...] = ()
 
 
 class DeploymentRuntime:
@@ -496,6 +512,88 @@ class DeploymentRuntime:
             updates.append(self._submit_risk_approved_order(intent, quote, decision))
 
         return tuple(updates)
+
+    def repair_unprotected_positions(
+        self,
+        quotes_by_symbol: Mapping[str, ExecutionQuote],
+        *,
+        approval_token: str,
+        created_at: datetime | None = None,
+    ) -> tuple[BrokerPositionSnapshot, ...]:
+        """Submit approved broker-side SL/TP repair requests for repairable drift."""
+
+        self._validate_position_protection_action_approval(
+            approval_token,
+            action_name="repair",
+        )
+        if self.effective_mode != "live":
+            raise RuntimeError(
+                "Approved position-protection repair is only available in live mode."
+            )
+
+        repair_method = getattr(self._live_adapter, "repair_position_protection", None)
+        if not callable(repair_method):
+            raise RuntimeError("The active live adapter does not support protection repair.")
+
+        snapshot_provider = self._resolved_broker_snapshot_provider()
+        if snapshot_provider is None:
+            raise RuntimeError("Cannot repair unprotected positions without broker snapshots.")
+
+        report = self._last_reconciliation_report
+        if report is None:
+            report_provider = self._resolved_reconciliation_report_provider()
+            if report_provider is None:
+                raise RuntimeError("Cannot repair unprotected positions without reconciliation.")
+            report = report_provider()
+            if report is None:
+                raise RuntimeError(
+                    "Cannot repair unprotected positions without a reconciliation report."
+                )
+            self._last_reconciliation_report = report
+        self._activate_reconciliation_fail_safe(
+            report,
+            default_reason="position_protection_reconciliation_failed",
+        )
+
+        targets = _position_protection_repair_targets(
+            report,
+            snapshot_provider.list_broker_positions(),
+        )
+        if not targets:
+            return ()
+
+        timestamp = created_at or datetime.now(UTC)
+        repaired_positions: list[BrokerPositionSnapshot] = []
+        for target in targets:
+            quote = quotes_by_symbol.get(target.symbol)
+            if quote is None:
+                raise KeyError(f"Missing quote for approved repair symbol: {target.symbol}")
+            if quote.symbol != target.symbol:
+                raise ValueError("Repair quote symbol must match broker position symbol.")
+            repaired_position = repair_method(
+                target.symbol,
+                position_id=target.position_id,
+                stop_loss_price=target.stop_loss_price,
+                take_profit_price=target.take_profit_price,
+                quote=quote,
+                timestamp=timestamp,
+            )
+            repaired_positions.append(repaired_position)
+            self._record_position_protection_repair_event(
+                target,
+                repaired_position,
+                quote=quote,
+                repaired_at=timestamp,
+            )
+            if self.config.monitoring.metrics_enabled:
+                self._metrics.increment(
+                    "scalper_ai_position_protection_repairs_total",
+                    requested_mode=self.requested_mode,
+                    effective_mode=self.effective_mode,
+                    symbol=target.symbol,
+                )
+
+        return tuple(repaired_positions)
 
     def _submit_risk_approved_order(
         self,
@@ -911,6 +1009,39 @@ class DeploymentRuntime:
                 causation_id=order.broker_order_id,
                 strategy_id=order.intent.strategy_id,
                 symbol=update.position.symbol,
+            )
+        )
+
+    def _record_position_protection_repair_event(
+        self,
+        target: _PositionProtectionRepairTarget,
+        repaired_position: BrokerPositionSnapshot,
+        *,
+        quote: ExecutionQuote,
+        repaired_at: datetime,
+    ) -> None:
+        self._record_journal_event(
+            JournalEvent.from_payload(
+                event_id=(
+                    "position-protection-repair-"
+                    f"{target.position_id}-{len(self._journal_events) + 1}"
+                ),
+                event_type=JournalEventType.POSITION_SNAPSHOT,
+                payload={
+                    "position": repaired_position,
+                    "quote": _quote_to_payload(quote),
+                    "position_id": target.position_id,
+                    "stop_loss_price": target.stop_loss_price,
+                    "take_profit_price": target.take_profit_price,
+                    "issue_codes": list(target.issue_codes),
+                    "reason": "approved_position_protection_repair",
+                },
+                recorded_at=repaired_at,
+                source="deployment_runtime",
+                event_timestamp=repaired_position.timestamp,
+                payload_type="PositionProtectionRepair",
+                correlation_id=target.position_id,
+                symbol=target.symbol,
             )
         )
 
@@ -1426,8 +1557,22 @@ class DeploymentRuntime:
             )
 
     def _validate_position_flatten_approval(self, approval_token: str) -> None:
+        self._validate_position_protection_action_approval(
+            approval_token,
+            action_name="flatten",
+        )
+
+    def _validate_position_protection_action_approval(
+        self,
+        approval_token: str,
+        *,
+        action_name: str,
+    ) -> None:
         if approval_token != self.config.deployment.live_confirmation_phrase:
-            raise RuntimeError("Approved flatten workflow requires the live confirmation phrase.")
+            raise RuntimeError(
+                f"Approved position-protection {action_name} workflow requires the "
+                "live confirmation phrase."
+            )
 
     def _require_position_stop_loss(self) -> bool:
         return (
@@ -1466,6 +1611,112 @@ def _position_protection_issue_symbols(report: ReconciliationReport) -> frozense
         if symbol is not None and symbol.strip():
             symbols.add(symbol)
     return frozenset(symbols)
+
+
+def _position_protection_repair_targets(
+    report: ReconciliationReport,
+    broker_positions: tuple[BrokerPositionSnapshot, ...],
+) -> tuple[_PositionProtectionRepairTarget, ...]:
+    positions_by_symbol: dict[str, tuple[BrokerPositionSnapshot, ...]] = {}
+    for position in broker_positions:
+        positions_by_symbol.setdefault(position.symbol, ())
+        positions_by_symbol[position.symbol] = positions_by_symbol[position.symbol] + (
+            position,
+        )
+
+    targets: dict[tuple[str, str], _PositionProtectionRepairTarget] = {}
+    for issue in report.issues:
+        field_name = _REPAIRABLE_POSITION_PROTECTION_CODES.get(issue.code)
+        if field_name is None or issue.details is None:
+            continue
+        expected_value = issue.details.get("expected_value")
+        if expected_value is None:
+            continue
+        symbol = _repair_issue_symbol(issue)
+        if symbol is None:
+            continue
+        position_id = _repair_issue_position_id(
+            issue,
+            positions_by_symbol.get(symbol, ()),
+        )
+        if position_id is None:
+            continue
+
+        key = (symbol, position_id)
+        previous = targets.get(key)
+        target = _merge_position_protection_repair_target(
+            previous
+            or _PositionProtectionRepairTarget(symbol=symbol, position_id=position_id),
+            field_name=field_name,
+            expected_value=float(expected_value),
+            issue_code=issue.code,
+        )
+        targets[key] = target
+
+    return tuple(sorted(targets.values(), key=lambda item: (item.symbol, item.position_id)))
+
+
+def _repair_issue_symbol(issue: object) -> str | None:
+    details = getattr(issue, "details", None)
+    if isinstance(details, Mapping):
+        raw_symbol = details.get("symbol")
+        if isinstance(raw_symbol, str) and raw_symbol.strip():
+            return raw_symbol
+    reference_id = getattr(issue, "reference_id", None)
+    scope = getattr(issue, "scope", None)
+    if scope == "position" and isinstance(reference_id, str) and reference_id.strip():
+        return reference_id
+    return None
+
+
+def _repair_issue_position_id(
+    issue: object,
+    broker_positions: tuple[BrokerPositionSnapshot, ...],
+) -> str | None:
+    reference_id = getattr(issue, "reference_id", None)
+    if not isinstance(reference_id, str) or not reference_id.strip():
+        return None
+    for position in broker_positions:
+        if position.position_id == reference_id:
+            return reference_id
+        if reference_id in position.source_position_ids:
+            return reference_id
+    if len(broker_positions) != 1:
+        return None
+    position = broker_positions[0]
+    if position.position_id is not None:
+        return position.position_id
+    if len(position.source_position_ids) == 1:
+        return position.source_position_ids[0]
+    return None
+
+
+def _merge_position_protection_repair_target(
+    target: _PositionProtectionRepairTarget,
+    *,
+    field_name: str,
+    expected_value: float,
+    issue_code: str,
+) -> _PositionProtectionRepairTarget:
+    stop_loss_price = target.stop_loss_price
+    take_profit_price = target.take_profit_price
+    if field_name == "stop_loss_price":
+        if stop_loss_price is not None and stop_loss_price != expected_value:
+            raise ValueError("Conflicting stop-loss repair targets for the same position.")
+        stop_loss_price = expected_value
+    elif field_name == "take_profit_price":
+        if take_profit_price is not None and take_profit_price != expected_value:
+            raise ValueError("Conflicting take-profit repair targets for the same position.")
+        take_profit_price = expected_value
+    else:
+        raise ValueError(f"Unsupported protection repair field: {field_name}")
+    return _PositionProtectionRepairTarget(
+        symbol=target.symbol,
+        position_id=target.position_id,
+        stop_loss_price=stop_loss_price,
+        take_profit_price=take_profit_price,
+        issue_codes=tuple(sorted(set((*target.issue_codes, issue_code)))),
+    )
 
 
 def _oms_record_to_payload(record: OmsOrderRecord, *, stage: str) -> dict[str, object]:

@@ -15,7 +15,7 @@ from scalper_ai.execution.mt5_client import (
     Mt5TerminalClientConfig,
     discover_mt5_terminal_path,
 )
-from scalper_ai.execution.mt5_live import Mt5OrderRequest
+from scalper_ai.execution.mt5_live import Mt5OrderRequest, Mt5ProtectionUpdateRequest
 
 
 def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission() -> None:
@@ -350,6 +350,68 @@ def test_mt5_terminal_client_includes_protective_prices_in_order_check() -> None
     assert module.last_order_check_payload["tp"] == 1.1050
 
 
+def test_mt5_terminal_client_modifies_position_protection_with_precheck() -> None:
+    module = _FakeMetaTrader5Module()
+    module._positions["EURUSD"] = SimpleNamespace(
+        ticket=8801,
+        symbol="EURUSD",
+        type=module.POSITION_TYPE_BUY,
+        volume=0.01,
+        price_open=1.1002,
+        sl=0.0,
+        tp=0.0,
+        time=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    position = client.modify_position_protection(
+        Mt5ProtectionUpdateRequest(
+            broker_symbol="EURUSD",
+            position_ticket="8801",
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            stop_loss_price=1.0950,
+            take_profit_price=1.1050,
+        )
+    )
+
+    assert module.last_order_check_payload["action"] == module.TRADE_ACTION_SLTP
+    assert module.last_order_check_payload["position"] == 8801
+    assert module.last_order_send_payload["action"] == module.TRADE_ACTION_SLTP
+    assert module.last_order_send_payload["sl"] == 1.0950
+    assert module.last_order_send_payload["tp"] == 1.1050
+    assert position.position_ticket == "8801"
+    assert position.stop_loss_price == pytest.approx(1.0950)
+    assert position.take_profit_price == pytest.approx(1.1050)
+
+
+def test_mt5_terminal_client_does_not_modify_when_protection_precheck_rejects() -> None:
+    module = _FakeMetaTrader5Module()
+    module.order_check_result = SimpleNamespace(
+        retcode=10016,
+        comment="invalid stops",
+        time=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    with pytest.raises(RuntimeError, match="invalid stops"):
+        client.modify_position_protection(
+            Mt5ProtectionUpdateRequest(
+                broker_symbol="EURUSD",
+                position_ticket="8801",
+                submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+                stop_loss_price=1.0950,
+            )
+        )
+
+    assert module.order_send_call_count == 0
+
+
 def test_mt5_terminal_client_normalizes_symbol_spec() -> None:
     module = _FakeMetaTrader5Module()
     client = Mt5TerminalClient(
@@ -393,6 +455,7 @@ def test_discover_mt5_terminal_path_finds_macos_bundle_executable(tmp_path: Path
 class _FakeMetaTrader5Module:
     TRADE_ACTION_DEAL = 1
     TRADE_ACTION_PENDING = 5
+    TRADE_ACTION_SLTP = 6
     TRADE_ACTION_REMOVE = 8
     TRADE_RETCODE_DONE = 10009
     TRADE_RETCODE_PLACED = 10008
@@ -447,10 +510,13 @@ class _FakeMetaTrader5Module:
         self._deals: dict[int, list[SimpleNamespace]] = {}
         self._positions: dict[str, SimpleNamespace] = {
             "USDJPY": SimpleNamespace(
+                ticket=7701,
                 symbol="USDJPY",
                 type=self.POSITION_TYPE_SELL,
                 volume=0.5,
                 price_open=150.25,
+                sl=0.0,
+                tp=0.0,
                 time=1_774_670_400,
             )
         }
@@ -519,6 +585,25 @@ class _FakeMetaTrader5Module:
         self.last_order_send_payload = dict(request)
         if not self.use_default_order_send:
             return self.order_send_result
+        if request["action"] == self.TRADE_ACTION_SLTP:
+            position_ticket = int(request["position"])
+            for position in self._positions.values():
+                if int(position.ticket) == position_ticket:
+                    position.sl = request.get("sl", 0.0)
+                    position.tp = request.get("tp", 0.0)
+                    position.time = 1_774_670_400
+                    return SimpleNamespace(
+                        retcode=self.TRADE_RETCODE_DONE,
+                        order=0,
+                        comment="done",
+                        time=1_774_670_400,
+                    )
+            return SimpleNamespace(
+                retcode=10036,
+                order=0,
+                comment="position not found",
+                time=1_774_670_400,
+            )
         order_id = 9001
         self._history_orders[order_id] = SimpleNamespace(
             ticket=order_id,
@@ -548,6 +633,7 @@ class _FakeMetaTrader5Module:
             )
         ]
         self._positions[str(request["symbol"])] = SimpleNamespace(
+            ticket=8801,
             symbol=request["symbol"],
             type=self.POSITION_TYPE_BUY,
             volume=request["volume"],
