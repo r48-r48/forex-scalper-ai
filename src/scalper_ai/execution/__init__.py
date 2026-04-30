@@ -20,6 +20,7 @@ from scalper_ai.execution.mt5_client import (
     Mt5TerminalClientConfig,
 )
 from scalper_ai.execution.mt5_live import (
+    Mt5DealState,
     Mt5ExecutionAdapter,
     Mt5ExecutionClientProtocol,
     Mt5ExecutionConfig,
@@ -70,6 +71,7 @@ __all__ = [
     "KillSwitchState",
     "LiveExecutionStubAdapter",
     "LiveExecutionStubConfig",
+    "Mt5DealState",
     "Mt5ExecutionAdapter",
     "Mt5AccountSnapshot",
     "Mt5ExecutionClientProtocol",

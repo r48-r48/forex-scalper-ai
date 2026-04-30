@@ -241,6 +241,15 @@ def _order_state_to_dict(order: Any) -> dict[str, Any]:
     payload["status"] = order.status.value
     payload["submitted_at"] = order.submitted_at.isoformat()
     payload["updated_at"] = order.updated_at.isoformat()
+    payload["deals"] = [_deal_state_to_dict(deal) for deal in order.deals]
+    return payload
+
+
+def _deal_state_to_dict(deal: Any) -> dict[str, Any]:
+    payload = asdict(deal)
+    payload["timestamp"] = deal.timestamp.isoformat()
+    payload["side"] = deal.side.value
+    payload["execution_cost"] = deal.execution_cost
     return payload
 
 

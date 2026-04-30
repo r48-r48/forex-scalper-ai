@@ -98,6 +98,56 @@ class Mt5OrderRequest:
 
 
 @dataclass(frozen=True)
+class Mt5DealState:
+    """Normalized MT5 deal/fill record used for live accounting."""
+
+    broker_deal_id: str
+    broker_order_id: str
+    broker_symbol: str
+    timestamp: datetime
+    side: OrderSide
+    volume_lots: float
+    price: float
+    commission: float = 0.0
+    fee: float = 0.0
+    swap: float = 0.0
+    position_ticket: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.broker_deal_id.strip():
+            raise ValueError("broker_deal_id must be non-empty.")
+        if not self.broker_order_id.strip():
+            raise ValueError("broker_order_id must be non-empty.")
+        if not self.broker_symbol.strip():
+            raise ValueError("broker_symbol must be non-empty.")
+        if self.timestamp.tzinfo is None or self.timestamp.utcoffset() is None:
+            raise ValueError("timestamp must be timezone-aware.")
+        if self.volume_lots <= 0:
+            raise ValueError("volume_lots must be greater than zero.")
+        if self.price <= 0:
+            raise ValueError("price must be greater than zero.")
+        for value_name, value in {
+            "commission": self.commission,
+            "fee": self.fee,
+            "swap": self.swap,
+        }.items():
+            if not math.isfinite(value):
+                raise ValueError(f"{value_name} must be finite.")
+        if self.position_ticket is not None and not self.position_ticket.strip():
+            raise ValueError("position_ticket must be non-empty when provided.")
+
+    @property
+    def execution_cost(self) -> float:
+        """Return non-negative deal costs representable by FillEvent.commission."""
+
+        return sum(
+            abs(value)
+            for value in (self.commission, self.fee, self.swap)
+            if value < 0
+        )
+
+
+@dataclass(frozen=True)
 class Mt5OrderState:
     """Normalized MT5 order state returned by the broker client."""
 
@@ -112,6 +162,7 @@ class Mt5OrderState:
     average_fill_price: float | None = None
     rejection_reason: str | None = None
     cancel_reason: str | None = None
+    deals: tuple[Mt5DealState, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.broker_order_id.strip():
@@ -128,6 +179,13 @@ class Mt5OrderState:
             raise ValueError("submitted_at must be timezone-aware.")
         if self.updated_at.tzinfo is None or self.updated_at.utcoffset() is None:
             raise ValueError("updated_at must be timezone-aware.")
+        seen_deal_ids: set[str] = set()
+        for deal in self.deals:
+            if deal.broker_order_id != self.broker_order_id:
+                raise ValueError("deals must reference the same broker_order_id.")
+            if deal.broker_deal_id in seen_deal_ids:
+                raise ValueError("deals must not contain duplicate broker_deal_id values.")
+            seen_deal_ids.add(deal.broker_deal_id)
 
 
 @dataclass(frozen=True)
@@ -263,6 +321,7 @@ class Mt5ExecutionAdapter:
         self._open_order_ids_by_symbol: dict[str, list[str]] = {}
         self._positions: dict[str, PositionState] = {}
         self._last_quotes: dict[str, ExecutionQuote] = {}
+        self._seen_deal_ids: set[str] = set()
         self._next_fill_id = 1
 
     @property
@@ -494,8 +553,25 @@ class Mt5ExecutionAdapter:
 
         fills: tuple[FillEvent, ...] = ()
         order_fills: tuple[FillEvent, ...] = () if previous_order is None else previous_order.fills
-        if delta_filled_quantity > _ZERO_TOLERANCE:
-            fill = self._build_fill(
+        deal_fills = self._build_deal_fills(
+            intent,
+            state=state,
+            previous_filled_quantity=previous_filled_quantity,
+            quote=quote,
+        )
+        if deal_fills:
+            for fill in deal_fills:
+                self._cash_balance = apply_fill_to_cash(self._cash_balance, fill)
+                next_position = apply_fill_to_position(
+                    self._positions.get(intent.symbol),
+                    fill,
+                    mark_price=quote.mid_price,
+                )
+                self._positions[intent.symbol] = next_position
+            fills = deal_fills
+            order_fills = order_fills + fills
+        elif delta_filled_quantity > _ZERO_TOLERANCE:
+            fill = self._build_fallback_fill(
                 intent,
                 broker_order_id=state.broker_order_id,
                 fill_quantity=delta_filled_quantity,
@@ -553,7 +629,57 @@ class Mt5ExecutionAdapter:
         self._orders[rejected_order.broker_order_id] = rejected_order
         return self._build_update(rejected_order, (), quote=quote)
 
-    def _build_fill(
+    def _build_deal_fills(
+        self,
+        intent: OrderIntent,
+        *,
+        state: Mt5OrderState,
+        previous_filled_quantity: float,
+        quote: ExecutionQuote,
+    ) -> tuple[FillEvent, ...]:
+        if not state.deals:
+            return ()
+
+        previous_filled_lots = previous_filled_quantity / self._config.base_units_per_lot
+        cumulative_lots = 0.0
+        fills: list[FillEvent] = []
+        for deal in sorted(state.deals, key=lambda item: (item.timestamp, item.broker_deal_id)):
+            cumulative_lots += deal.volume_lots
+            if cumulative_lots <= previous_filled_lots + _ZERO_TOLERANCE:
+                self._seen_deal_ids.add(deal.broker_deal_id)
+                continue
+            if deal.broker_deal_id in self._seen_deal_ids:
+                continue
+            self._seen_deal_ids.add(deal.broker_deal_id)
+            fills.append(self._build_deal_fill(intent, deal=deal, quote=quote))
+        return tuple(fills)
+
+    def _build_deal_fill(
+        self,
+        intent: OrderIntent,
+        *,
+        deal: Mt5DealState,
+        quote: ExecutionQuote,
+    ) -> FillEvent:
+        fill_quantity = self._lots_to_base_units(deal.volume_lots)
+        return FillEvent(
+            fill_id=f"mt5-deal-{deal.broker_deal_id}",
+            intent_id=intent.intent_id,
+            broker_order_id=deal.broker_order_id,
+            symbol=intent.symbol,
+            event_timestamp=deal.timestamp,
+            received_timestamp=deal.timestamp,
+            side=deal.side,
+            fill_price=deal.price,
+            fill_quantity=fill_quantity,
+            commission=deal.execution_cost,
+            spread_cost=abs(deal.price - quote.mid_price) * fill_quantity,
+            slippage_cost=0.0,
+            liquidity_flag=LiquidityFlag.UNKNOWN,
+            venue=self._config.default_venue,
+        )
+
+    def _build_fallback_fill(
         self,
         intent: OrderIntent,
         *,

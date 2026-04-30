@@ -235,6 +235,17 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - targeted pytest for MT5 live/client, reconciliation, config, preflight, and bootstrap passed with `33 passed`
   - `.venv/bin/python -m compileall src tests scripts` passed
   - full `.venv/bin/pytest` passed with `182 passed`
+- 2026-04-30 completed the first P0.D deal-based live accounting slice:
+  - added `Mt5DealState` for normalized broker deal id, order id, symbol, timestamp, side, volume, price, commission, fee, swap, and position ticket
+  - `Mt5OrderState` now carries normalized deal records
+  - `Mt5TerminalClient` normalizes history deals into deal records and still calculates cumulative fill volume / average fill price for order state
+  - `Mt5ExecutionAdapter` tracks seen deal ids and builds fills from unseen deals before falling back to cumulative order deltas
+  - deal commission, fee, and swap charges are folded into non-negative `FillEvent.commission` for explicit execution cost accounting
+  - MT5 broker probe and demo-order scripts now JSON-serialize normalized deal records safely
+  - targeted Ruff passed for MT5 live/client, execution exports, scripts, and touched tests
+  - targeted pytest for MT5 live/client, deployment bootstrap, broker-probe script, and demo-order script tests passed with `22 passed`
+  - `.venv/bin/python -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `183 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -397,6 +408,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_reconciliation.py tests/unit/test_config_loader.py tests/unit/test_deployment_mt5_preflight.py tests/integration/test_deployment_bootstrap.py` -> `33 passed`
 - 2026-04-30: `.venv/bin/python -m compileall src tests scripts` -> passed
 - 2026-04-30: `.venv/bin/pytest` -> `182 passed`
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/execution/mt5_live.py src/scalper_ai/execution/mt5_client.py src/scalper_ai/execution/__init__.py scripts/mt5_broker_probe.py scripts/mt5_demo_order.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py` -> passed
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py tests/unit/test_scripts_mt5_broker_probe.py tests/unit/test_scripts_mt5_demo_order.py` -> `22 passed`
+- 2026-04-30: `.venv/bin/python -m compileall src tests scripts` -> passed after P0.D
+- 2026-04-30: `.venv/bin/pytest` -> `183 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -414,9 +429,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Continue P0.D/P0.E hardening:
-- add deal-based live accounting and commission/fee/swap attribution
+Continue P0.E and P0.D follow-through:
 - add protective TP/SL/bracket management and reconciliation
+- persist per-deal attribution in durable state/journal
 - add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
 - add symbol-specific MT5 capability discovery and conservative quantization

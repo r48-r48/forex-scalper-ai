@@ -10,6 +10,7 @@ from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionMode
 from scalper_ai.execution import (
     ExecutionOrderStatus,
     ExecutionQuote,
+    Mt5DealState,
     Mt5ExecutionAdapter,
     Mt5ExecutionConfig,
     Mt5OrderRequest,
@@ -80,6 +81,48 @@ def test_mt5_execution_adapter_submits_live_market_order_and_exports_snapshots()
     assert connectivity.connected is True
     assert connectivity.venue == "MT5"
     assert connectivity.last_snapshot_at == timestamp
+
+
+def test_mt5_execution_adapter_builds_fills_from_deal_records_with_costs() -> None:
+    client = _DealFillMt5Client()
+    adapter = Mt5ExecutionAdapter(
+        client,
+        config=Mt5ExecutionConfig(
+            initial_cash=1_000_000.0,
+            base_units_per_lot=100_000.0,
+        ),
+    )
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-deal-intent",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="broker-feed",
+        ),
+    )
+
+    assert update.order.status is ExecutionOrderStatus.FILLED
+    assert len(update.fills) == 1
+    assert update.fills[0].fill_id == "mt5-deal-5001"
+    assert update.fills[0].fill_quantity == pytest.approx(100_000.0)
+    assert update.fills[0].fill_price == pytest.approx(1.1002)
+    assert update.fills[0].commission == pytest.approx(2.5)
+    assert update.order.fills == update.fills
+    assert update.position.last_fill_id == "mt5-deal-5001"
 
 
 def test_mt5_execution_adapter_process_quote_polls_open_orders_until_fill() -> None:
@@ -369,6 +412,44 @@ class _ImmediateFillMt5Client:
 
     def ping_latency_ms(self) -> float | None:
         return 4.0
+
+
+class _DealFillMt5Client(_ImmediateFillMt5Client):
+    def submit_order(self, request: Mt5OrderRequest) -> Mt5OrderState:
+        self.requests.append(request)
+        deal = Mt5DealState(
+            broker_deal_id="5001",
+            broker_order_id="mt5-order-deal-1",
+            broker_symbol=request.broker_symbol,
+            timestamp=request.submitted_at,
+            side=request.side,
+            volume_lots=request.volume_lots,
+            price=1.1002,
+            commission=-2.0,
+            fee=-0.5,
+            swap=0.25,
+            position_ticket="7001",
+        )
+        state = Mt5OrderState(
+            broker_order_id=deal.broker_order_id,
+            broker_symbol=request.broker_symbol,
+            status=ExecutionOrderStatus.FILLED,
+            submitted_at=request.submitted_at,
+            updated_at=request.submitted_at,
+            requested_volume_lots=request.volume_lots,
+            filled_volume_lots=request.volume_lots,
+            remaining_volume_lots=0.0,
+            average_fill_price=deal.price,
+            deals=(deal,),
+        )
+        self._orders[state.broker_order_id] = state
+        self._positions[request.broker_symbol] = Mt5PositionState(
+            broker_symbol=request.broker_symbol,
+            timestamp=request.submitted_at,
+            net_volume_lots=request.volume_lots,
+            average_entry_price=deal.price,
+        )
+        return state
 
 
 class _BrokerPositionMt5Client:

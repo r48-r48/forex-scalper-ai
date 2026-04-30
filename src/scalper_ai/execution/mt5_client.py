@@ -13,6 +13,7 @@ from typing import Any, Protocol
 from scalper_ai.domain import OrderSide, OrderType, PositionMode, TimeInForce
 from scalper_ai.execution.models import ExecutionOrderStatus
 from scalper_ai.execution.mt5_live import (
+    Mt5DealState,
     Mt5ExecutionClientProtocol,
     Mt5OrderRequest,
     Mt5OrderState,
@@ -571,7 +572,9 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             raise ValueError("MT5 order payload is missing volume information.")
 
         remaining_volume_lots = self._coerce_float(payload.get("volume_current"))
-        fill_quantity_lots, average_fill_price = self._deal_fill_summary(int(broker_order_id))
+        fill_quantity_lots, average_fill_price, deals = self._deal_fill_summary(
+            int(broker_order_id)
+        )
 
         if remaining_volume_lots is None:
             remaining_volume_lots = max(0.0, requested_volume_lots - fill_quantity_lots)
@@ -617,6 +620,7 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             average_fill_price=average_fill_price,
             rejection_reason=rejection_reason,
             cancel_reason=cancel_reason,
+            deals=deals,
         )
 
     def _normalize_position_record(self, raw_position: Any) -> Mt5PositionState:
@@ -638,21 +642,67 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             source_position_tickets=() if position_ticket is None else (position_ticket,),
         )
 
-    def _deal_fill_summary(self, ticket: int) -> tuple[float, float | None]:
-        deals = self._history_deals_get(ticket=ticket)
+    def _normalize_deal_record(self, raw_deal: Any) -> Mt5DealState:
+        payload = self._coerce_mapping(raw_deal)
+        raw_type = payload.get("type")
+        side = (
+            OrderSide.SELL
+            if raw_type == getattr(self._module, "DEAL_TYPE_SELL", 1)
+            else OrderSide.BUY
+        )
+        volume_lots = self._coerce_float(payload.get("volume"))
+        price = self._coerce_float(payload.get("price"))
+        if volume_lots is None or volume_lots <= 0:
+            raise ValueError("MT5 deal payload is missing positive volume.")
+        if price is None or price <= 0:
+            raise ValueError("MT5 deal payload is missing positive price.")
+
+        broker_deal_id = self._coerce_optional_str(payload.get("ticket"))
+        broker_order_id = self._coerce_optional_str(payload.get("order"))
+        if broker_deal_id is None:
+            raise ValueError("MT5 deal payload is missing ticket.")
+        if broker_order_id is None:
+            raise ValueError("MT5 deal payload is missing order.")
+
+        return Mt5DealState(
+            broker_deal_id=broker_deal_id,
+            broker_order_id=broker_order_id,
+            broker_symbol=str(payload["symbol"]),
+            timestamp=self._payload_timestamp(payload, primary="time_msc", fallback="time"),
+            side=side,
+            volume_lots=abs(volume_lots),
+            price=price,
+            commission=self._coerce_float(payload.get("commission")) or 0.0,
+            fee=self._coerce_float(payload.get("fee")) or 0.0,
+            swap=self._coerce_float(payload.get("swap")) or 0.0,
+            position_ticket=self._coerce_optional_str(
+                payload.get("position_id", payload.get("position"))
+            ),
+        )
+
+    def _deal_fill_summary(
+        self,
+        ticket: int,
+    ) -> tuple[float, float | None, tuple[Mt5DealState, ...]]:
+        deals = tuple(
+            sorted(
+                (
+                    self._normalize_deal_record(deal)
+                    for deal in self._history_deals_get(ticket=ticket)
+                ),
+                key=lambda deal: (deal.timestamp, deal.broker_deal_id),
+            )
+        )
         if not deals:
-            return 0.0, None
+            return 0.0, None, ()
         total_volume = 0.0
         weighted_notional = 0.0
         for deal in deals:
-            payload = self._coerce_mapping(deal)
-            volume = self._coerce_float(payload.get("volume")) or 0.0
-            price = self._coerce_float(payload.get("price")) or 0.0
-            total_volume += abs(volume)
-            weighted_notional += abs(volume) * price
+            total_volume += deal.volume_lots
+            weighted_notional += deal.volume_lots * deal.price
         if total_volume <= 0:
-            return 0.0, None
-        return total_volume, weighted_notional / total_volume
+            return 0.0, None, deals
+        return total_volume, weighted_notional / total_volume, deals
 
     def _orders_get(self, **kwargs: Any) -> tuple[Any, ...]:
         try:

@@ -130,6 +130,7 @@ class _BootstrapFakeMetaTrader5Module:
     ORDER_FILLING_IOC = 1
     ORDER_FILLING_RETURN = 2
     ORDER_STATE_FILLED = 4
+    DEAL_TYPE_BUY = 0
     POSITION_TYPE_BUY = 0
 
     def __init__(self) -> None:
@@ -189,9 +190,17 @@ class _BootstrapFakeMetaTrader5Module:
         )
         self._deals[order_id] = [
             SimpleNamespace(
+                ticket=order_id + 1000,
                 order=order_id,
+                symbol=request["symbol"],
+                type=self.DEAL_TYPE_BUY,
                 volume=request["volume"],
                 price=request["price"],
+                commission=0.0,
+                fee=0.0,
+                swap=0.0,
+                position_id=order_id + 2000,
+                time=current_epoch,
             )
         ]
         self._positions[str(request["symbol"])] = SimpleNamespace(

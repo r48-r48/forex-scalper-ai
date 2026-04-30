@@ -22,15 +22,15 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 
 2. MT5 live sizing uses local adapter state instead of broker state.
    - First slice completed on `2026-04-30`: `Mt5ExecutionAdapter.submit_order()` now refreshes broker positions before target-position and reduce-only sizing, `get_position()` refreshes from broker state when a quote is available, and broker position snapshots carry gross exposure and source tickets.
-   - Remaining work: richer multi-ticket close workflows, broker fault-injection tests, deal-based accounting, protective order handling, and symbol-specific lot constraints.
+   - Remaining work: richer multi-ticket close workflows, broker fault-injection tests, protective order handling, symbol-specific lot constraints, and durable per-deal attribution follow-through.
 
 3. Durable restart recovery was absent at audit time.
    - First slice completed on `2026-04-30`: `state_store.py` now provides SQLite persistence for runtime order/risk/OMS/execution/fill/position/kill-switch state, and `DeploymentRuntime.start()` reloads state before new orders.
    - Remaining work: expand broker-side recovery/fault injection for broker-only positions, partial local state, and missing/empty broker history.
 
 4. Live PnL, fees, and fill attribution are incomplete.
-   - `src/scalper_ai/execution/mt5_live.py:413` builds fills with `commission=0.0` and `slippage_cost=0.0`.
-   - `src/scalper_ai/execution/mt5_client.py:612` summarizes deals only into total volume and average fill price; it does not surface deal ids, commission, fee, swap, or per-deal attribution into the live adapter.
+   - First slice completed on `2026-04-30`: `Mt5DealState` now surfaces deal ids, order ids, side, volume, price, timestamp, commission, fee, swap, and position tickets; `Mt5OrderState` carries deal records; the live adapter creates fills from unseen deal ids and folds non-negative commission/fee/swap charges into `FillEvent.commission`.
+   - Remaining work: durable/journal per-deal persistence, real-terminal non-empty history validation, and richer account-currency cost/credit semantics.
 
 5. Production bracket / TP / SL handling is absent.
    - `src/scalper_ai/domain/trading.py:19` defines `OrderIntent` with market/limit/stop/stop_limit fields, but no bracket, parent-child, stop-loss, take-profit, or OCO semantics.
@@ -111,13 +111,16 @@ Required behavior:
 
 ### P0.D - Deal-Based Live Accounting
 
+Status: first deal-normalization slice completed on `2026-04-30`.
+
 Goal: make live fills and PnL auditable.
 
 Required behavior:
-- Track seen deal ids.
-- Normalize every new broker deal separately.
-- Propagate commission, fee, swap, price, volume, order id, position id, and timestamps.
-- Avoid rebuilding delta fills from cumulative average price when deal history is available.
+- Completed: track seen deal ids.
+- Completed: normalize every new broker deal separately.
+- Completed: propagate commission, fee, swap, price, volume, order id, position id, and timestamps into normalized deal records and fills.
+- Completed: avoid rebuilding delta fills from cumulative average price when deal history is available.
+- Pending: persist deal-level attribution in durable state/journal and validate against non-empty real broker history.
 
 ### P0.E - Protective Order / Bracket Management
 
@@ -147,4 +150,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue with P0.D/P0.E: deal/history normalization, commission/fee/swap attribution, and protective TP/SL/bracket management on top of the mandatory runtime Risk/OMS, durable recovery, and first broker-source MT5 hedging gates.
+Continue with P0.E plus P0.D follow-through: protective TP/SL/bracket management, durable/journal per-deal persistence, real broker history investigation, broker-side recovery fault tests, and symbol-specific quantization on top of the mandatory runtime Risk/OMS, durable recovery, broker-source MT5 hedging, and first deal-accounting gates.

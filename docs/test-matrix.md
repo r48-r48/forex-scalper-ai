@@ -13,7 +13,7 @@ Latest local validation in the available desktop environment:
 Result:
 
 ```text
-182 passed
+183 passed
 ```
 
 The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created with bundled Python 3.12.13 for target-runtime validation.
@@ -41,7 +41,7 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 |---|---|---|
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
-| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `182 passed` |
+| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `183 passed` |
 | Real MT5 terminal smoke | partial pass | Windows notebook and same-Mac Parallels VM both connect to demo terminals without `order_send`; Windows/MetaQuotes accepted EURUSD FOK, while Parallels/Dukascopy accepted EURUSD IOC and rejected FOK |
 | Docker/Compose paper runtime | source added, Docker unavailable locally | `Dockerfile`, `.dockerignore`, `paper-runtime` Compose profile, and Makefile targets exist; local macOS Codex and Parallels Windows have no Docker command; Compose YAML parse and local paper runtime describe/health/metrics passed |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
@@ -52,5 +52,5 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 - Webhook alert transport tests use a fake opener and do not send real network requests.
 - Backtesting V1 models immediate market fills with explicit costs; execution-aware V2 now covers latency, queue position, partial fills, stale/closed markets, and cancel/replace races with forced-scenario tests.
 - Baseline strategies are deterministic and report explicit costs, but they still rely on replayed feature-frame quality and do not prove live broker profitability.
-- Linting is exposed through `make lint` and `make lint-baseline`. The Python 3.12.13 `.venv` baseline currently reports `374` historical Ruff issues after the scripts, config-layer, logging-utils, journal, OMS, validation, models, and risk cleanup batches; targeted Ruff is green for the 2026-04-30 P0.C MT5/reconciliation/preflight changes; newly touched code should keep targeted Ruff checks green.
+- Linting is exposed through `make lint` and `make lint-baseline`. The Python 3.12.13 `.venv` baseline currently reports `374` historical Ruff issues after the scripts, config-layer, logging-utils, journal, OMS, validation, models, and risk cleanup batches; targeted Ruff is green for the 2026-04-30 P0.C/P0.D MT5/reconciliation/deal-accounting changes; newly touched code should keep targeted Ruff checks green.
 - Full type checking is exposed through `make typecheck` and `make typecheck-baseline`. The Python 3.12.13 `.venv` baseline currently reports `51` mypy errors in `30` files, so mypy is not yet part of the GitHub Actions gate.

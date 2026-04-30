@@ -117,6 +117,23 @@ def main() -> None:
                     "filled_volume_lots": order.filled_volume_lots,
                     "remaining_volume_lots": order.remaining_volume_lots,
                     "average_fill_price": order.average_fill_price,
+                    "deals": [
+                        {
+                            "broker_deal_id": deal.broker_deal_id,
+                            "broker_order_id": deal.broker_order_id,
+                            "broker_symbol": deal.broker_symbol,
+                            "timestamp": deal.timestamp.isoformat(),
+                            "side": deal.side.value,
+                            "volume_lots": deal.volume_lots,
+                            "price": deal.price,
+                            "commission": deal.commission,
+                            "fee": deal.fee,
+                            "swap": deal.swap,
+                            "position_ticket": deal.position_ticket,
+                            "execution_cost": deal.execution_cost,
+                        }
+                        for deal in order.deals
+                    ],
                 }
                 for order in orders
             ]

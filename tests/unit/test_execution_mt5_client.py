@@ -53,6 +53,14 @@ def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission(
     assert state.status is ExecutionOrderStatus.FILLED
     assert state.filled_volume_lots == 1.0
     assert state.average_fill_price == 1.1002
+    assert len(state.deals) == 1
+    assert state.deals[0].broker_deal_id == "9901"
+    assert state.deals[0].broker_order_id == "9001"
+    assert state.deals[0].side is OrderSide.BUY
+    assert state.deals[0].commission == -2.0
+    assert state.deals[0].fee == -0.5
+    assert state.deals[0].swap == 0.25
+    assert state.deals[0].execution_cost == pytest.approx(2.5)
 
 
 def test_mt5_terminal_client_exposes_normalized_order_check_result() -> None:
@@ -283,6 +291,8 @@ class _FakeMetaTrader5Module:
     ORDER_STATE_FILLED = 4
     ORDER_STATE_CANCELED = 5
     ORDER_STATE_REJECTED = 7
+    DEAL_TYPE_BUY = 0
+    DEAL_TYPE_SELL = 1
     POSITION_TYPE_BUY = 0
     POSITION_TYPE_SELL = 1
 
@@ -369,9 +379,17 @@ class _FakeMetaTrader5Module:
         )
         self._deals[order_id] = [
             SimpleNamespace(
+                ticket=9901,
                 order=order_id,
+                symbol=request["symbol"],
+                type=self.DEAL_TYPE_BUY,
                 volume=request["volume"],
                 price=request["price"],
+                commission=-2.0,
+                fee=-0.5,
+                swap=0.25,
+                position_id=8801,
+                time=1_774_670_400,
             )
         ]
         self._positions[str(request["symbol"])] = SimpleNamespace(
