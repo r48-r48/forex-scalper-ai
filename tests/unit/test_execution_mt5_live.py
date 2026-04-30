@@ -85,6 +85,8 @@ def test_mt5_execution_adapter_submits_live_market_order_and_exports_snapshots()
     assert broker_orders[0].stop_loss_price == pytest.approx(1.0950)
     assert broker_orders[0].take_profit_price == pytest.approx(1.1050)
     assert broker_positions[0].net_quantity == pytest.approx(100_000.0)
+    assert broker_positions[0].stop_loss_price == pytest.approx(1.0950)
+    assert broker_positions[0].take_profit_price == pytest.approx(1.1050)
     assert connectivity.connected is True
     assert connectivity.venue == "MT5"
     assert connectivity.last_snapshot_at == timestamp
@@ -525,6 +527,8 @@ class _ImmediateFillMt5Client:
             timestamp=request.submitted_at,
             net_volume_lots=signed_volume,
             average_entry_price=1.1002,
+            stop_loss_price=request.stop_loss_price,
+            take_profit_price=request.take_profit_price,
         )
         return state
 

@@ -253,6 +253,8 @@ class Mt5PositionState:
     position_mode: PositionMode = PositionMode.NETTING
     gross_volume_lots: float | None = None
     source_position_tickets: tuple[str, ...] = ()
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
 
     def __post_init__(self) -> None:
         if not self.broker_symbol.strip():
@@ -273,6 +275,12 @@ class Mt5PositionState:
         for ticket in self.source_position_tickets:
             if not ticket.strip():
                 raise ValueError("source_position_tickets must contain non-empty values.")
+        for value_name, value in {
+            "stop_loss_price": self.stop_loss_price,
+            "take_profit_price": self.take_profit_price,
+        }.items():
+            if value is not None and (value <= 0 or not math.isfinite(value)):
+                raise ValueError(f"{value_name} must be a positive finite value when provided.")
 
     @property
     def gross_lots(self) -> float:
@@ -327,6 +335,14 @@ def aggregate_mt5_positions(
         position_mode=resolved_mode,
         gross_volume_lots=gross_volume_lots,
         source_position_tickets=_source_position_tickets(selected),
+        stop_loss_price=_shared_position_protective_price(
+            selected,
+            field_name="stop_loss_price",
+        ),
+        take_profit_price=_shared_position_protective_price(
+            selected,
+            field_name="take_profit_price",
+        ),
     )
 
 
@@ -613,6 +629,8 @@ class Mt5ExecutionAdapter:
                         broker_symbol=position.broker_symbol,
                     ),
                     source_position_ids=position.source_position_tickets,
+                    stop_loss_price=position.stop_loss_price,
+                    take_profit_price=position.take_profit_price,
                 )
             )
         return tuple(sorted(snapshots, key=lambda snapshot: snapshot.symbol))
@@ -1183,6 +1201,23 @@ def _source_position_tickets(positions: Sequence[Mt5PositionState]) -> tuple[str
             tickets.append(position.position_ticket)
         tickets.extend(position.source_position_tickets)
     return tuple(sorted(set(tickets)))
+
+
+def _shared_position_protective_price(
+    positions: Sequence[Mt5PositionState],
+    *,
+    field_name: str,
+) -> float | None:
+    if not positions:
+        return None
+    first_value = getattr(positions[0], field_name)
+    if first_value is None:
+        return None
+    for position in positions[1:]:
+        value = getattr(position, field_name)
+        if value is None or not math.isclose(value, first_value, abs_tol=_ZERO_TOLERANCE):
+            return None
+    return float(first_value)
 
 
 def _weighted_entry_price(

@@ -684,6 +684,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             position_mode=PositionMode(self._config.account_mode),
             gross_volume_lots=abs(volume_lots),
             source_position_tickets=() if position_ticket is None else (position_ticket,),
+            stop_loss_price=self._coerce_positive_optional_float(payload.get("sl")),
+            take_profit_price=self._coerce_positive_optional_float(payload.get("tp")),
         )
 
     def _normalize_deal_record(self, raw_deal: Any) -> Mt5DealState:

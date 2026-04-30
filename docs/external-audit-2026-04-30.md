@@ -35,7 +35,8 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 
 5. Production bracket / TP / SL handling is absent.
    - First slice completed on `2026-04-30`: `OrderIntent` now carries optional stop-loss and take-profit prices, `Mt5TerminalClient` maps them to MT5 native `sl`/`tp`, MT5 order state carries broker-acknowledged protective prices, and reconciliation flags missing/mismatched broker protection.
-   - Remaining work: true bracket/OCO lifecycle management, fail-safe flatten/block policies if broker-side protection disappears after fill, and real-terminal validation of broker echo/position protection behavior.
+   - Position fail-safe slice completed on `2026-04-30`: broker position snapshots now carry SL/TP, MT5 position normalization maps `sl`/`tp`, reconciliation flags required live MT5 positions missing broker-side protection after fill/reconnect, and runtime health activates a durable session kill-switch for that drift.
+   - Remaining work: true bracket/OCO lifecycle management, approved flatten workflow when broker-side protection disappears, and real-terminal validation of broker echo/position protection behavior.
 
 6. MT5 account-mode assumptions are currently unsafe for Dukascopy hedging behavior.
    - First slice completed on `2026-04-30`: MT5 config/client/adapter now accept `account_mode='hedging'`, the MT5 overlay defaults to hedging for the observed Dukascopy demo behavior, and ticket-specific reduce-only closes pass the MT5 `position` field.
@@ -134,8 +135,10 @@ Required behavior:
 - Completed: support MT5 native `sl`/`tp` for the first production slice.
 - Completed: reconcile protective order presence after broker acknowledgement through `BrokerOrderSnapshot`.
 - Completed: block exposure-increasing MT5 orders when config requires missing SL and/or TP.
+- Completed: reconcile required broker-side position protection after fill/reconnect through `BrokerPositionSnapshot`.
+- Completed: activate a durable runtime session kill-switch when required live MT5 position protection is missing.
 - Pending: true bracket/OCO parent-child lifecycle management.
-- Pending: flatten or fail-safe workflow when broker-side protection disappears after a fill or reconnect.
+- Pending: approved flatten workflow when broker-side protection disappears after a fill or reconnect.
 
 ### P1 - Symbol Specs, Reconnect, And Risk Config Completion
 
@@ -157,4 +160,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue with richer bracket/OCO protection plus P0.D follow-through: durable/journal per-deal persistence, real broker history investigation, broker-side recovery fault tests, fail-safe handling for missing protection after fills/reconnects, and symbol-specific quantization on top of the mandatory runtime Risk/OMS, durable recovery, broker-source MT5 hedging, first deal-accounting gate, and first protective SL/TP gate.
+Continue with true bracket/OCO protection plus P0.D follow-through: durable/journal per-deal persistence, real broker history investigation, broker-side recovery fault tests, approved flatten handling for missing protection after fills/reconnects, and symbol metadata enforcement for prices/stops/filling on top of the mandatory runtime Risk/OMS, durable recovery, broker-source MT5 hedging, first deal-accounting gate, protective SL/TP gate, and position-protection fail-safe.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Protocol
 
 from scalper_ai.domain import PositionState
@@ -81,6 +81,8 @@ def build_snapshot_reconciliation_report(
     paper: bool,
     checked_at: datetime | None = None,
     allow_missing_terminal_orders: bool = True,
+    require_position_stop_loss: bool = False,
+    require_position_take_profit: bool = False,
 ) -> ReconciliationReport:
     """Build a reconciliation report from tracked internal state and broker snapshots."""
 
@@ -99,6 +101,8 @@ def build_snapshot_reconciliation_report(
         broker_orders=broker_orders,
         internal_positions=internal_positions,
         broker_positions=broker_positions,
-        checked_at=checked_at or datetime.now(timezone.utc),
+        checked_at=checked_at or datetime.now(UTC),
         allow_missing_terminal_orders=allow_missing_terminal_orders,
+        require_position_stop_loss=require_position_stop_loss,
+        require_position_take_profit=require_position_take_profit,
     )

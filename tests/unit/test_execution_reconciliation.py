@@ -157,6 +157,60 @@ def test_reconcile_position_flags_hedged_gross_exposure() -> None:
     assert issues[0].severity is ReconciliationSeverity.ERROR
 
 
+def test_reconcile_position_flags_required_missing_position_protection() -> None:
+    broker_position = BrokerPositionSnapshot(
+        symbol="EURUSD",
+        timestamp=datetime(2026, 3, 27, 10, 0, tzinfo=UTC),
+        net_quantity=100_000.0,
+        average_entry_price=1.1000,
+    )
+
+    issues = reconcile_position(
+        None,
+        broker_position,
+        require_stop_loss=True,
+        require_take_profit=True,
+    )
+
+    assert {issue.code for issue in issues} == {
+        "position_quantity_mismatch",
+        "position_stop_loss_missing",
+        "position_take_profit_missing",
+    }
+    assert all(issue.severity is ReconciliationSeverity.ERROR for issue in issues)
+
+
+def test_reconcile_position_accepts_required_position_protection() -> None:
+    broker_position = BrokerPositionSnapshot(
+        symbol="EURUSD",
+        timestamp=datetime(2026, 3, 27, 10, 0, tzinfo=UTC),
+        net_quantity=100_000.0,
+        average_entry_price=1.1000,
+        stop_loss_price=1.0950,
+        take_profit_price=1.1050,
+    )
+    internal_position = PositionState(
+        symbol="EURUSD",
+        timestamp=datetime(2026, 3, 27, 10, 0, tzinfo=UTC),
+        net_quantity=100_000.0,
+        average_entry_price=1.1000,
+        mark_price=1.1002,
+        realized_pnl=0.0,
+        unrealized_pnl=20.0,
+        exposure_quote=110_020.0,
+        position_mode=PositionMode.NETTING,
+    )
+
+    issues = reconcile_position(
+        internal_position,
+        broker_position,
+        require_stop_loss=True,
+        require_take_profit=True,
+    )
+
+    assert issues == ()
+
+
 def test_build_reconciliation_report_collects_unknown_broker_orders() -> None:
     order = _make_order(
         status=ExecutionOrderStatus.FILLED,

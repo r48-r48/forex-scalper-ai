@@ -671,6 +671,96 @@ def test_runtime_recovers_durable_kill_switch_before_router_submit(tmp_path) -> 
     assert update.order.rejection_reason == "session_kill_switch"
 
 
+def test_live_runtime_fail_safe_blocks_after_unprotected_position_reconciliation(
+    tmp_path,
+) -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "mt5",
+                "mt5": {"require_stop_loss": True},
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    timestamp = datetime(2026, 4, 30, 10, 45, tzinfo=UTC)
+    adapter = _RejectIfSubmittedAdapter()
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+
+    class UnprotectedPositionProvider:
+        def list_broker_orders(self) -> tuple[BrokerOrderSnapshot, ...]:
+            return ()
+
+        def list_broker_positions(self) -> tuple[BrokerPositionSnapshot, ...]:
+            return (
+                BrokerPositionSnapshot(
+                    symbol="EURUSD",
+                    timestamp=timestamp,
+                    net_quantity=100_000.0,
+                    average_entry_price=1.1000,
+                ),
+            )
+
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: adapter,
+        broker_snapshot_provider=UnprotectedPositionProvider(),
+        live_confirmation_token="ENABLE_ME",
+        state_store=store,
+    )
+    runtime.start()
+
+    snapshot = runtime.health_snapshot()
+
+    assert snapshot.overall_status is HealthStatus.FAIL
+    reconciliation_check = next(
+        check for check in snapshot.checks if check.name == "execution_reconciliation"
+    )
+    assert reconciliation_check.status is HealthStatus.FAIL
+    assert "position_stop_loss_missing" in reconciliation_check.details["issue_codes"]
+    assert any(
+        state.scope is KillSwitchScope.SESSION
+        and state.enabled
+        and state.reason == "position_protection_reconciliation_failed"
+        for state in store.list_kill_switch_states()
+    )
+
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="blocked-after-unprotected-position",
+            strategy_id="runtime-protection-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            stop_loss_price=1.0950,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1001,
+            venue="broker-feed",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "session_kill_switch"
+
+
 def test_live_startup_blocks_paper_fallback_when_recovered_live_order_is_open(tmp_path) -> None:
     store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
     timestamp = datetime(2026, 4, 30, 10, 25, tzinfo=UTC)

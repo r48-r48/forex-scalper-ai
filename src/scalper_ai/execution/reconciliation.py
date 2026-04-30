@@ -84,6 +84,8 @@ class BrokerPositionSnapshot:
     position_id: str | None = None
     gross_quantity: float | None = None
     source_position_ids: tuple[str, ...] = ()
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
 
     def __post_init__(self) -> None:
         if not self.symbol.strip():
@@ -111,6 +113,12 @@ class BrokerPositionSnapshot:
         for position_id in self.source_position_ids:
             if not position_id.strip():
                 raise ValueError("source_position_ids must contain non-empty values.")
+        for value_name, value in {
+            "stop_loss_price": self.stop_loss_price,
+            "take_profit_price": self.take_profit_price,
+        }.items():
+            if value is not None and (value <= 0 or not math.isfinite(value)):
+                raise ValueError(f"{value_name} must be positive and finite when provided.")
 
 
 @dataclass(frozen=True)
@@ -290,6 +298,8 @@ def reconcile_position(
     *,
     quantity_tolerance: float = _ZERO_TOLERANCE,
     price_tolerance: float = _ZERO_TOLERANCE,
+    require_stop_loss: bool = False,
+    require_take_profit: bool = False,
 ) -> tuple[ReconciliationIssue, ...]:
     """Compare one internal net position to one broker-side position snapshot."""
 
@@ -399,6 +409,15 @@ def reconcile_position(
                 )
             )
 
+    if broker_position is not None:
+        _compare_required_position_protection(
+            issues,
+            broker_position,
+            quantity_tolerance=quantity_tolerance,
+            require_stop_loss=require_stop_loss,
+            require_take_profit=require_take_profit,
+        )
+
     return tuple(issues)
 
 
@@ -410,6 +429,8 @@ def build_reconciliation_report(
     broker_position: BrokerPositionSnapshot | None,
     checked_at: datetime | None = None,
     allow_missing_terminal_orders: bool = True,
+    require_position_stop_loss: bool = False,
+    require_position_take_profit: bool = False,
 ) -> ReconciliationReport:
     """Build one aggregated reconciliation report."""
 
@@ -428,6 +449,8 @@ def build_reconciliation_report(
         broker_positions=broker_positions,
         checked_at=checked_at,
         allow_missing_terminal_orders=allow_missing_terminal_orders,
+        require_position_stop_loss=require_position_stop_loss,
+        require_position_take_profit=require_position_take_profit,
     )
 
 
@@ -439,6 +462,8 @@ def build_reconciliation_report_for_positions(
     broker_positions: Mapping[str, BrokerPositionSnapshot],
     checked_at: datetime | None = None,
     allow_missing_terminal_orders: bool = True,
+    require_position_stop_loss: bool = False,
+    require_position_take_profit: bool = False,
 ) -> ReconciliationReport:
     """Build one aggregated reconciliation report across many symbols."""
 
@@ -475,6 +500,8 @@ def build_reconciliation_report_for_positions(
             reconcile_position(
                 internal_positions.get(symbol),
                 broker_positions.get(symbol),
+                require_stop_loss=require_position_stop_loss,
+                require_take_profit=require_position_take_profit,
             )
         )
 
@@ -545,6 +572,55 @@ def _compare_protective_price(
                     "field_name": field_name,
                     "internal_value": float(internal_value),
                     "broker_value": broker_value,
+                },
+            )
+        )
+
+
+def _compare_required_position_protection(
+    issues: list[ReconciliationIssue],
+    broker_position: BrokerPositionSnapshot,
+    *,
+    quantity_tolerance: float,
+    require_stop_loss: bool,
+    require_take_profit: bool,
+) -> None:
+    protected_exposure = (
+        broker_position.gross_quantity
+        if broker_position.gross_quantity is not None
+        else abs(broker_position.net_quantity)
+    )
+    if protected_exposure <= quantity_tolerance:
+        return
+    if require_stop_loss and broker_position.stop_loss_price is None:
+        issues.append(
+            ReconciliationIssue(
+                scope="position",
+                reference_id=broker_position.position_id or broker_position.symbol,
+                severity=ReconciliationSeverity.ERROR,
+                code="position_stop_loss_missing",
+                message="Broker position is missing required stop-loss protection.",
+                details={
+                    "symbol": broker_position.symbol,
+                    "net_quantity": broker_position.net_quantity,
+                    "gross_quantity": broker_position.gross_quantity,
+                    "source_position_ids": list(broker_position.source_position_ids),
+                },
+            )
+        )
+    if require_take_profit and broker_position.take_profit_price is None:
+        issues.append(
+            ReconciliationIssue(
+                scope="position",
+                reference_id=broker_position.position_id or broker_position.symbol,
+                severity=ReconciliationSeverity.ERROR,
+                code="position_take_profit_missing",
+                message="Broker position is missing required take-profit protection.",
+                details={
+                    "symbol": broker_position.symbol,
+                    "net_quantity": broker_position.net_quantity,
+                    "gross_quantity": broker_position.gross_quantity,
+                    "source_position_ids": list(broker_position.source_position_ids),
                 },
             )
         )

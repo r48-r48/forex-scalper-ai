@@ -67,6 +67,10 @@ def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission(
     assert state.deals[0].fee == -0.5
     assert state.deals[0].swap == 0.25
     assert state.deals[0].execution_cost == pytest.approx(2.5)
+    position = client.get_position("EURUSD.a")
+    assert position is not None
+    assert position.stop_loss_price == pytest.approx(1.0950)
+    assert position.take_profit_price == pytest.approx(1.1050)
 
 
 def test_mt5_terminal_client_exposes_normalized_order_check_result() -> None:
@@ -463,6 +467,8 @@ class _FakeMetaTrader5Module:
             type=self.POSITION_TYPE_BUY,
             volume=request["volume"],
             price_open=request["price"],
+            sl=request.get("sl", 0.0),
+            tp=request.get("tp", 0.0),
             time=1_774_670_400,
         )
         return SimpleNamespace(

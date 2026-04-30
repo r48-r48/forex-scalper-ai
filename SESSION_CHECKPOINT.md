@@ -284,6 +284,15 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - combined targeted safety/MT5 pytest passed with `61 passed`
   - `.venv/bin/python -m compileall src tests scripts` passed
   - full `.venv/bin/pytest` passed with `199 passed`
+- 2026-04-30 completed the P0.E position-protection fail-safe slice:
+  - `BrokerPositionSnapshot` and `Mt5PositionState` now carry optional `stop_loss_price` and `take_profit_price`
+  - `Mt5TerminalClient` normalizes MT5 position `sl`/`tp` into broker-source position state
+  - MT5 broker position snapshots now expose SL/TP protection through the existing reconciliation contract
+  - reconciliation can require broker-side position stop-loss and/or take-profit protection after fills or reconnects
+  - `DeploymentRuntime` passes MT5 required-protection config into live snapshot reconciliation
+  - runtime health activates and persists a session kill-switch when required live MT5 position protection is missing, blocking later order submissions through the normal risk path
+  - targeted Ruff passed for reconciliation, snapshots, MT5 live/client, deployment runtime, and touched tests
+  - `.venv/bin/pytest tests/unit/test_execution_reconciliation.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_runtime.py` passed with `51 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -476,8 +485,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Continue richer bracket/OCO protection and P0.D follow-through:
-- add bracket/OCO lifecycle management and fail-safe handling for missing protection after fill or reconnect
+Continue true bracket/OCO protection and P0.D follow-through:
+- add true bracket/OCO lifecycle management and an approved flatten workflow for positions whose required broker protection disappears after fill or reconnect
 - persist per-deal attribution in durable state/journal
 - add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills

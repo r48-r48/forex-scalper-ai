@@ -33,6 +33,7 @@ from scalper_ai.execution import (
     ExecutionStateTracker,
     ExecutionUpdate,
     KillSwitchScope,
+    KillSwitchState,
     PaperExecutionAdapter,
     ReconciliationReport,
     build_snapshot_reconciliation_report,
@@ -80,6 +81,13 @@ class RuntimeSummary:
 
 ReconciliationReportProvider = Callable[[], ReconciliationReport | None]
 RiskContextProvider = Callable[[OrderIntent, ExecutionQuote, ExecutionStateTracker], RiskContext]
+
+_POSITION_PROTECTION_ISSUE_CODES = frozenset(
+    {
+        "position_stop_loss_missing",
+        "position_take_profit_missing",
+    }
+)
 
 
 class JournalWriterProtocol(Protocol):
@@ -1003,6 +1011,7 @@ class DeploymentRuntime:
             )
 
         self._last_reconciliation_report = report
+        self._activate_position_protection_fail_safe(report)
         if report.has_errors:
             status = HealthStatus.FAIL
             summary = "Reconciliation detected error-level drift between internal and broker state."
@@ -1213,6 +1222,8 @@ class DeploymentRuntime:
             state_tracker=self._state_tracker,
             snapshot_provider=snapshot_provider,
             paper=self.effective_mode == "paper",
+            require_position_stop_loss=self._require_position_stop_loss(),
+            require_position_take_profit=self._require_position_take_profit(),
         )
 
     def _resolved_broker_snapshot_provider(self) -> BrokerSnapshotProvider | None:
@@ -1242,6 +1253,34 @@ class DeploymentRuntime:
         if not callable(list_orders_method) or not callable(list_positions_method):
             return None
         return cast(BrokerSnapshotProvider, candidate)
+
+    def _activate_position_protection_fail_safe(self, report: ReconciliationReport) -> None:
+        if not any(issue.code in _POSITION_PROTECTION_ISSUE_CODES for issue in report.issues):
+            return
+        self._session_kill_switch_enabled = True
+        if self._state_store is not None:
+            self._state_store.save_kill_switch_state(
+                KillSwitchState(
+                    scope=KillSwitchScope.SESSION,
+                    enabled=True,
+                    updated_at=report.checked_at,
+                    reason="position_protection_reconciliation_failed",
+                )
+            )
+
+    def _require_position_stop_loss(self) -> bool:
+        return (
+            self.effective_mode == "live"
+            and self.config.broker.live_adapter == "mt5"
+            and self.config.broker.mt5.require_stop_loss
+        )
+
+    def _require_position_take_profit(self) -> bool:
+        return (
+            self.effective_mode == "live"
+            and self.config.broker.live_adapter == "mt5"
+            and self.config.broker.mt5.require_take_profit
+        )
 
     def _close_live_adapter(self) -> None:
         if self._live_adapter is None:
