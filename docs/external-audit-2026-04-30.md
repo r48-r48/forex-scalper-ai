@@ -55,7 +55,8 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 
 3. Reconnect and MT5 supervision are partial.
    - `src/scalper_ai/execution/mt5_client.py:468` returns immediately when `_initialized` is true.
-   - There is no reconnect policy, circuit breaker, terminal supervision state machine, or mandatory reconciliation after reconnect.
+   - First reconnect supervision slice completed on `2026-04-30`: `Mt5TerminalClient` now probes terminal/account readiness before use, reconnects stale initialized sessions, exposes a connection snapshot, opens a circuit breaker after configured failed reconnect attempts, and wires reconnect config through typed app config, env overrides, and live factory.
+   - Remaining work: long-running daemon supervision loop, operator-facing circuit reset workflow, alert routing, and mandatory reconciliation scheduling after reconnect outside health-check execution.
 
 4. The project does not yet have a complete long-running live strategy daemon.
    - The runtime exposes startup, health, metrics, manual `submit_order()`, and `process_quote()`.
@@ -146,6 +147,8 @@ Required behavior:
 - Add symbol capability discovery and conservative Decimal-based quantization.
 - Completed first slice: broker `symbol_info` is normalized and lot sizing is conservatively quantized by symbol volume constraints.
 - Add MT5 reconnect policy, circuit breaker, and mandatory post-reconnect reconciliation.
+- Completed first slice: terminal/account probes, stale-session reconnect, circuit-breaker diagnostics, and config/env wiring exist in `Mt5TerminalClient`.
+- Pending: daemon-level reconnect orchestration, operator reset workflow, alert routing, and explicit post-reconnect reconciliation scheduling.
 - Completed first slice: wire max spread, cooldown, volatility, news/model/feature health guards, and recovered kill switches into enforced risk decisions.
 - Pending: connect those guards to real providers and symbol-specific broker metadata.
 - Add fault-injection tests for the live execution failure modes listed above.

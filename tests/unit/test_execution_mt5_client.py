@@ -200,6 +200,71 @@ def test_mt5_terminal_client_describes_account_positions_and_closes_cleanly() ->
     assert module.shutdown_called is True
 
 
+def test_mt5_terminal_client_reconnects_when_existing_session_is_stale() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    module.terminal_connected = False
+    module.account_connected = False
+
+    account = client.describe_account()
+    connection = client.describe_connection()
+
+    assert account.login == 123456
+    assert module.initialize_call_count == 2
+    assert module.shutdown_call_count == 1
+    assert connection.connected is True
+    assert connection.reconnect_attempt_count == 1
+    assert connection.circuit_breaker_open is False
+
+
+def test_mt5_terminal_client_opens_circuit_breaker_after_failed_reconnect() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(reconnect_max_attempts=1),
+        module=module,
+    )
+
+    module.recover_connection_on_initialize = False
+    module.terminal_connected = False
+    module.account_connected = False
+    module.last_error_payload = (10031, "terminal offline")
+
+    assert client.is_connected() is False
+    connection = client.describe_connection()
+
+    assert module.initialize_call_count == 2
+    assert module.shutdown_call_count == 1
+    assert connection.connected is False
+    assert connection.reconnect_attempt_count == 1
+    assert connection.circuit_breaker_open is True
+    assert "account_info" in str(connection.last_error)
+    with pytest.raises(RuntimeError, match="circuit breaker"):
+        client.describe_account()
+
+
+def test_mt5_terminal_client_blocks_reconnect_when_disabled() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(reconnect_enabled=False),
+        module=module,
+    )
+
+    module.terminal_connected = False
+
+    with pytest.raises(RuntimeError, match="reconnect is disabled"):
+        client.describe_account()
+
+    connection = client.describe_connection()
+    assert module.initialize_call_count == 1
+    assert module.shutdown_call_count == 0
+    assert connection.connected is False
+    assert connection.circuit_breaker_open is True
+
+
 def test_mt5_terminal_client_aggregates_hedging_positions_by_symbol() -> None:
     module = _FakeMetaTrader5Module()
     module._positions = {
@@ -353,11 +418,16 @@ class _FakeMetaTrader5Module:
 
     def __init__(self) -> None:
         self.initialize_kwargs: dict[str, object] = {}
+        self.initialize_call_count = 0
+        self.shutdown_call_count = 0
         self.last_order_check_payload: dict[str, object] = {}
         self.last_order_send_payload: dict[str, object] = {}
         self.order_send_call_count = 0
         self.shutdown_called = False
         self.last_error_payload: tuple[int, str] = (0, "ok")
+        self.terminal_connected = True
+        self.account_connected = True
+        self.recover_connection_on_initialize = True
         self.order_check_result: SimpleNamespace | None = SimpleNamespace(
             retcode=0,
             comment="check passed",
@@ -383,19 +453,28 @@ class _FakeMetaTrader5Module:
         }
 
     def initialize(self, **kwargs: object) -> bool:
+        self.initialize_call_count += 1
         self.initialize_kwargs = dict(kwargs)
+        if self.recover_connection_on_initialize:
+            self.terminal_connected = True
+            self.account_connected = True
         return True
 
     def shutdown(self) -> None:
+        self.shutdown_call_count += 1
         self.shutdown_called = True
 
     def last_error(self) -> tuple[int, str]:
         return self.last_error_payload
 
-    def terminal_info(self) -> SimpleNamespace:
+    def terminal_info(self) -> SimpleNamespace | None:
+        if not self.terminal_connected:
+            return None
         return SimpleNamespace(name="MT5")
 
-    def account_info(self) -> SimpleNamespace:
+    def account_info(self) -> SimpleNamespace | None:
+        if not self.account_connected:
+            return None
         return SimpleNamespace(
             login=123456,
             server="MetaQuotes-Demo",

@@ -293,6 +293,17 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - runtime health activates and persists a session kill-switch when required live MT5 position protection is missing, blocking later order submissions through the normal risk path
   - targeted Ruff passed for reconciliation, snapshots, MT5 live/client, deployment runtime, and touched tests
   - `.venv/bin/pytest tests/unit/test_execution_reconciliation.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_runtime.py` passed with `51 passed`
+- 2026-04-30 completed the first P1 MT5 reconnect supervision slice:
+  - `Mt5TerminalClient` now probes `terminal_info()` and `account_info()` before using an already-initialized session
+  - stale initialized sessions are shut down and reinitialized when reconnect is enabled
+  - `Mt5ConnectionSnapshot` exposes initialized/connected state, reconnect attempts, circuit-breaker state, last reconnect time, last error, and last ping latency
+  - repeated reconnect failures open a circuit breaker after `reconnect_max_attempts`
+  - reconnect settings are wired through `Mt5TerminalClientConfig`, app MT5 config, env overrides, and live factory
+  - targeted Ruff passed for MT5 client/export, config loader/models, live factory, and touched tests
+  - `.venv/bin/pytest tests/unit/test_execution_mt5_client.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed with `23 passed`
+  - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
+  - `git diff --check` passed
+  - full `.venv/bin/pytest` passed with `205 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -468,6 +479,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `.venv/bin/python -m compileall src tests scripts` -> passed after P1 risk-config and MT5 symbol-spec slices
 - 2026-04-30: `git diff --check` -> passed after P1 risk-config and MT5 symbol-spec slices
 - 2026-04-30: `.venv/bin/pytest` -> `199 passed` after P1 risk-config and MT5 symbol-spec slices
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/execution/mt5_client.py src/scalper_ai/execution/__init__.py src/scalper_ai/config/models.py src/scalper_ai/config/loader.py src/scalper_ai/deployment/live_factory.py tests/unit/test_execution_mt5_client.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` -> passed after P1 MT5 reconnect supervision slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_mt5_client.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` -> `23 passed` after P1 MT5 reconnect supervision slice
+- 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after P1 MT5 reconnect supervision slice
+- 2026-04-30: `git diff --check` -> passed after P1 MT5 reconnect supervision slice
+- 2026-04-30: `.venv/bin/pytest` -> `205 passed` after P1 MT5 reconnect supervision slice
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -491,7 +507,7 @@ Continue true bracket/OCO protection and P0.D follow-through:
 - add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
 - extend symbol-specific metadata enforcement to price precision, stops/freeze levels, trade mode, and filling mode
-- add MT5 reconnect supervision/circuit breaker and connect real volatility/news/model/feature health providers into the new risk guard fields
+- add daemon-level MT5 reconnect orchestration, operator circuit-reset workflow, alert routing, and connect real volatility/news/model/feature health providers into the new risk guard fields
 
 If further MT5 validation is paused:
 - validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup

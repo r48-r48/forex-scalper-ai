@@ -37,6 +37,8 @@ class Mt5TerminalClientConfig:
     history_lookback_hours: int = 24
     account_mode: str = "netting"
     order_comment_prefix: str = "scalper_ai"
+    reconnect_enabled: bool = True
+    reconnect_max_attempts: int = 3
 
     def __post_init__(self) -> None:
         if self.timeout_milliseconds <= 0:
@@ -57,6 +59,22 @@ class Mt5TerminalClientConfig:
         object.__setattr__(self, "account_mode", account_mode)
         if not self.order_comment_prefix.strip():
             raise ValueError("order_comment_prefix must be non-empty.")
+        if self.reconnect_max_attempts <= 0:
+            raise ValueError("reconnect_max_attempts must be greater than zero.")
+
+
+@dataclass(frozen=True)
+class Mt5ConnectionSnapshot:
+    """Current MT5 terminal supervision state."""
+
+    initialized: bool
+    connected: bool
+    reconnect_enabled: bool
+    reconnect_attempt_count: int
+    circuit_breaker_open: bool
+    last_reconnect_at: datetime | None = None
+    last_error: str | None = None
+    last_ping_latency_ms: float | None = None
 
 
 @dataclass(frozen=True)
@@ -260,6 +278,11 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         self._module = load_metatrader5_module() if module is None else module
         self._initialized = False
         self._last_ping_latency_ms: float | None = None
+        self._reconnect_attempt_count = 0
+        self._consecutive_reconnect_failures = 0
+        self._circuit_breaker_open = False
+        self._last_reconnect_at: datetime | None = None
+        self._last_connection_error: str | None = None
         self._ensure_initialized()
 
     def close(self) -> None:
@@ -268,6 +291,25 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         if self._initialized:
             self._module.shutdown()
             self._initialized = False
+
+    def describe_connection(self) -> Mt5ConnectionSnapshot:
+        """Return the current terminal supervision snapshot without forcing reconnect."""
+
+        connected = (
+            self._initialized
+            and not self._circuit_breaker_open
+            and self._connection_is_ready(update_error=False)
+        )
+        return Mt5ConnectionSnapshot(
+            initialized=self._initialized,
+            connected=connected,
+            reconnect_enabled=self._config.reconnect_enabled,
+            reconnect_attempt_count=self._reconnect_attempt_count,
+            circuit_breaker_open=self._circuit_breaker_open,
+            last_reconnect_at=self._last_reconnect_at,
+            last_error=self._last_connection_error,
+            last_ping_latency_ms=self._last_ping_latency_ms,
+        )
 
     def describe_account(self) -> Mt5AccountSnapshot:
         """Return one normalized read-only MT5 account summary."""
@@ -527,9 +569,28 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         return self._last_ping_latency_ms
 
     def _ensure_initialized(self) -> None:
+        if self._circuit_breaker_open:
+            raise RuntimeError(
+                "MT5 reconnect circuit breaker is open. Restart or recreate the client "
+                "after investigating terminal connectivity."
+            )
         if self._initialized:
+            if self._connection_is_ready(update_error=True):
+                self._consecutive_reconnect_failures = 0
+                self._last_connection_error = None
+                return
+            if not self._config.reconnect_enabled:
+                self._initialized = False
+                self._circuit_breaker_open = True
+                raise RuntimeError(
+                    "MT5 terminal connection is unavailable and reconnect is disabled."
+                )
+            self._reconnect()
             return
 
+        self._initialize_terminal()
+
+    def _initialize_terminal(self) -> None:
         initialize_kwargs: dict[str, Any] = {"timeout": self._config.timeout_milliseconds}
         if self._config.terminal_path is not None:
             initialize_kwargs["path"] = str(self._config.terminal_path)
@@ -548,6 +609,40 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
                 "MT5 initialize succeeded but account_info() returned no active account."
             )
         self._initialized = True
+
+    def _reconnect(self) -> None:
+        self._reconnect_attempt_count += 1
+        self._last_reconnect_at = datetime.now(UTC)
+        if self._initialized:
+            try:
+                self._module.shutdown()
+            finally:
+                self._initialized = False
+
+        try:
+            self._initialize_terminal()
+        except Exception as exc:
+            self._consecutive_reconnect_failures += 1
+            self._last_connection_error = str(exc)
+            if self._consecutive_reconnect_failures >= self._config.reconnect_max_attempts:
+                self._circuit_breaker_open = True
+            raise RuntimeError(f"MT5 reconnect failed: {exc}") from exc
+
+        self._consecutive_reconnect_failures = 0
+        self._last_connection_error = None
+
+    def _connection_is_ready(self, *, update_error: bool) -> bool:
+        try:
+            terminal_ready = self._module.terminal_info() is not None
+            account_ready = self._module.account_info() is not None
+        except Exception as exc:
+            if update_error:
+                self._last_connection_error = str(exc)
+            return False
+        ready = terminal_ready and account_ready
+        if update_error and not ready:
+            self._last_connection_error = self._last_error_message()
+        return ready
 
     def _build_order_payload(self, request: Mt5OrderRequest) -> dict[str, Any]:
         payload: dict[str, Any] = {

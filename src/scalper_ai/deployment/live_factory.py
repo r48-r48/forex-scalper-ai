@@ -41,6 +41,8 @@ def build_mt5_terminal_client(
             history_lookback_hours=mt5_config.history_lookback_hours,
             account_mode=mt5_config.account_mode,
             order_comment_prefix=mt5_config.order_comment_prefix,
+            reconnect_enabled=mt5_config.reconnect_enabled,
+            reconnect_max_attempts=mt5_config.reconnect_max_attempts,
         ),
         module=mt5_module,
     )

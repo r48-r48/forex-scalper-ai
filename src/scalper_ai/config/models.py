@@ -124,6 +124,8 @@ class Mt5BrokerConfig(BaseModel):
     order_comment_prefix: str = "scalper_ai"
     require_stop_loss: bool = False
     require_take_profit: bool = False
+    reconnect_enabled: bool = True
+    reconnect_max_attempts: int = Field(default=3, gt=0)
     symbol_map: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("password", "server", "order_comment_prefix")
