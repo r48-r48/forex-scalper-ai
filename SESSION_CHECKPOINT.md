@@ -262,7 +262,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - the report remains directionally correct, but its original P0 runtime/Risk/OMS, durable-state, broker-source, deal-accounting, and native protective-order findings are now partly stale because first production slices are implemented
   - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md` so future context does not treat P0.A as still fully open
   - verification passed: `.venv/bin/python -m compileall src tests scripts`, targeted safety pytest with `56 passed`, and full `.venv/bin/pytest` with `188 passed`
-  - next confirmed work order remains: durable per-deal attribution, broker-side recovery/fault-injection tests, MT5 history investigation, richer protective-order repair/modify support, daemon supervision, and fuller symbol metadata enforcement
+  - next confirmed work order remains: broker-side recovery/fault-injection tests, MT5 history investigation, richer protective-order repair/modify support, daemon supervision, and fuller symbol metadata enforcement
 - 2026-04-30 completed the first P1 risk-config guard slice:
   - `RiskRejectCode` now includes max spread, loss cooldown, volatility guard, news guard, stale features, and model health reject reasons
   - `RiskLimits.from_risk_config()` now wires `max_spread_pips`, `cooldown_after_loss_burst_seconds`, `volatility_filter_enabled`, and `news_filter_enabled`
@@ -316,6 +316,17 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
   - `git diff --check` passed
   - full `.venv/bin/pytest` passed with `210 passed`
+- 2026-04-30 completed the durable per-deal attribution slice:
+  - `FillEvent` now carries optional broker deal attribution fields
+  - `Mt5ExecutionAdapter` maps `Mt5DealState` into broker deal id, broker symbol, position id, and signed raw broker commission/fee/swap fields
+  - `SqliteExecutionStateStore` schema v2 creates/upserts `deal_attributions` and exposes `list_deal_attributions()`
+  - FILL journal payloads preserve broker deal id, position id, signed broker commission/fee/swap, and normalized non-negative execution cost
+  - targeted Ruff passed for domain trading, execution models/exports, MT5 live, state store, and touched tests
+  - `.venv/bin/pytest tests/unit/test_execution_state_store.py tests/unit/test_execution_mt5_live.py tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py tests/unit/test_domain_trading.py` passed with `26 passed`
+  - `.venv/bin/pytest tests/unit/test_execution_state_store.py tests/unit/test_execution_mt5_live.py tests/unit/test_deployment_runtime.py tests/unit/test_execution_paper.py tests/integration/test_execution_workflow.py tests/integration/test_deployment_bootstrap.py` passed with `40 passed`
+  - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
+  - `git diff --check` passed
+  - full `.venv/bin/pytest` passed with `211 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -502,6 +513,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after bracket/OCO lifecycle and approved flatten slice
 - 2026-04-30: `git diff --check` -> passed after bracket/OCO lifecycle and approved flatten slice
 - 2026-04-30: `.venv/bin/pytest` -> `210 passed` after bracket/OCO lifecycle and approved flatten slice
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/domain/trading.py src/scalper_ai/execution/models.py src/scalper_ai/execution/__init__.py src/scalper_ai/execution/mt5_live.py src/scalper_ai/execution/state_store.py tests/unit/test_execution_state_store.py tests/unit/test_execution_mt5_live.py tests/unit/test_journal_events.py` -> passed after durable per-deal attribution slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_state_store.py tests/unit/test_execution_mt5_live.py tests/unit/test_journal_events.py tests/integration/test_journal_jsonl.py tests/unit/test_domain_trading.py` -> `26 passed` after durable per-deal attribution slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_state_store.py tests/unit/test_execution_mt5_live.py tests/unit/test_deployment_runtime.py tests/unit/test_execution_paper.py tests/integration/test_execution_workflow.py tests/integration/test_deployment_bootstrap.py` -> `40 passed` after durable per-deal attribution slice
+- 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after durable per-deal attribution slice
+- 2026-04-30: `git diff --check` -> passed after durable per-deal attribution slice
+- 2026-04-30: `.venv/bin/pytest` -> `211 passed` after durable per-deal attribution slice
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -519,8 +536,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Continue P0.D follow-through and remaining live hardening:
-- persist per-deal attribution in durable state/journal
+Continue remaining live hardening:
 - add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
 - extend symbol-specific metadata enforcement to price precision, stops/freeze levels, trade mode, and filling mode

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType
@@ -38,6 +39,22 @@ def test_sqlite_execution_state_store_round_trips_runtime_records(tmp_path) -> N
         venue="paper",
     )
     update = PaperExecutionAdapter().submit_order(intent, quote)
+    attributed_fill = update.fills[0].model_copy(
+        update={
+            "broker_deal_id": "5001",
+            "broker_symbol": "EURUSD",
+            "broker_position_id": "7001",
+            "broker_commission": -2.0,
+            "broker_fee": -0.5,
+            "broker_swap": 0.25,
+            "commission": 2.5,
+        }
+    )
+    update = replace(
+        update,
+        fills=(attributed_fill,),
+        order=replace(update.order, fills=(attributed_fill,)),
+    )
     decision = RiskDecision(
         status=RiskDecisionStatus.APPROVED,
         checked_at=timestamp,
@@ -86,6 +103,7 @@ def test_sqlite_execution_state_store_round_trips_runtime_records(tmp_path) -> N
     assert store.count_rows("oms_transitions") == 4
     assert store.count_rows("execution_updates") == 1
     assert store.count_rows("fill_events") == 1
+    assert store.count_rows("deal_attributions") == 1
     assert store.count_rows("position_states") == 1
     assert store.count_rows("kill_switch_states") == 1
 
@@ -93,6 +111,15 @@ def test_sqlite_execution_state_store_round_trips_runtime_records(tmp_path) -> N
     assert store.list_risk_decisions()[0].status is RiskDecisionStatus.APPROVED
     assert store.list_oms_records()[0].status is OmsOrderStatus.FILLED
     assert store.list_execution_updates()[0].order.broker_order_id == update.order.broker_order_id
-    assert store.list_fill_events()[0].intent_id == intent.intent_id
+    persisted_fill = store.list_fill_events()[0]
+    assert persisted_fill.intent_id == intent.intent_id
+    assert persisted_fill.broker_deal_id == "5001"
+    deal_attribution = store.list_deal_attributions()[0]
+    assert deal_attribution.broker_deal_id == "5001"
+    assert deal_attribution.fill_id == persisted_fill.fill_id
+    assert deal_attribution.broker_commission == -2.0
+    assert deal_attribution.broker_fee == -0.5
+    assert deal_attribution.broker_swap == 0.25
+    assert deal_attribution.execution_cost == 2.5
     assert store.list_position_states()[0].net_quantity == 2.0
     assert store.list_kill_switch_states()[0].reason == "manual_pause"

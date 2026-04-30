@@ -130,6 +130,11 @@ def test_mt5_execution_adapter_builds_fills_from_deal_records_with_costs() -> No
     assert update.fills[0].fill_quantity == pytest.approx(100_000.0)
     assert update.fills[0].fill_price == pytest.approx(1.1002)
     assert update.fills[0].commission == pytest.approx(2.5)
+    assert update.fills[0].broker_deal_id == "5001"
+    assert update.fills[0].broker_position_id == "7001"
+    assert update.fills[0].broker_commission == pytest.approx(-2.0)
+    assert update.fills[0].broker_fee == pytest.approx(-0.5)
+    assert update.fills[0].broker_swap == pytest.approx(0.25)
     assert update.order.fills == update.fills
     assert update.position.last_fill_id == "mt5-deal-5001"
 

@@ -110,6 +110,12 @@ class FillEvent(DomainModel):
     commission: NonNegativeFiniteFloat = 0.0
     spread_cost: NonNegativeFiniteFloat = 0.0
     slippage_cost: NonNegativeFiniteFloat = 0.0
+    broker_deal_id: NonEmptyStr | None = None
+    broker_symbol: NonEmptyStr | None = None
+    broker_position_id: NonEmptyStr | None = None
+    broker_commission: FiniteFloat = 0.0
+    broker_fee: FiniteFloat = 0.0
+    broker_swap: FiniteFloat = 0.0
     liquidity_flag: LiquidityFlag = LiquidityFlag.UNKNOWN
     venue: NonEmptyStr | None = None
 

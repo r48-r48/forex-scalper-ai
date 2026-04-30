@@ -814,6 +814,12 @@ class Mt5ExecutionAdapter:
             commission=deal.execution_cost,
             spread_cost=abs(deal.price - quote.mid_price) * fill_quantity,
             slippage_cost=0.0,
+            broker_deal_id=deal.broker_deal_id,
+            broker_symbol=deal.broker_symbol,
+            broker_position_id=deal.position_ticket,
+            broker_commission=deal.commission,
+            broker_fee=deal.fee,
+            broker_swap=deal.swap,
             liquidity_flag=LiquidityFlag.UNKNOWN,
             venue=self._config.default_venue,
         )

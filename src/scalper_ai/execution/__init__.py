@@ -8,6 +8,7 @@ from scalper_ai.execution.interfaces import (
 )
 from scalper_ai.execution.live_stub import LiveExecutionStubAdapter, LiveExecutionStubConfig
 from scalper_ai.execution.models import (
+    ExecutionDealAttribution,
     ExecutionOrder,
     ExecutionOrderStatus,
     ExecutionQuote,
@@ -63,6 +64,7 @@ __all__ = [
     "BrokerConnectivitySnapshot",
     "BrokerSnapshotProvider",
     "ExecutionAdapter",
+    "ExecutionDealAttribution",
     "ExecutionOrder",
     "ExecutionOrderStatus",
     "ExecutionQuote",

@@ -12,9 +12,10 @@ from typing import Protocol
 
 import orjson
 
-from scalper_ai.domain import DomainModel, FillEvent, OrderIntent, PositionState
+from scalper_ai.domain import DomainModel, FillEvent, OrderIntent, OrderSide, PositionState
 from scalper_ai.domain.validators import ensure_utc_datetime, serialize_utc_datetime
 from scalper_ai.execution.models import (
+    ExecutionDealAttribution,
     ExecutionOrder,
     ExecutionOrderStatus,
     ExecutionQuote,
@@ -23,7 +24,7 @@ from scalper_ai.execution.models import (
 from scalper_ai.risk import RiskDecision, RiskDecisionStatus, RiskRejectCode
 from scalper_ai.services import OmsOrderRecord, OmsOrderStatus
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 SESSION_KILL_SWITCH_SYMBOL = "__session__"
 
 
@@ -84,6 +85,9 @@ class ExecutionStateStore(Protocol):
 
     def list_fill_events(self) -> tuple[FillEvent, ...]:
         """Return persisted fills in fill-id order."""
+
+    def list_deal_attributions(self) -> tuple[ExecutionDealAttribution, ...]:
+        """Return persisted broker deal attributions in event order."""
 
     def list_position_states(self) -> tuple[PositionState, ...]:
         """Return the latest persisted position state per route and symbol."""
@@ -149,6 +153,25 @@ class SqliteExecutionStateStore:
                     broker_order_id TEXT,
                     symbol TEXT NOT NULL,
                     event_timestamp TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS deal_attributions (
+                    broker_deal_id TEXT PRIMARY KEY,
+                    fill_id TEXT NOT NULL,
+                    intent_id TEXT NOT NULL,
+                    broker_order_id TEXT,
+                    symbol TEXT NOT NULL,
+                    event_timestamp TEXT NOT NULL,
+                    broker_symbol TEXT,
+                    broker_position_id TEXT,
+                    side TEXT NOT NULL,
+                    fill_quantity REAL NOT NULL,
+                    fill_price REAL NOT NULL,
+                    execution_cost REAL NOT NULL,
+                    broker_commission REAL NOT NULL,
+                    broker_fee REAL NOT NULL,
+                    broker_swap REAL NOT NULL,
+                    venue TEXT,
                     payload_json TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS position_states (
@@ -313,6 +336,68 @@ class SqliteExecutionStateStore:
                         _json_dumps(fill.to_record(exclude_none=False)),
                     ),
                 )
+                deal_attribution = _deal_attribution_from_fill(fill)
+                if deal_attribution is not None:
+                    connection.execute(
+                        """
+                        INSERT INTO deal_attributions (
+                            broker_deal_id,
+                            fill_id,
+                            intent_id,
+                            broker_order_id,
+                            symbol,
+                            event_timestamp,
+                            broker_symbol,
+                            broker_position_id,
+                            side,
+                            fill_quantity,
+                            fill_price,
+                            execution_cost,
+                            broker_commission,
+                            broker_fee,
+                            broker_swap,
+                            venue,
+                            payload_json
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(broker_deal_id) DO UPDATE SET
+                            fill_id=excluded.fill_id,
+                            intent_id=excluded.intent_id,
+                            broker_order_id=excluded.broker_order_id,
+                            symbol=excluded.symbol,
+                            event_timestamp=excluded.event_timestamp,
+                            broker_symbol=excluded.broker_symbol,
+                            broker_position_id=excluded.broker_position_id,
+                            side=excluded.side,
+                            fill_quantity=excluded.fill_quantity,
+                            fill_price=excluded.fill_price,
+                            execution_cost=excluded.execution_cost,
+                            broker_commission=excluded.broker_commission,
+                            broker_fee=excluded.broker_fee,
+                            broker_swap=excluded.broker_swap,
+                            venue=excluded.venue,
+                            payload_json=excluded.payload_json
+                        """,
+                        (
+                            deal_attribution.broker_deal_id,
+                            deal_attribution.fill_id,
+                            deal_attribution.intent_id,
+                            deal_attribution.broker_order_id,
+                            deal_attribution.symbol,
+                            serialize_utc_datetime(deal_attribution.event_timestamp),
+                            deal_attribution.broker_symbol,
+                            deal_attribution.broker_position_id,
+                            deal_attribution.side.value,
+                            deal_attribution.fill_quantity,
+                            deal_attribution.fill_price,
+                            deal_attribution.execution_cost,
+                            deal_attribution.broker_commission,
+                            deal_attribution.broker_fee,
+                            deal_attribution.broker_swap,
+                            deal_attribution.venue,
+                            _json_dumps(_deal_attribution_to_payload(deal_attribution)),
+                        ),
+                    )
             connection.execute(
                 """
                 INSERT INTO position_states (
@@ -400,6 +485,18 @@ class SqliteExecutionStateStore:
 
         rows = self._fetch_payloads("SELECT payload_json FROM fill_events ORDER BY fill_id")
         return tuple(FillEvent.from_record(_json_loads(row)) for row in rows)
+
+    def list_deal_attributions(self) -> tuple[ExecutionDealAttribution, ...]:
+        """Return persisted broker deal attributions in event order."""
+
+        rows = self._fetch_payloads(
+            """
+            SELECT payload_json
+            FROM deal_attributions
+            ORDER BY event_timestamp, broker_deal_id
+            """
+        )
+        return tuple(_deal_attribution_from_payload(_json_loads(row)) for row in rows)
 
     def list_position_states(self) -> tuple[PositionState, ...]:
         """Return the latest persisted position state per route and symbol."""
@@ -538,6 +635,73 @@ def _execution_update_from_payload(payload: Mapping[str, object]) -> ExecutionUp
     )
 
 
+def _deal_attribution_from_fill(fill: FillEvent) -> ExecutionDealAttribution | None:
+    if fill.broker_deal_id is None:
+        return None
+    return ExecutionDealAttribution(
+        broker_deal_id=fill.broker_deal_id,
+        fill_id=fill.fill_id,
+        intent_id=fill.intent_id,
+        broker_order_id=fill.broker_order_id,
+        symbol=fill.symbol,
+        event_timestamp=fill.event_timestamp,
+        side=fill.side,
+        fill_quantity=float(fill.fill_quantity),
+        fill_price=float(fill.fill_price),
+        execution_cost=float(fill.commission),
+        broker_symbol=fill.broker_symbol,
+        broker_position_id=fill.broker_position_id,
+        broker_commission=float(fill.broker_commission),
+        broker_fee=float(fill.broker_fee),
+        broker_swap=float(fill.broker_swap),
+        venue=fill.venue,
+    )
+
+
+def _deal_attribution_to_payload(deal: ExecutionDealAttribution) -> dict[str, object]:
+    return {
+        "broker_deal_id": deal.broker_deal_id,
+        "fill_id": deal.fill_id,
+        "intent_id": deal.intent_id,
+        "broker_order_id": deal.broker_order_id,
+        "symbol": deal.symbol,
+        "event_timestamp": deal.event_timestamp,
+        "side": deal.side.value,
+        "fill_quantity": deal.fill_quantity,
+        "fill_price": deal.fill_price,
+        "execution_cost": deal.execution_cost,
+        "broker_symbol": deal.broker_symbol,
+        "broker_position_id": deal.broker_position_id,
+        "broker_commission": deal.broker_commission,
+        "broker_fee": deal.broker_fee,
+        "broker_swap": deal.broker_swap,
+        "venue": deal.venue,
+    }
+
+
+def _deal_attribution_from_payload(
+    payload: Mapping[str, object],
+) -> ExecutionDealAttribution:
+    return ExecutionDealAttribution(
+        broker_deal_id=str(payload["broker_deal_id"]),
+        fill_id=str(payload["fill_id"]),
+        intent_id=str(payload["intent_id"]),
+        broker_order_id=_optional_str(payload, "broker_order_id"),
+        symbol=str(payload["symbol"]),
+        event_timestamp=_parse_datetime(str(payload["event_timestamp"])),
+        side=OrderSide(str(payload["side"])),
+        fill_quantity=float(payload["fill_quantity"]),
+        fill_price=float(payload["fill_price"]),
+        execution_cost=float(payload["execution_cost"]),
+        broker_symbol=_optional_str(payload, "broker_symbol"),
+        broker_position_id=_optional_str(payload, "broker_position_id"),
+        broker_commission=float(payload.get("broker_commission") or 0.0),
+        broker_fee=float(payload.get("broker_fee") or 0.0),
+        broker_swap=float(payload.get("broker_swap") or 0.0),
+        venue=_optional_str(payload, "venue"),
+    )
+
+
 def _execution_order_to_payload(order: ExecutionOrder) -> dict[str, object]:
     return {
         "intent": order.intent,
@@ -665,6 +829,7 @@ _COUNTABLE_TABLES = frozenset(
         "oms_transitions",
         "execution_updates",
         "fill_events",
+        "deal_attributions",
         "position_states",
         "kill_switch_states",
     }

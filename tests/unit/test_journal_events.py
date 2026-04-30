@@ -6,7 +6,15 @@ from datetime import UTC, datetime
 
 import pytest
 
-from scalper_ai.domain import EventSource, OrderIntent, OrderSide, OrderType, TickEvent
+from scalper_ai.domain import (
+    EventSource,
+    FillEvent,
+    LiquidityFlag,
+    OrderIntent,
+    OrderSide,
+    OrderType,
+    TickEvent,
+)
 from scalper_ai.journal import JournalEvent, JournalEventType, journal_events_to_flat_records
 
 
@@ -98,6 +106,46 @@ def test_journal_flat_records_are_parquet_friendly() -> None:
     assert flat["event_timestamp"] == "2026-04-27T10:02:00Z"
     assert flat["symbol"] == "EURUSD"
     assert '"intent_id":"intent-1"' in flat["payload_json"]
+
+
+def test_journal_fill_payload_preserves_broker_deal_attribution() -> None:
+    timestamp = datetime(2026, 4, 27, 10, 2, tzinfo=UTC)
+    fill = FillEvent(
+        fill_id="mt5-deal-5001",
+        intent_id="intent-1",
+        broker_order_id="order-1",
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        side=OrderSide.BUY,
+        fill_price=1.1002,
+        fill_quantity=100_000.0,
+        commission=2.5,
+        spread_cost=10.0,
+        slippage_cost=0.0,
+        broker_deal_id="5001",
+        broker_symbol="EURUSD",
+        broker_position_id="7001",
+        broker_commission=-2.0,
+        broker_fee=-0.5,
+        broker_swap=0.25,
+        liquidity_flag=LiquidityFlag.UNKNOWN,
+        venue="MT5",
+    )
+
+    event = JournalEvent.from_payload(
+        event_id="journal-fill-1",
+        event_type=JournalEventType.FILL,
+        payload=fill,
+        recorded_at=timestamp,
+        source="deployment_runtime",
+    )
+
+    assert event.payload["broker_deal_id"] == "5001"
+    assert event.payload["broker_position_id"] == "7001"
+    assert event.payload["broker_commission"] == -2.0
+    assert event.payload["broker_fee"] == -0.5
+    assert event.payload["broker_swap"] == 0.25
 
 
 def test_journal_event_requires_utc_timestamps() -> None:

@@ -23,7 +23,7 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 
 2. MT5 live sizing uses local adapter state instead of broker state.
    - First slice completed on `2026-04-30`: `Mt5ExecutionAdapter.submit_order()` now refreshes broker positions before target-position and reduce-only sizing, `get_position()` refreshes from broker state when a quote is available, and broker position snapshots carry gross exposure and source tickets.
-   - Remaining work: richer multi-ticket close workflows, broker fault-injection tests, protective order handling, symbol-specific lot constraints, and durable per-deal attribution follow-through.
+   - Remaining work: richer multi-ticket close workflows, broker fault-injection tests, protective-order repair/modify support, and fuller symbol-specific price/protection/filling constraints.
 
 3. Durable restart recovery was absent at audit time.
    - First slice completed on `2026-04-30`: `state_store.py` now provides SQLite persistence for runtime order/risk/OMS/execution/fill/position/kill-switch state, and `DeploymentRuntime.start()` reloads state before new orders.
@@ -31,7 +31,8 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 
 4. Live PnL, fees, and fill attribution are incomplete.
    - First slice completed on `2026-04-30`: `Mt5DealState` now surfaces deal ids, order ids, side, volume, price, timestamp, commission, fee, swap, and position tickets; `Mt5OrderState` carries deal records; the live adapter creates fills from unseen deal ids and folds non-negative commission/fee/swap charges into `FillEvent.commission`.
-   - Remaining work: durable/journal per-deal persistence, real-terminal non-empty history validation, and richer account-currency cost/credit semantics.
+   - Durable/journal follow-up completed on `2026-04-30`: `FillEvent` now carries optional broker deal attribution, MT5 deal fills populate broker deal/position/cost fields, `SqliteExecutionStateStore` schema v2 persists `deal_attributions`, and FILL journal payloads preserve raw signed broker commission/fee/swap.
+   - Remaining work: real-terminal non-empty history validation and richer account-currency cost/credit semantics.
 
 5. Production bracket / TP / SL handling is absent.
    - First slice completed on `2026-04-30`: `OrderIntent` now carries optional stop-loss and take-profit prices, `Mt5TerminalClient` maps them to MT5 native `sl`/`tp`, MT5 order state carries broker-acknowledged protective prices, and reconciliation flags missing/mismatched broker protection.
@@ -165,4 +166,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue with P0.D follow-through and remaining live hardening: durable/journal per-deal persistence, real broker history investigation, broker-side recovery fault tests, richer protective-order repair/modify support, daemon supervision, and symbol metadata enforcement for prices/stops/filling on top of the mandatory runtime Risk/OMS, durable recovery, broker-source MT5 hedging, deal-accounting gate, protective SL/TP gates, position-protection fail-safe, and approved protection-flatten workflow.
+Continue remaining live hardening: real broker history investigation, broker-side recovery fault tests, richer protective-order repair/modify support, daemon supervision, and symbol metadata enforcement for prices/stops/filling on top of the mandatory runtime Risk/OMS, durable recovery, broker-source MT5 hedging, deal-accounting/per-deal attribution gates, protective SL/TP gates, position-protection fail-safe, and approved protection-flatten workflow.
