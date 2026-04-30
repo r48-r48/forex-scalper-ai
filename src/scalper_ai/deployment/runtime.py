@@ -433,7 +433,10 @@ class DeploymentRuntime:
                     "Cannot flatten unprotected positions without a reconciliation report."
                 )
             self._last_reconciliation_report = report
-        self._activate_position_protection_fail_safe(report)
+        self._activate_reconciliation_fail_safe(
+            report,
+            default_reason="position_protection_reconciliation_failed",
+        )
 
         target_symbols = _position_protection_issue_symbols(report)
         if not target_symbols:
@@ -604,12 +607,14 @@ class DeploymentRuntime:
             raise RuntimeError(
                 "Cannot start live runtime with open recovered live orders without reconciliation."
             )
-        try:
-            report = report_provider()
-        except Exception as exc:
-            raise RuntimeError(
-                "Cannot start live runtime because startup reconciliation failed."
-            ) from exc
+        report = self._last_reconciliation_report
+        if report is None:
+            try:
+                report = report_provider()
+            except Exception as exc:
+                raise RuntimeError(
+                    "Cannot start live runtime because startup reconciliation failed."
+                ) from exc
         if report is None:
             raise RuntimeError(
                 "Cannot start live runtime because startup reconciliation returned no report."
@@ -618,6 +623,29 @@ class DeploymentRuntime:
         if report.has_errors:
             raise RuntimeError(
                 "Cannot start live runtime because startup reconciliation found error drift."
+            )
+
+    def _run_live_startup_reconciliation(self) -> None:
+        if self.effective_mode != "live":
+            return
+        report_provider = self._resolved_reconciliation_report_provider()
+        if report_provider is None:
+            raise RuntimeError("No startup reconciliation provider is configured.")
+        try:
+            report = report_provider()
+        except Exception as exc:
+            raise RuntimeError("startup reconciliation provider raised an exception.") from exc
+        if report is None:
+            raise RuntimeError("startup reconciliation returned no report.")
+        self._last_reconciliation_report = report
+        self._activate_reconciliation_fail_safe(
+            report,
+            default_reason="startup_reconciliation_error_drift",
+        )
+        if report.has_errors:
+            self._startup_reason = (
+                "Startup reconciliation detected error-level broker/internal drift; "
+                "session kill-switch is active."
             )
 
     def _build_risk_context(self, intent: OrderIntent, quote: ExecutionQuote) -> RiskContext:
@@ -940,8 +968,16 @@ class DeploymentRuntime:
                     paper_adapter=self._paper_adapter_factory(),
                     live_adapter=live_adapter,
                 )
-                self._state = RuntimeLifecycleState.RUNNING
-                return
+                try:
+                    self._run_live_startup_reconciliation()
+                except Exception as exc:
+                    live_failure_reason = f"Live startup reconciliation failed: {exc}"
+                    self._close_live_adapter()
+                    self._router = None
+                    self._live_adapter = None
+                else:
+                    self._state = RuntimeLifecycleState.RUNNING
+                    return
 
         if self.config.deployment.fallback_to_paper_on_live_failure:
             self._router = ExecutionRouter(paper_adapter=self._paper_adapter_factory())
@@ -1116,7 +1152,10 @@ class DeploymentRuntime:
             )
 
         self._last_reconciliation_report = report
-        self._activate_position_protection_fail_safe(report)
+        self._activate_reconciliation_fail_safe(
+            report,
+            default_reason="reconciliation_error_drift",
+        )
         if report.has_errors:
             status = HealthStatus.FAIL
             summary = "Reconciliation detected error-level drift between internal and broker state."
@@ -1359,9 +1398,22 @@ class DeploymentRuntime:
             return None
         return cast(BrokerSnapshotProvider, candidate)
 
-    def _activate_position_protection_fail_safe(self, report: ReconciliationReport) -> None:
-        if not any(issue.code in _POSITION_PROTECTION_ISSUE_CODES for issue in report.issues):
+    def _activate_reconciliation_fail_safe(
+        self,
+        report: ReconciliationReport,
+        *,
+        default_reason: str,
+    ) -> None:
+        if not report.has_errors:
             return
+        has_position_protection_drift = any(
+            issue.code in _POSITION_PROTECTION_ISSUE_CODES for issue in report.issues
+        )
+        reason = (
+            "position_protection_reconciliation_failed"
+            if has_position_protection_drift
+            else default_reason
+        )
         self._session_kill_switch_enabled = True
         if self._state_store is not None:
             self._state_store.save_kill_switch_state(
@@ -1369,7 +1421,7 @@ class DeploymentRuntime:
                     scope=KillSwitchScope.SESSION,
                     enabled=True,
                     updated_at=report.checked_at,
-                    reason="position_protection_reconciliation_failed",
+                    reason=reason,
                 )
             )
 

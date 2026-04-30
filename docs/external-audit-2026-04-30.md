@@ -27,7 +27,8 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 
 3. Durable restart recovery was absent at audit time.
    - First slice completed on `2026-04-30`: `state_store.py` now provides SQLite persistence for runtime order/risk/OMS/execution/fill/position/kill-switch state, and `DeploymentRuntime.start()` reloads state before new orders.
-   - Remaining work: expand broker-side recovery/fault injection for broker-only positions, partial local state, and missing/empty broker history.
+   - Startup recovery/fault-injection follow-up completed on `2026-04-30`: live startup now requires reconciliation after live adapter activation, blocks missing/failed startup reconciliation reports, activates a durable session kill-switch for broker/internal error drift, and tests broker-only exposure plus provider exception/empty-report faults.
+   - Remaining work: real-broker non-empty history investigation, scheduled post-reconnect reconciliation, and richer operator recovery/reset workflows.
 
 4. Live PnL, fees, and fill attribution are incomplete.
    - First slice completed on `2026-04-30`: `Mt5DealState` now surfaces deal ids, order ids, side, volume, price, timestamp, commission, fee, swap, and position tickets; `Mt5OrderState` carries deal records; the live adapter creates fills from unseen deal ids and folds non-negative commission/fee/swap charges into `FillEvent.commission`.
@@ -98,7 +99,8 @@ Required behavior:
 - Completed: reload execution/OMS/account state during `DeploymentRuntime.start()` before accepting new orders.
 - Completed: block duplicate intents after restart through recovered execution state.
 - Completed: block unsafe paper fallback or unreconciled live startup when recovered live orders are still open.
-- Pending: expand broker-side startup reconciliation and fault-injection tests for broker-only positions, partial local state, and missing/empty broker history.
+- Completed first startup recovery/fault-injection slice: live startup performs mandatory reconciliation after live adapter activation, blocks missing/failed reports, and kill-switches broker/internal error drift before new live orders.
+- Pending: real-broker non-empty history investigation, scheduled post-reconnect reconciliation, and richer operator recovery/reset workflows.
 
 ### P0.C - Broker-Source-Of-Truth MT5 Position Handling
 
@@ -166,4 +168,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue remaining live hardening: real broker history investigation, broker-side recovery fault tests, richer protective-order repair/modify support, daemon supervision, and symbol metadata enforcement for prices/stops/filling on top of the mandatory runtime Risk/OMS, durable recovery, broker-source MT5 hedging, deal-accounting/per-deal attribution gates, protective SL/TP gates, position-protection fail-safe, and approved protection-flatten workflow.
+Continue remaining live hardening: real broker history investigation, richer protective-order repair/modify support, daemon supervision, post-reconnect reconciliation scheduling, and symbol metadata enforcement for prices/stops/filling on top of the mandatory runtime Risk/OMS, durable recovery/startup reconciliation, broker-source MT5 hedging, deal-accounting/per-deal attribution gates, protective SL/TP gates, position-protection fail-safe, and approved protection-flatten workflow.

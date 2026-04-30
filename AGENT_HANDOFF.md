@@ -482,7 +482,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue richer bracket/OCO protection workflows, P0.D durable/journal deal attribution follow-through, deeper broker-side recovery/fault injection, symbol-specific MT5 quantization, and non-empty history/deal normalization
+  - continue real-broker history/deal investigation, symbol metadata enforcement for prices/stops/filling, daemon-level reconnect orchestration/operator circuit reset, richer protective-order repair/modify support, and Docker/runtime validation where available
   - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## Constraints To Preserve

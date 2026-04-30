@@ -871,6 +871,7 @@ def test_live_runtime_approved_flatten_requires_confirmation_phrase(tmp_path) ->
     runtime = DeploymentRuntime(
         config,
         live_adapter_factory=lambda: adapter,
+        broker_snapshot_provider=_EmptyBrokerSnapshotProvider(),
         live_confirmation_token="ENABLE_ME",
         state_store=SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite"),
     )
@@ -952,6 +953,153 @@ def test_live_startup_blocks_paper_fallback_when_recovered_live_order_is_open(tm
     runtime = DeploymentRuntime(config, state_store=store)
 
     with pytest.raises(RuntimeError, match="Cannot fall back to paper"):
+        runtime.start()
+
+
+def test_live_startup_reconciliation_kill_switches_broker_only_position(tmp_path) -> None:
+    timestamp = datetime(2026, 4, 30, 11, 40, tzinfo=UTC)
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+    adapter = _RejectIfSubmittedAdapter()
+
+    class BrokerOnlyPositionProvider:
+        def list_broker_orders(self) -> tuple[BrokerOrderSnapshot, ...]:
+            return ()
+
+        def list_broker_positions(self) -> tuple[BrokerPositionSnapshot, ...]:
+            return (
+                BrokerPositionSnapshot(
+                    symbol="EURUSD",
+                    timestamp=timestamp,
+                    net_quantity=100_000.0,
+                    average_entry_price=1.1000,
+                    position_id="broker-position-1",
+                    source_position_ids=("broker-position-1",),
+                ),
+            )
+
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: adapter,
+        broker_snapshot_provider=BrokerOnlyPositionProvider(),
+        live_confirmation_token="ENABLE_ME",
+        state_store=store,
+    )
+
+    summary = runtime.start()
+
+    assert summary.effective_mode == "live"
+    assert summary.lifecycle_state is RuntimeLifecycleState.RUNNING
+    assert summary.startup_reason is not None
+    assert "session kill-switch is active" in summary.startup_reason
+    assert any(
+        state.scope is KillSwitchScope.SESSION
+        and state.enabled
+        and state.reason == "startup_reconciliation_error_drift"
+        for state in store.list_kill_switch_states()
+    )
+
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="blocked-after-broker-only-startup",
+            strategy_id="runtime-recovery-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1001,
+            venue="broker-feed",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "session_kill_switch"
+
+
+def test_live_startup_reconciliation_provider_failure_blocks_start() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+
+    def broken_report_provider() -> ReconciliationReport | None:
+        raise RuntimeError("broker history unavailable")
+
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=LiveExecutionStubAdapter,
+        reconciliation_report_provider=broken_report_provider,
+        live_confirmation_token="ENABLE_ME",
+    )
+
+    with pytest.raises(RuntimeError, match="Live startup reconciliation failed"):
+        runtime.start()
+
+
+def test_live_startup_reconciliation_missing_report_blocks_start() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=LiveExecutionStubAdapter,
+        reconciliation_report_provider=lambda: None,
+        live_confirmation_token="ENABLE_ME",
+    )
+
+    with pytest.raises(RuntimeError, match="startup reconciliation returned no report"):
         runtime.start()
 
 
@@ -1041,6 +1189,14 @@ class _RejectIfSubmittedAdapter:
 
     def get_position(self, symbol: str, *, quote: ExecutionQuote | None = None) -> object | None:
         return None
+
+
+class _EmptyBrokerSnapshotProvider:
+    def list_broker_orders(self) -> tuple[BrokerOrderSnapshot, ...]:
+        return ()
+
+    def list_broker_positions(self) -> tuple[BrokerPositionSnapshot, ...]:
+        return ()
 
 
 class _RecordingFlattenAdapter:

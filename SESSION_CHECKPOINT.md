@@ -262,7 +262,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - the report remains directionally correct, but its original P0 runtime/Risk/OMS, durable-state, broker-source, deal-accounting, and native protective-order findings are now partly stale because first production slices are implemented
   - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md` so future context does not treat P0.A as still fully open
   - verification passed: `.venv/bin/python -m compileall src tests scripts`, targeted safety pytest with `56 passed`, and full `.venv/bin/pytest` with `188 passed`
-  - next confirmed work order remains: broker-side recovery/fault-injection tests, MT5 history investigation, richer protective-order repair/modify support, daemon supervision, and fuller symbol metadata enforcement
+  - next confirmed work order remains: MT5 history investigation, richer protective-order repair/modify support, daemon supervision, post-reconnect reconciliation scheduling, and fuller symbol metadata enforcement
 - 2026-04-30 completed the first P1 risk-config guard slice:
   - `RiskRejectCode` now includes max spread, loss cooldown, volatility guard, news guard, stale features, and model health reject reasons
   - `RiskLimits.from_risk_config()` now wires `max_spread_pips`, `cooldown_after_loss_burst_seconds`, `volatility_filter_enabled`, and `news_filter_enabled`
@@ -327,6 +327,16 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
   - `git diff --check` passed
   - full `.venv/bin/pytest` passed with `211 passed`
+- 2026-04-30 completed the first broker-side startup recovery/fault-injection slice:
+  - live startup now runs reconciliation after successful live adapter activation, using the explicit reconciliation provider or the live adapter broker snapshot provider
+  - missing startup reconciliation providers, provider exceptions, and `None` reports block live startup before new live orders are accepted
+  - error-level broker/internal drift activates and persists a session kill-switch during startup or later health reconciliation
+  - broker-only live exposure is detected before the first health poll and blocks normal new live orders while still leaving approved flatten workflows available for protection drift
+  - targeted Ruff passed for deployment runtime and runtime tests
+  - `.venv/bin/pytest tests/unit/test_deployment_runtime.py tests/unit/test_execution_reconciliation.py` passed with `38 passed`
+  - `.venv/bin/pytest tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py` passed with `51 passed`
+  - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `214 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -519,6 +529,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after durable per-deal attribution slice
 - 2026-04-30: `git diff --check` -> passed after durable per-deal attribution slice
 - 2026-04-30: `.venv/bin/pytest` -> `211 passed` after durable per-deal attribution slice
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/deployment/runtime.py tests/unit/test_deployment_runtime.py` -> passed after broker-side startup recovery/fault-injection slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_deployment_runtime.py tests/unit/test_execution_reconciliation.py` -> `38 passed` after broker-side startup recovery/fault-injection slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py` -> `51 passed` after broker-side startup recovery/fault-injection slice
+- 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after broker-side startup recovery/fault-injection slice
+- 2026-04-30: `.venv/bin/pytest` -> `214 passed` after broker-side startup recovery/fault-injection slice
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -537,7 +552,6 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 ## Recommended Next Move
 
 Continue remaining live hardening:
-- add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
 - extend symbol-specific metadata enforcement to price precision, stops/freeze levels, trade mode, and filling mode
 - add daemon-level MT5 reconnect orchestration, operator circuit-reset workflow, alert routing, and connect real volatility/news/model/feature health providers into the new risk guard fields
