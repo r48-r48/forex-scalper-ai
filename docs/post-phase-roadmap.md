@@ -58,7 +58,7 @@ Already implemented:
 - local JSONL alert transport for warning/failing health snapshots
 
 Known gaps:
-- RiskEngine and OMS exist, but are not yet mandatory in `DeploymentRuntime.submit_order()`, which still calls the execution router directly
+- RiskEngine and OMS are now mandatory in `DeploymentRuntime.submit_order()` for the first runtime gate slice, but durable persistence and startup recovery for those decisions are still pending
 - durable state storage and startup recovery are still absent; live state is currently process-local
 - MT5 live sizing still needs broker-source-of-truth refresh before target-position/reduce-only decisions
 - live accounting still needs deal-level commission/fee/swap attribution
@@ -100,7 +100,7 @@ Known gaps:
 - Risk Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `392` to `374`.
 - Parallels MT5 read-only validation and runtime availability check: completed on 2026-04-28 without order_send; IOC is required for Dukascopy EURUSD, one-year history is empty, terminal-side trading permission is disabled, Docker is unavailable locally, and local paper runtime describe/health/metrics passed.
 - Controlled Parallels MT5 demo-order validation: completed on 2026-04-29 with explicit operator approval, minimum EURUSD IOC demo fill, ticket-specific flattening, and zero remaining open positions.
-- Current next task: wire RiskEngine + OMS into `DeploymentRuntime.submit_order()` as the mandatory execution gate, then continue with durable recovery, broker-source-of-truth MT5 sizing, hedging-aware MT5 execution/reconciliation, and history API investigation.
+- Current next task: build durable state/startup recovery on top of the new runtime Risk/OMS submit gate, then continue with broker-source-of-truth MT5 sizing, hedging-aware MT5 execution/reconciliation, and history API investigation.
 
 ## P0 Workstream
 
@@ -463,14 +463,19 @@ Completed implementation notes:
 
 ## Immediate Next Task
 
-Implement the first external-audit P0 slice: mandatory RiskEngine + OMS runtime gating.
+The first external-audit P0 runtime gate slice is completed.
 
-Recommended runtime-gating slice:
-1. Build a `RiskContext` for every `DeploymentRuntime.submit_order()` call.
-2. Evaluate the order with `RiskEngine` before touching the router or broker.
-3. Create and transition an `OmsOrderRecord` through checked/sent/final states.
-4. Journal risk and OMS/order events through the existing journal contracts.
-5. Return a normalized rejected execution update when risk blocks an order, without broker submission.
+Completed runtime-gating slice:
+1. `DeploymentRuntime.submit_order()` builds a `RiskContext` for every order.
+2. Runtime evaluates `RiskEngine` before touching the router or broker.
+3. Runtime creates and transitions `OmsOrderRecord` through checked/sent/final/process-update states or risk-rejected states.
+4. Runtime records risk, OMS, order response, fill, and position journal events in memory and through an optional writer.
+5. Runtime returns a normalized rejected execution update when risk blocks an order, without broker submission.
+
+Next immediate slice:
+1. Add durable state storage for order intents, OMS transitions, risk decisions, execution updates, fills, positions, and kill-switch state.
+2. Add startup recovery that reloads the durable state, fetches broker snapshots, reconciles, and blocks unsafe running states.
+3. Add fault-injection tests for restart with open order, local state empty but broker position present, and duplicate intent after recovery.
 
 Then continue MT5 demo validation when the Windows terminal is available.
 

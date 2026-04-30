@@ -203,6 +203,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - the audit was verified against current code and is directionally correct
   - confirmed P0 gaps are mandatory Risk/OMS runtime gating, durable state/startup recovery, broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, deal-based accounting, and protective TP/SL/bracket management
   - recommended immediate next implementation slice is wiring `RiskEngine` + `OmsOrderRecord` into `DeploymentRuntime.submit_order()` before router/broker submission
+- 2026-04-30 completed the first P0.A runtime Risk/OMS gate slice:
+  - `DeploymentRuntime.submit_order()` now builds a `RiskContext`, evaluates `RiskEngine` before router/broker submission, and returns a normalized rejected `ExecutionUpdate` without touching the router when risk blocks the order
+  - successful runtime submissions now transition `OmsOrderRecord` through `CHECKED`, `SENT`, and final/process-update `ACK`/`PARTIAL`/`FILLED`/`REJECTED`/`CANCELLED` states; risk blocks create a `REJECTED` OMS record
+  - runtime records in-memory and optional-writer journal events for risk decisions, OMS transitions, order responses, fills, and position snapshots
+  - added unit coverage for risk rejection before adapter submit and journal/OMS event recording
+  - `.venv/bin/ruff check src/scalper_ai/deployment/runtime.py tests/unit/test_deployment_runtime.py` passed
+  - `.venv/bin/pytest tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py` passed
+  - full `.venv/bin/pytest` passed with `173 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:

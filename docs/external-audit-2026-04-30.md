@@ -71,14 +71,17 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 
 ### P0.A - Wire Risk + OMS Into Runtime
 
+Status: first runtime gate slice completed on `2026-04-30`.
+
 Goal: remove the direct `runtime -> router.submit_order()` path.
 
 Required behavior:
-- Build a `RiskContext` for every `OrderIntent`.
-- Evaluate with `RiskEngine` before adapter/router submission.
-- Create and transition `OmsOrderRecord` through `NEW -> CHECKED -> SENT -> ACK/PARTIAL/FILLED/REJECTED/CANCELLED -> RECONCILED`.
-- Journal risk decisions, order requests, broker responses, fills, and position updates.
-- Return a normalized rejected `ExecutionUpdate` when risk blocks an order, without touching the broker.
+- Completed: build a `RiskContext` for every `OrderIntent`.
+- Completed: evaluate with `RiskEngine` before adapter/router submission.
+- Completed: create and transition `OmsOrderRecord` through `NEW -> CHECKED -> SENT -> ACK/PARTIAL/FILLED/REJECTED/CANCELLED` or risk-rejected states.
+- Completed: journal risk decisions, OMS transitions, broker responses, fills, and position updates in memory and through an optional writer.
+- Completed: return a normalized rejected `ExecutionUpdate` when risk blocks an order, without touching the broker.
+- Pending: durable persistence of these records and startup recovery, covered by P0.B.
 
 ### P0.B - Durable State Store And Startup Recovery
 
@@ -137,4 +140,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Start with P0.A: wire RiskEngine and OMS into `DeploymentRuntime.submit_order()` behind tests. This is the shortest path to turning existing safety modules from optional building blocks into a mandatory execution gate.
+Continue with P0.B: add durable state storage and startup recovery on top of the new mandatory runtime Risk/OMS gate.

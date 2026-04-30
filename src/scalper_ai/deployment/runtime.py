@@ -3,20 +3,30 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
-from typing import Callable, Optional, cast
+from typing import Protocol, cast
 
+from scalper_ai.backtesting.accounting import calculate_equity, mark_position
 from scalper_ai.config import AppConfig
-from scalper_ai.deployment.health import HealthCheckResult, HealthRegistry, HealthSnapshot, HealthStatus
+from scalper_ai.deployment.health import (
+    HealthCheckResult,
+    HealthRegistry,
+    HealthSnapshot,
+    HealthStatus,
+)
 from scalper_ai.deployment.metrics import MetricsRegistry
+from scalper_ai.domain import OrderIntent, PositionState
 from scalper_ai.execution import (
     BrokerConnectivityProvider,
     BrokerConnectivitySnapshot,
     BrokerSnapshotProvider,
     ExecutionAdapter,
+    ExecutionOrder,
+    ExecutionOrderStatus,
     ExecutionQuote,
     ExecutionRouter,
     ExecutionStateTracker,
@@ -25,11 +35,13 @@ from scalper_ai.execution import (
     ReconciliationReport,
     build_snapshot_reconciliation_report,
 )
-from scalper_ai.domain import OrderIntent
+from scalper_ai.journal import JournalEvent, JournalEventType
+from scalper_ai.risk import RiskContext, RiskDecision, RiskEngine, RiskLimits
+from scalper_ai.services import OmsOrderRecord, OmsOrderStatus, transition_order
 from scalper_ai.utils import get_logger, resolve_repo_root
 
 
-class RuntimeLifecycleState(str, Enum):
+class RuntimeLifecycleState(StrEnum):
     """Lifecycle states for the deployment runtime."""
 
     CREATED = "created"
@@ -46,8 +58,8 @@ class RuntimeSummary:
     requested_mode: str
     effective_mode: str
     lifecycle_state: RuntimeLifecycleState
-    started_at: Optional[datetime]
-    startup_reason: Optional[str]
+    started_at: datetime | None
+    startup_reason: str | None
     execution_enabled: bool
 
     def to_dict(self) -> dict[str, object]:
@@ -64,7 +76,15 @@ class RuntimeSummary:
         }
 
 
-ReconciliationReportProvider = Callable[[], Optional[ReconciliationReport]]
+ReconciliationReportProvider = Callable[[], ReconciliationReport | None]
+RiskContextProvider = Callable[[OrderIntent, ExecutionQuote, ExecutionStateTracker], RiskContext]
+
+
+class JournalWriterProtocol(Protocol):
+    """Minimal journal writer surface used by the runtime audit hooks."""
+
+    def write(self, event: JournalEvent) -> object:
+        """Persist one journal event."""
 
 
 class DeploymentRuntime:
@@ -74,13 +94,16 @@ class DeploymentRuntime:
         self,
         config: AppConfig,
         *,
-        paper_adapter_factory: Optional[Callable[[], ExecutionAdapter]] = None,
-        live_adapter_factory: Optional[Callable[[], ExecutionAdapter]] = None,
-        broker_snapshot_provider: Optional[BrokerSnapshotProvider] = None,
-        broker_connectivity_provider: Optional[BrokerConnectivityProvider] = None,
-        reconciliation_report_provider: Optional[ReconciliationReportProvider] = None,
-        live_confirmation_token: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
+        paper_adapter_factory: Callable[[], ExecutionAdapter] | None = None,
+        live_adapter_factory: Callable[[], ExecutionAdapter] | None = None,
+        broker_snapshot_provider: BrokerSnapshotProvider | None = None,
+        broker_connectivity_provider: BrokerConnectivityProvider | None = None,
+        reconciliation_report_provider: ReconciliationReportProvider | None = None,
+        risk_engine: RiskEngine | None = None,
+        risk_context_provider: RiskContextProvider | None = None,
+        journal_writer: JournalWriterProtocol | None = None,
+        live_confirmation_token: str | None = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         self.config = config
         self._service_name = config.monitoring.service_name or config.project_name
@@ -89,21 +112,31 @@ class DeploymentRuntime:
         self._broker_snapshot_provider = broker_snapshot_provider
         self._broker_connectivity_provider = broker_connectivity_provider
         self._reconciliation_report_provider = reconciliation_report_provider
+        self._risk_engine = risk_engine or RiskEngine(RiskLimits.from_risk_config(config.risk))
+        self._risk_context_provider = risk_context_provider
+        self._journal_writer = journal_writer
         self._live_confirmation_token = live_confirmation_token
         self._logger = logger or get_logger(f"{config.logging.logger_name}.deployment")
         self._metrics = MetricsRegistry(service_name=self._service_name)
-        self._health = HealthRegistry(service_name=self._service_name, requested_mode=config.runtime.mode)
+        self._health = HealthRegistry(
+            service_name=self._service_name,
+            requested_mode=config.runtime.mode,
+        )
         self._state_tracker = ExecutionStateTracker()
-        self._router: Optional[ExecutionRouter] = None
-        self._live_adapter: Optional[ExecutionAdapter] = None
+        self._oms_records: dict[str, OmsOrderRecord] = {}
+        self._journal_events: list[JournalEvent] = []
+        self._last_cash_balance_by_route: dict[bool, float] = {}
+        self._last_equity_by_route: dict[bool, float] = {}
+        self._router: ExecutionRouter | None = None
+        self._live_adapter: ExecutionAdapter | None = None
         self._state = RuntimeLifecycleState.CREATED
         self._effective_mode = config.runtime.mode
-        self._started_at: Optional[datetime] = None
-        self._startup_reason: Optional[str] = None
-        self._last_broker_connectivity_snapshot: Optional[BrokerConnectivitySnapshot] = None
-        self._last_broker_connectivity_provider_error: Optional[str] = None
-        self._last_reconciliation_report: Optional[ReconciliationReport] = None
-        self._last_reconciliation_provider_error: Optional[str] = None
+        self._started_at: datetime | None = None
+        self._startup_reason: str | None = None
+        self._last_broker_connectivity_snapshot: BrokerConnectivitySnapshot | None = None
+        self._last_broker_connectivity_provider_error: str | None = None
+        self._last_reconciliation_report: ReconciliationReport | None = None
+        self._last_reconciliation_provider_error: str | None = None
         self._register_default_health_checks()
 
     @property
@@ -113,10 +146,22 @@ class DeploymentRuntime:
         return self._metrics
 
     @property
-    def router(self) -> Optional[ExecutionRouter]:
+    def router(self) -> ExecutionRouter | None:
         """Return the execution router when runtime execution is enabled."""
 
         return self._router
+
+    @property
+    def journal_events(self) -> tuple[JournalEvent, ...]:
+        """Return journal events recorded by the runtime in process memory."""
+
+        return tuple(self._journal_events)
+
+    @property
+    def oms_records(self) -> tuple[OmsOrderRecord, ...]:
+        """Return latest OMS lifecycle records keyed by intent id."""
+
+        return tuple(sorted(self._oms_records.values(), key=lambda record: record.intent.intent_id))
 
     @property
     def lifecycle_state(self) -> RuntimeLifecycleState:
@@ -153,12 +198,15 @@ class DeploymentRuntime:
             for path in self.resolved_directories().values():
                 path.mkdir(parents=True, exist_ok=True)
 
-        self._started_at = datetime.now(timezone.utc)
+        self._started_at = datetime.now(UTC)
         self._last_broker_connectivity_snapshot = None
         self._last_broker_connectivity_provider_error = None
         self._last_reconciliation_report = None
         self._last_reconciliation_provider_error = None
-        self._metrics.increment("scalper_ai_runtime_start_total", requested_mode=self.requested_mode)
+        self._metrics.increment(
+            "scalper_ai_runtime_start_total",
+            requested_mode=self.requested_mode,
+        )
         self._activate_mode()
         self._metrics.set_gauge(
             "scalper_ai_runtime_up",
@@ -234,7 +282,7 @@ class DeploymentRuntime:
                 requested_mode=self.requested_mode,
                 effective_mode=self.effective_mode,
                 lifecycle_state=self._state.value,
-                checked_at=datetime.now(timezone.utc),
+                checked_at=datetime.now(UTC),
                 overall_status=HealthStatus.WARN,
                 checks=(
                     HealthCheckResult(
@@ -249,7 +297,7 @@ class DeploymentRuntime:
             snapshot = self._health.snapshot(
                 effective_mode=self.effective_mode,
                 lifecycle_state=self._state.value,
-                checked_at=datetime.now(timezone.utc),
+                checked_at=datetime.now(UTC),
             )
 
         warning_count = sum(result.status is HealthStatus.WARN for result in snapshot.checks)
@@ -288,17 +336,60 @@ class DeploymentRuntime:
         return self._router
 
     def submit_order(self, intent: OrderIntent, quote: ExecutionQuote) -> ExecutionUpdate:
-        """Submit one order through the active execution router."""
+        """Submit one order through mandatory risk, OMS, journal, and routing gates."""
+
+        risk_context = self._build_risk_context(intent, quote)
+        risk_decision = self._risk_engine.evaluate_order(intent, risk_context)
+        self._record_risk_decision(risk_decision)
+
+        oms_record = OmsOrderRecord.new(intent)
+        if not risk_decision.accepted:
+            rejected_record = transition_order(
+                oms_record,
+                OmsOrderStatus.REJECTED,
+                updated_at=risk_decision.checked_at,
+                rejection_reason=risk_decision.reason or "risk_rejected",
+            )
+            self._remember_oms_record(rejected_record)
+            self._record_oms_event(rejected_record, "risk_rejected")
+            update = self._build_risk_rejected_update(intent, quote, risk_context, risk_decision)
+            self._state_tracker.apply_update(update)
+            self._remember_account_state(update)
+            self._record_order_response(update, causation_id=rejected_record.intent.intent_id)
+            self._increment_rejected_metric(intent)
+            return update
+
+        checked_record = transition_order(
+            oms_record,
+            OmsOrderStatus.CHECKED,
+            updated_at=risk_decision.checked_at,
+        )
+        self._remember_oms_record(checked_record)
+        self._record_oms_event(checked_record, "checked")
+        self._record_order_request(intent, quote)
+
+        sent_record = transition_order(
+            checked_record,
+            OmsOrderStatus.SENT,
+            updated_at=quote.received_timestamp,
+        )
+        self._remember_oms_record(sent_record)
+        self._record_oms_event(sent_record, "sent")
 
         update = self.require_execution_router().submit_order(intent, quote)
+        final_record = self._transition_oms_after_execution_update(sent_record, update)
+        self._remember_oms_record(final_record)
+        self._record_oms_event(final_record, "final")
         self._state_tracker.apply_update(update)
+        self._remember_account_state(update)
+        self._record_order_response(update, causation_id=sent_record.intent.intent_id)
         if self.config.monitoring.metrics_enabled:
             self._metrics.increment(
                 "scalper_ai_execution_orders_submitted_total",
                 requested_mode=self.requested_mode,
                 effective_mode=self.effective_mode,
                 paper=str(intent.paper).lower(),
-            )
+        )
         return update
 
     def process_quote(self, quote: ExecutionQuote) -> tuple[ExecutionUpdate, ...]:
@@ -306,6 +397,13 @@ class DeploymentRuntime:
 
         updates = self.require_execution_router().process_quote(quote)
         self._state_tracker.apply_updates(updates)
+        for update in updates:
+            self._remember_account_state(update)
+            oms_record = self._transition_existing_oms_after_execution_update(update)
+            if oms_record is not None:
+                self._remember_oms_record(oms_record)
+                self._record_oms_event(oms_record, "process_update")
+            self._record_order_response(update, causation_id=update.order.intent.intent_id)
         if self.config.monitoring.metrics_enabled and updates:
             self._metrics.increment(
                 "scalper_ai_execution_updates_total",
@@ -314,6 +412,279 @@ class DeploymentRuntime:
                 effective_mode=self.effective_mode,
             )
         return updates
+
+    def _build_risk_context(self, intent: OrderIntent, quote: ExecutionQuote) -> RiskContext:
+        if self._risk_context_provider is not None:
+            return self._risk_context_provider(intent, quote, self._state_tracker)
+
+        checked_at = quote.received_timestamp
+        route_orders = self._state_tracker.list_orders(paper=intent.paper)
+        route_positions = {
+            position.symbol: position
+            for position in self._state_tracker.list_positions(paper=intent.paper)
+        }
+        return RiskContext(
+            checked_at=checked_at,
+            positions=route_positions,
+            order_timestamps=tuple(order.submitted_at for order in route_orders),
+            known_intent_ids=frozenset(order.intent.intent_id for order in route_orders),
+            known_broker_order_ids=frozenset(order.broker_order_id for order in route_orders),
+            recent_rejection_timestamps=tuple(
+                order.updated_at
+                for order in route_orders
+                if order.status is ExecutionOrderStatus.REJECTED
+            ),
+            latest_market_data_at=quote.received_timestamp,
+            realized_pnl_today=sum(
+                float(position.realized_pnl) for position in route_positions.values()
+            ),
+            starting_equity=self._last_equity_by_route.get(intent.paper),
+            current_equity=self._last_equity_by_route.get(intent.paper),
+            session_kill_switch=False,
+            symbol_kill_switches=frozenset(),
+        )
+
+    def _build_risk_rejected_update(
+        self,
+        intent: OrderIntent,
+        quote: ExecutionQuote,
+        context: RiskContext,
+        decision: RiskDecision,
+    ) -> ExecutionUpdate:
+        requested_quantity = self._risk_rejected_quantity(intent, context)
+        broker_order_id = f"risk-rejected-{intent.intent_id}"
+        rejected_order = ExecutionOrder(
+            intent=intent,
+            broker_order_id=broker_order_id,
+            status=ExecutionOrderStatus.REJECTED,
+            submitted_at=decision.checked_at,
+            updated_at=decision.checked_at,
+            requested_quantity=requested_quantity,
+            filled_quantity=0.0,
+            remaining_quantity=requested_quantity,
+            rejection_reason=decision.reason or "risk_rejected",
+        )
+        position = self._marked_runtime_position(intent, quote, context)
+        cash_balance = self._last_cash_balance_by_route.get(intent.paper, 100_000.0)
+        equity = self._last_equity_by_route.get(
+            intent.paper,
+            calculate_equity(cash_balance, position),
+        )
+        return ExecutionUpdate(
+            order=rejected_order,
+            fills=(),
+            position=position,
+            cash_balance=cash_balance,
+            equity=equity,
+            quote=quote,
+        )
+
+    @staticmethod
+    def _risk_rejected_quantity(intent: OrderIntent, context: RiskContext) -> float:
+        if intent.quantity is not None:
+            return float(intent.quantity)
+        current_position = context.positions.get(intent.symbol)
+        current_quantity = 0.0 if current_position is None else float(current_position.net_quantity)
+        if intent.target_position is not None:
+            requested_quantity = abs(float(intent.target_position) - current_quantity)
+            if requested_quantity > 0:
+                return requested_quantity
+        return 1.0
+
+    def _marked_runtime_position(
+        self,
+        intent: OrderIntent,
+        quote: ExecutionQuote,
+        context: RiskContext,
+    ) -> PositionState:
+        return mark_position(
+            context.positions.get(intent.symbol),
+            symbol=intent.symbol,
+            timestamp=quote.received_timestamp,
+            mark_price=quote.mid_price,
+        )
+
+    def _transition_oms_after_execution_update(
+        self,
+        record: OmsOrderRecord,
+        update: ExecutionUpdate,
+    ) -> OmsOrderRecord:
+        updated_at = update.order.updated_at
+        status = update.order.status
+        if status is ExecutionOrderStatus.REJECTED:
+            return transition_order(
+                record,
+                OmsOrderStatus.REJECTED,
+                updated_at=updated_at,
+                broker_order_id=update.order.broker_order_id,
+                rejection_reason=update.order.rejection_reason or "execution_rejected",
+            )
+        if status is ExecutionOrderStatus.CANCELED:
+            return transition_order(
+                record,
+                OmsOrderStatus.CANCELLED,
+                updated_at=updated_at,
+                broker_order_id=update.order.broker_order_id,
+                cancel_reason=update.order.cancel_reason or "execution_cancelled",
+            )
+
+        ack_record = transition_order(
+            record,
+            OmsOrderStatus.ACK,
+            updated_at=updated_at,
+            broker_order_id=update.order.broker_order_id,
+            filled_quantity=update.order.filled_quantity,
+        )
+        if status is ExecutionOrderStatus.FILLED:
+            return _transition_ack_or_partial_to_filled(ack_record, update)
+        if status is ExecutionOrderStatus.PARTIALLY_FILLED:
+            return _transition_ack_or_partial_to_partial(ack_record, update)
+        return ack_record
+
+    def _transition_existing_oms_after_execution_update(
+        self,
+        update: ExecutionUpdate,
+    ) -> OmsOrderRecord | None:
+        record = self._oms_records.get(update.order.intent.intent_id)
+        if record is None or record.is_terminal:
+            return None
+
+        status = update.order.status
+        if status in {ExecutionOrderStatus.ACCEPTED, ExecutionOrderStatus.TRIGGERED}:
+            return record
+        if status is ExecutionOrderStatus.FILLED:
+            return _transition_ack_or_partial_to_filled(record, update)
+        if status is ExecutionOrderStatus.PARTIALLY_FILLED:
+            return _transition_ack_or_partial_to_partial(record, update)
+        if status is ExecutionOrderStatus.CANCELED:
+            return transition_order(
+                record,
+                OmsOrderStatus.CANCELLED,
+                updated_at=update.order.updated_at,
+                broker_order_id=update.order.broker_order_id,
+                cancel_reason=update.order.cancel_reason or "execution_cancelled",
+            )
+        if status is ExecutionOrderStatus.REJECTED:
+            return transition_order(
+                record,
+                OmsOrderStatus.REJECTED,
+                updated_at=update.order.updated_at,
+                broker_order_id=update.order.broker_order_id,
+                rejection_reason=update.order.rejection_reason or "execution_rejected",
+            )
+        return record
+
+    def _remember_oms_record(self, record: OmsOrderRecord) -> None:
+        self._oms_records[record.intent.intent_id] = record
+
+    def _remember_account_state(self, update: ExecutionUpdate) -> None:
+        route = update.order.intent.paper
+        self._last_cash_balance_by_route[route] = update.cash_balance
+        self._last_equity_by_route[route] = update.equity
+
+    def _record_risk_decision(self, decision: RiskDecision) -> None:
+        self._record_journal_event(
+            decision.to_journal_event(
+                event_id=f"risk-{decision.intent_id}-{len(self._journal_events) + 1}",
+                source="deployment_runtime",
+            )
+        )
+
+    def _record_oms_event(self, record: OmsOrderRecord, stage: str) -> None:
+        self._record_journal_event(
+            JournalEvent.from_payload(
+                event_id=f"oms-{record.intent.intent_id}-{stage}-{len(self._journal_events) + 1}",
+                event_type=JournalEventType.ORDER_RESPONSE,
+                payload=_oms_record_to_payload(record, stage=stage),
+                recorded_at=record.updated_at,
+                source="deployment_runtime",
+                event_timestamp=record.updated_at,
+                payload_type="OmsOrderRecord",
+                correlation_id=record.intent.intent_id,
+                strategy_id=record.intent.strategy_id,
+                symbol=record.intent.symbol,
+            )
+        )
+
+    def _record_order_request(self, intent: OrderIntent, quote: ExecutionQuote) -> None:
+        self._record_journal_event(
+            JournalEvent.from_payload(
+                event_id=f"order-request-{intent.intent_id}-{len(self._journal_events) + 1}",
+                event_type=JournalEventType.ORDER_REQUEST,
+                payload={
+                    "intent": intent,
+                    "quote": _quote_to_payload(quote),
+                },
+                recorded_at=quote.received_timestamp,
+                source="deployment_runtime",
+                event_timestamp=intent.created_at,
+                payload_type="RuntimeOrderRequest",
+                correlation_id=intent.intent_id,
+                strategy_id=intent.strategy_id,
+                symbol=intent.symbol,
+            )
+        )
+
+    def _record_order_response(self, update: ExecutionUpdate, *, causation_id: str) -> None:
+        order = update.order
+        self._record_journal_event(
+            JournalEvent.from_payload(
+                event_id=f"order-response-{order.intent.intent_id}-{len(self._journal_events) + 1}",
+                event_type=JournalEventType.ORDER_RESPONSE,
+                payload=_execution_update_to_payload(update),
+                recorded_at=order.updated_at,
+                source="deployment_runtime",
+                event_timestamp=order.updated_at,
+                payload_type="ExecutionUpdate",
+                correlation_id=order.intent.intent_id,
+                causation_id=causation_id,
+                strategy_id=order.intent.strategy_id,
+                symbol=order.intent.symbol,
+            )
+        )
+        for fill in update.fills:
+            self._record_journal_event(
+                JournalEvent.from_payload(
+                    event_id=f"fill-{fill.fill_id}-{len(self._journal_events) + 1}",
+                    event_type=JournalEventType.FILL,
+                    payload=fill,
+                    recorded_at=fill.received_timestamp,
+                    source="deployment_runtime",
+                    correlation_id=fill.intent_id,
+                    causation_id=order.broker_order_id,
+                    strategy_id=order.intent.strategy_id,
+                    symbol=fill.symbol,
+                )
+            )
+        self._record_journal_event(
+            JournalEvent.from_payload(
+                event_id=f"position-{order.intent.intent_id}-{len(self._journal_events) + 1}",
+                event_type=JournalEventType.POSITION_SNAPSHOT,
+                payload=update.position,
+                recorded_at=update.position.timestamp,
+                source="deployment_runtime",
+                correlation_id=order.intent.intent_id,
+                causation_id=order.broker_order_id,
+                strategy_id=order.intent.strategy_id,
+                symbol=update.position.symbol,
+            )
+        )
+
+    def _record_journal_event(self, event: JournalEvent) -> None:
+        self._journal_events.append(event)
+        if self._journal_writer is not None:
+            self._journal_writer.write(event)
+
+    def _increment_rejected_metric(self, intent: OrderIntent) -> None:
+        if not self.config.monitoring.metrics_enabled:
+            return
+        self._metrics.increment(
+            "scalper_ai_execution_orders_rejected_total",
+            requested_mode=self.requested_mode,
+            effective_mode=self.effective_mode,
+            paper=str(intent.paper).lower(),
+            source="risk",
+        )
 
     def resolved_directories(self) -> dict[str, Path]:
         """Return absolute storage directories for runtime startup checks."""
@@ -376,7 +747,7 @@ class DeploymentRuntime:
             raise RuntimeError("No live adapter factory is configured.")
         return self._live_adapter_factory()
 
-    def _live_startup_blocker(self) -> Optional[str]:
+    def _live_startup_blocker(self) -> str | None:
         if not self.config.broker.live_enabled:
             return "Live runtime requested but broker.live_enabled is false."
         if (
@@ -384,7 +755,10 @@ class DeploymentRuntime:
             and self._live_confirmation_token != self.config.deployment.live_confirmation_phrase
         ):
             return "Live runtime confirmation phrase is missing or invalid."
-        if not self.config.risk.kill_switch_enabled and not self.config.broker.allow_live_without_kill_switch:
+        if (
+            not self.config.risk.kill_switch_enabled
+            and not self.config.broker.allow_live_without_kill_switch
+        ):
             return "Live runtime requires risk.kill_switch_enabled=true."
         return None
 
@@ -427,7 +801,9 @@ class DeploymentRuntime:
 
     def _storage_directory_check(self) -> HealthCheckResult:
         directories = self.resolved_directories()
-        missing = [name for name, path in directories.items() if not path.exists() or not path.is_dir()]
+        missing = [
+            name for name, path in directories.items() if not path.exists() or not path.is_dir()
+        ]
         if missing:
             return HealthCheckResult(
                 name="storage_directories",
@@ -516,7 +892,10 @@ class DeploymentRuntime:
             return HealthCheckResult(
                 name="execution_reconciliation",
                 status=HealthStatus.WARN,
-                summary="Reconciliation provider returned no broker snapshot for a live-capable runtime.",
+                summary=(
+                    "Reconciliation provider returned no broker snapshot for a "
+                    "live-capable runtime."
+                ),
                 details={"configured": True, "report_available": False},
             )
 
@@ -526,7 +905,9 @@ class DeploymentRuntime:
             summary = "Reconciliation detected error-level drift between internal and broker state."
         elif report.warning_count > 0:
             status = HealthStatus.WARN
-            summary = "Reconciliation detected warning-level drift between internal and broker state."
+            summary = (
+                "Reconciliation detected warning-level drift between internal and broker state."
+            )
         else:
             status = HealthStatus.PASS
             summary = "Reconciliation found no broker/internal drift."
@@ -556,7 +937,9 @@ class DeploymentRuntime:
                 return HealthCheckResult(
                     name="broker_connectivity",
                     status=HealthStatus.PASS,
-                    summary="No broker connectivity provider is required for the current safe mode.",
+                    summary=(
+                        "No broker connectivity provider is required for the current safe mode."
+                    ),
                     details={"configured": False, "effective_mode": self.effective_mode},
                 )
             return HealthCheckResult(
@@ -689,7 +1072,11 @@ class DeploymentRuntime:
         )
         self._metrics.set_gauge(
             "scalper_ai_broker_snapshot_age_seconds",
-            0.0 if snapshot is None or snapshot.snapshot_age_seconds() is None else snapshot.snapshot_age_seconds(),
+            (
+                0.0
+                if snapshot is None or snapshot.snapshot_age_seconds() is None
+                else snapshot.snapshot_age_seconds()
+            ),
             **labels,
         )
         self._metrics.set_gauge(
@@ -698,17 +1085,19 @@ class DeploymentRuntime:
             **labels,
         )
 
-    def _resolved_reconciliation_report_provider(self) -> Optional[ReconciliationReportProvider]:
+    def _resolved_reconciliation_report_provider(self) -> ReconciliationReportProvider | None:
         if self._reconciliation_report_provider is not None:
             return self._reconciliation_report_provider
         if self._resolved_broker_snapshot_provider() is None:
             return None
         return self._build_snapshot_report
 
-    def _resolved_broker_connectivity_provider(self) -> Optional[BrokerConnectivityProvider]:
+    def _resolved_broker_connectivity_provider(self) -> BrokerConnectivityProvider | None:
         if self._broker_connectivity_provider is not None:
             return self._broker_connectivity_provider
-        snapshot_provider = self._as_broker_connectivity_provider(self._resolved_broker_snapshot_provider())
+        snapshot_provider = self._as_broker_connectivity_provider(
+            self._resolved_broker_snapshot_provider()
+        )
         if snapshot_provider is not None:
             return snapshot_provider
         return self._as_broker_connectivity_provider(self._live_adapter)
@@ -723,7 +1112,7 @@ class DeploymentRuntime:
             paper=self.effective_mode == "paper",
         )
 
-    def _resolved_broker_snapshot_provider(self) -> Optional[BrokerSnapshotProvider]:
+    def _resolved_broker_snapshot_provider(self) -> BrokerSnapshotProvider | None:
         if self._broker_snapshot_provider is not None:
             return self._broker_snapshot_provider
         return self._as_broker_snapshot_provider(self._live_adapter)
@@ -731,7 +1120,7 @@ class DeploymentRuntime:
     def _as_broker_connectivity_provider(
         self,
         candidate: object | None,
-    ) -> Optional[BrokerConnectivityProvider]:
+    ) -> BrokerConnectivityProvider | None:
         if candidate is None:
             return None
         provider_method = getattr(candidate, "describe_broker_connectivity", None)
@@ -742,7 +1131,7 @@ class DeploymentRuntime:
     def _as_broker_snapshot_provider(
         self,
         candidate: object | None,
-    ) -> Optional[BrokerSnapshotProvider]:
+    ) -> BrokerSnapshotProvider | None:
         if candidate is None:
             return None
         list_orders_method = getattr(candidate, "list_broker_orders", None)
@@ -757,3 +1146,86 @@ class DeploymentRuntime:
         close_method = getattr(self._live_adapter, "close", None)
         if callable(close_method):
             close_method()
+
+
+def _oms_record_to_payload(record: OmsOrderRecord, *, stage: str) -> dict[str, object]:
+    return {
+        "stage": stage,
+        "intent_id": record.intent.intent_id,
+        "strategy_id": record.intent.strategy_id,
+        "symbol": record.intent.symbol,
+        "status": record.status.value,
+        "created_at": record.created_at,
+        "updated_at": record.updated_at,
+        "broker_order_id": record.broker_order_id,
+        "filled_quantity": record.filled_quantity,
+        "rejection_reason": record.rejection_reason,
+        "cancel_reason": record.cancel_reason,
+    }
+
+
+def _transition_ack_or_partial_to_filled(
+    record: OmsOrderRecord,
+    update: ExecutionUpdate,
+) -> OmsOrderRecord:
+    return transition_order(
+        record,
+        OmsOrderStatus.FILLED,
+        updated_at=update.order.updated_at,
+        broker_order_id=update.order.broker_order_id,
+        filled_quantity=update.order.filled_quantity,
+    )
+
+
+def _transition_ack_or_partial_to_partial(
+    record: OmsOrderRecord,
+    update: ExecutionUpdate,
+) -> OmsOrderRecord:
+    return transition_order(
+        record,
+        OmsOrderStatus.PARTIAL,
+        updated_at=update.order.updated_at,
+        broker_order_id=update.order.broker_order_id,
+        filled_quantity=update.order.filled_quantity,
+    )
+
+
+def _quote_to_payload(quote: ExecutionQuote) -> dict[str, object]:
+    return {
+        "symbol": quote.symbol,
+        "event_timestamp": quote.event_timestamp,
+        "received_timestamp": quote.received_timestamp,
+        "bid": quote.bid,
+        "ask": quote.ask,
+        "mid_price": quote.mid_price,
+        "spread": quote.spread,
+        "venue": quote.venue,
+    }
+
+
+def _execution_update_to_payload(update: ExecutionUpdate) -> dict[str, object]:
+    return {
+        "order": _execution_order_to_payload(update.order),
+        "fill_count": len(update.fills),
+        "fills": list(update.fills),
+        "position": update.position,
+        "cash_balance": update.cash_balance,
+        "equity": update.equity,
+        "quote": _quote_to_payload(update.quote),
+    }
+
+
+def _execution_order_to_payload(order: ExecutionOrder) -> dict[str, object]:
+    return {
+        "intent": order.intent,
+        "broker_order_id": order.broker_order_id,
+        "status": order.status.value,
+        "submitted_at": order.submitted_at,
+        "updated_at": order.updated_at,
+        "requested_quantity": order.requested_quantity,
+        "filled_quantity": order.filled_quantity,
+        "remaining_quantity": order.remaining_quantity,
+        "triggered_at": order.triggered_at,
+        "rejection_reason": order.rejection_reason,
+        "cancel_reason": order.cancel_reason,
+    }

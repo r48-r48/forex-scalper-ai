@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from scalper_ai.config import AppConfig, load_app_config
-from scalper_ai.deployment import DeploymentRuntime, HealthStatus, MetricsRegistry, RuntimeLifecycleState
+from scalper_ai.deployment import (
+    DeploymentRuntime,
+    HealthStatus,
+    MetricsRegistry,
+    RuntimeLifecycleState,
+)
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType
 from scalper_ai.execution import (
     BrokerConnectivitySnapshot,
@@ -25,6 +30,8 @@ from scalper_ai.execution import (
     ReconciliationReport,
     ReconciliationSeverity,
 )
+from scalper_ai.journal import JournalEvent, JournalEventType
+from scalper_ai.services import OmsOrderStatus
 from scalper_ai.utils import resolve_repo_root
 
 
@@ -78,7 +85,10 @@ def test_live_runtime_falls_back_to_paper_when_confirmation_is_missing() -> None
 
     snapshot = runtime.health_snapshot()
     assert snapshot.overall_status is HealthStatus.WARN
-    assert any(check.name == "execution_mode" and check.status is HealthStatus.WARN for check in snapshot.checks)
+    assert any(
+        check.name == "execution_mode" and check.status is HealthStatus.WARN
+        for check in snapshot.checks
+    )
 
 
 def test_live_runtime_raises_when_fallback_is_disabled() -> None:
@@ -115,7 +125,10 @@ def test_health_snapshot_warns_when_runtime_is_stopped() -> None:
     snapshot = runtime.health_snapshot()
 
     assert snapshot.overall_status is HealthStatus.WARN
-    assert any(check.name == "runtime_state" and check.status is HealthStatus.WARN for check in snapshot.checks)
+    assert any(
+        check.name == "runtime_state" and check.status is HealthStatus.WARN
+        for check in snapshot.checks
+    )
 
 
 def test_health_snapshot_warns_on_reconciliation_drift_and_exports_metrics() -> None:
@@ -123,7 +136,7 @@ def test_health_snapshot_warns_on_reconciliation_drift_and_exports_metrics() -> 
     runtime = DeploymentRuntime(
         config,
         reconciliation_report_provider=lambda: ReconciliationReport(
-            checked_at=datetime(2026, 3, 28, 9, 0, tzinfo=timezone.utc),
+            checked_at=datetime(2026, 3, 28, 9, 0, tzinfo=UTC),
             issues=(
                 ReconciliationIssue(
                     scope="position",
@@ -196,7 +209,7 @@ def test_health_snapshot_fails_when_broker_connectivity_provider_raises() -> Non
         live_adapter_factory=LiveExecutionStubAdapter,
         broker_connectivity_provider=BrokenConnectivityProvider(),
         reconciliation_report_provider=lambda: ReconciliationReport(
-            checked_at=datetime(2026, 3, 28, 9, 0, tzinfo=timezone.utc),
+            checked_at=datetime(2026, 3, 28, 9, 0, tzinfo=UTC),
             issues=(),
         ),
         live_confirmation_token="ENABLE_ME",
@@ -237,9 +250,9 @@ def test_health_snapshot_warns_on_stale_broker_snapshot_and_exports_metrics() ->
         def describe_broker_connectivity(self) -> BrokerConnectivitySnapshot:
             return BrokerConnectivitySnapshot(
                 venue="live_stub",
-                checked_at=datetime(2026, 3, 28, 10, 0, 10, tzinfo=timezone.utc),
+                checked_at=datetime(2026, 3, 28, 10, 0, 10, tzinfo=UTC),
                 connected=True,
-                last_snapshot_at=datetime(2026, 3, 28, 10, 0, 0, tzinfo=timezone.utc),
+                last_snapshot_at=datetime(2026, 3, 28, 10, 0, 0, tzinfo=UTC),
                 latency_ms=12.5,
             )
 
@@ -248,7 +261,7 @@ def test_health_snapshot_warns_on_stale_broker_snapshot_and_exports_metrics() ->
         live_adapter_factory=LiveExecutionStubAdapter,
         broker_connectivity_provider=StaleConnectivityProvider(),
         reconciliation_report_provider=lambda: ReconciliationReport(
-            checked_at=datetime(2026, 3, 28, 10, 0, tzinfo=timezone.utc),
+            checked_at=datetime(2026, 3, 28, 10, 0, tzinfo=UTC),
             issues=(),
         ),
         live_confirmation_token="ENABLE_ME",
@@ -301,7 +314,7 @@ def test_runtime_can_build_reconciliation_from_snapshot_provider() -> None:
     runtime = DeploymentRuntime(config, broker_snapshot_provider=StaticSnapshotProvider())
     runtime.start()
 
-    timestamp = datetime(2026, 3, 28, 10, 0, tzinfo=timezone.utc)
+    timestamp = datetime(2026, 3, 28, 10, 0, tzinfo=UTC)
     quote = ExecutionQuote(
         symbol="EURUSD",
         event_timestamp=timestamp,
@@ -335,6 +348,160 @@ def test_runtime_can_build_reconciliation_from_snapshot_provider() -> None:
     )
 
 
+def test_runtime_risk_rejects_before_router_submit_and_records_oms() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {"mode": "paper"},
+            "risk": {"max_position_size": 1.0},
+        }
+    )
+    adapter = _RejectIfSubmittedAdapter()
+    runtime = DeploymentRuntime(config, paper_adapter_factory=lambda: adapter)
+    runtime.start()
+
+    timestamp = datetime(2026, 4, 30, 10, 0, tzinfo=UTC)
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="risk-blocked-intent",
+            strategy_id="risk-runtime-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=2.0,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "max_position"
+    assert update.position.net_quantity == 0.0
+    assert runtime.oms_records[0].status is OmsOrderStatus.REJECTED
+    assert runtime.oms_records[0].rejection_reason == "max_position"
+    assert any(
+        event.event_type is JournalEventType.RISK and event.payload["status"] == "rejected"
+        for event in runtime.journal_events
+    )
+    assert any(
+        event.payload_type == "OmsOrderRecord"
+        and event.payload["stage"] == "risk_rejected"
+        and event.payload["status"] == "rejected"
+        for event in runtime.journal_events
+    )
+    assert "scalper_ai_execution_orders_rejected_total" in runtime.metrics_text()
+
+
+def test_runtime_success_path_records_risk_oms_and_execution_journal_events() -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    writer = _RecordingJournalWriter()
+    runtime = DeploymentRuntime(config, journal_writer=writer)
+    runtime.start()
+
+    timestamp = datetime(2026, 4, 30, 10, 5, tzinfo=UTC)
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="journaled-intent",
+            strategy_id="runtime-journal-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=2.0,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        ),
+    )
+
+    assert update.order.status is ExecutionOrderStatus.FILLED
+    assert runtime.oms_records[0].status is OmsOrderStatus.FILLED
+    assert tuple(writer.events) == runtime.journal_events
+
+    event_types = [event.event_type for event in runtime.journal_events]
+    assert JournalEventType.RISK in event_types
+    assert JournalEventType.ORDER_REQUEST in event_types
+    assert JournalEventType.ORDER_RESPONSE in event_types
+    assert JournalEventType.FILL in event_types
+    assert JournalEventType.POSITION_SNAPSHOT in event_types
+    assert any(
+        event.event_type is JournalEventType.RISK and event.payload["status"] == "approved"
+        for event in runtime.journal_events
+    )
+    assert any(
+        event.payload_type == "OmsOrderRecord" and event.payload["status"] == "filled"
+        for event in runtime.journal_events
+    )
+
+
+def test_runtime_oms_tracks_process_quote_fill_for_open_order() -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    runtime = DeploymentRuntime(config)
+    runtime.start()
+
+    timestamp = datetime(2026, 4, 30, 10, 10, tzinfo=UTC)
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="pending-intent",
+            strategy_id="runtime-oms-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            quantity=2.0,
+            limit_price=1.0995,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        ),
+    )
+
+    assert update.order.status is ExecutionOrderStatus.ACCEPTED
+    assert runtime.oms_records[0].status is OmsOrderStatus.ACK
+
+    fill_timestamp = datetime(2026, 4, 30, 10, 10, 1, tzinfo=UTC)
+    updates = runtime.process_quote(
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=fill_timestamp,
+            received_timestamp=fill_timestamp,
+            bid=1.0992,
+            ask=1.0994,
+            venue="paper",
+        )
+    )
+
+    assert len(updates) == 1
+    assert updates[0].order.status is ExecutionOrderStatus.FILLED
+    assert runtime.oms_records[0].status is OmsOrderStatus.FILLED
+    assert any(
+        event.payload_type == "OmsOrderRecord"
+        and event.payload["stage"] == "process_update"
+        and event.payload["status"] == "filled"
+        for event in runtime.journal_events
+    )
+
+
 def test_live_runtime_can_use_live_stub_adapter_with_snapshot_reconciliation() -> None:
     config = AppConfig.model_validate(
         {
@@ -365,7 +532,7 @@ def test_live_runtime_can_use_live_stub_adapter_with_snapshot_reconciliation() -
     assert summary.effective_mode == "live"
     assert summary.lifecycle_state is RuntimeLifecycleState.RUNNING
 
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
     update = runtime.submit_order(
         OrderIntent(
             intent_id="live-intent",
@@ -400,6 +567,36 @@ def test_live_runtime_can_use_live_stub_adapter_with_snapshot_reconciliation() -
         check.name == "execution_reconciliation" and check.status is HealthStatus.PASS
         for check in snapshot.checks
     )
+
+
+class _RejectIfSubmittedAdapter:
+    def __init__(self) -> None:
+        self.submit_count = 0
+
+    def submit_order(self, intent: OrderIntent, quote: ExecutionQuote) -> object:
+        self.submit_count += 1
+        raise AssertionError("risk rejected orders must not reach the router adapter")
+
+    def process_quote(self, quote: ExecutionQuote) -> tuple[object, ...]:
+        return ()
+
+    def cancel_order(self, broker_order_id: str, *, timestamp: datetime) -> object:
+        raise KeyError(broker_order_id)
+
+    def get_order(self, broker_order_id: str) -> object | None:
+        return None
+
+    def get_position(self, symbol: str, *, quote: ExecutionQuote | None = None) -> object | None:
+        return None
+
+
+class _RecordingJournalWriter:
+    def __init__(self) -> None:
+        self.events: list[JournalEvent] = []
+
+    def write(self, event: JournalEvent) -> object:
+        self.events.append(event)
+        return None
 
 
 def test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provider() -> None:
@@ -439,7 +636,11 @@ def test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provi
                 average_fill_price=1.1001,
             )
             self._orders[state.broker_order_id] = state
-            signed_volume = request.volume_lots if request.side is OrderSide.BUY else -request.volume_lots
+            signed_volume = (
+                request.volume_lots
+                if request.side is OrderSide.BUY
+                else -request.volume_lots
+            )
             self._positions[request.broker_symbol] = Mt5PositionState(
                 broker_symbol=request.broker_symbol,
                 timestamp=request.submitted_at,
@@ -483,7 +684,7 @@ def test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provi
     assert summary.effective_mode == "live"
     assert summary.lifecycle_state is RuntimeLifecycleState.RUNNING
 
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
     update = runtime.submit_order(
         OrderIntent(
             intent_id="mt5-live-intent",
