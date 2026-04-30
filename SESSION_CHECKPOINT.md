@@ -262,7 +262,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - the report remains directionally correct, but its original P0 runtime/Risk/OMS, durable-state, broker-source, deal-accounting, and native protective-order findings are now partly stale because first production slices are implemented
   - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md` so future context does not treat P0.A as still fully open
   - verification passed: `.venv/bin/python -m compileall src tests scripts`, targeted safety pytest with `56 passed`, and full `.venv/bin/pytest` with `188 passed`
-  - next confirmed work order remains: richer bracket/OCO and protection fail-safe behavior, durable per-deal attribution, broker-side recovery/fault-injection tests, MT5 history investigation, symbol-specific quantization, reconnect/circuit breaker, and risk-config completion
+  - next confirmed work order remains: durable per-deal attribution, broker-side recovery/fault-injection tests, MT5 history investigation, richer protective-order repair/modify support, daemon supervision, and fuller symbol metadata enforcement
 - 2026-04-30 completed the first P1 risk-config guard slice:
   - `RiskRejectCode` now includes max spread, loss cooldown, volatility guard, news guard, stale features, and model health reject reasons
   - `RiskLimits.from_risk_config()` now wires `max_spread_pips`, `cooldown_after_loss_burst_seconds`, `volatility_filter_enabled`, and `news_filter_enabled`
@@ -304,6 +304,18 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
   - `git diff --check` passed
   - full `.venv/bin/pytest` passed with `205 passed`
+- 2026-04-30 completed the first bracket/OCO lifecycle and approved flatten slice:
+  - reconciliation now derives expected broker-side position protection from filled internal bracket intents
+  - broker positions now flag missing, mismatched, or ambiguous SL/TP protection after fills or reconnects, even when the original terminal order is no longer broker-visible
+  - position-protection fail-safe now treats missing, mismatch, and ambiguity as kill-switch-worthy drift
+  - `DeploymentRuntime.flatten_unprotected_positions()` requires the live confirmation phrase and submits reduce-only market flatten intents only for symbols tied to position-protection reconciliation drift
+  - the approved flatten path records risk, OMS, execution, and position journal/state events while bypassing the session kill-switch that was activated by the protection drift
+  - targeted Ruff passed for reconciliation, execution exports, deployment runtime, and touched tests
+  - `.venv/bin/pytest tests/unit/test_execution_reconciliation.py tests/unit/test_deployment_runtime.py` passed with `35 passed`
+  - `.venv/bin/pytest tests/unit/test_execution_reconciliation.py tests/unit/test_deployment_runtime.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed with `47 passed`
+  - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
+  - `git diff --check` passed
+  - full `.venv/bin/pytest` passed with `210 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -484,6 +496,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after P1 MT5 reconnect supervision slice
 - 2026-04-30: `git diff --check` -> passed after P1 MT5 reconnect supervision slice
 - 2026-04-30: `.venv/bin/pytest` -> `205 passed` after P1 MT5 reconnect supervision slice
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/execution/reconciliation.py src/scalper_ai/execution/__init__.py src/scalper_ai/deployment/runtime.py tests/unit/test_execution_reconciliation.py tests/unit/test_deployment_runtime.py` -> passed after bracket/OCO lifecycle and approved flatten slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_reconciliation.py tests/unit/test_deployment_runtime.py` -> `35 passed` after bracket/OCO lifecycle and approved flatten slice
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_reconciliation.py tests/unit/test_deployment_runtime.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` -> `47 passed` after bracket/OCO lifecycle and approved flatten slice
+- 2026-04-30: `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` -> passed after bracket/OCO lifecycle and approved flatten slice
+- 2026-04-30: `git diff --check` -> passed after bracket/OCO lifecycle and approved flatten slice
+- 2026-04-30: `.venv/bin/pytest` -> `210 passed` after bracket/OCO lifecycle and approved flatten slice
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -501,8 +519,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Continue true bracket/OCO protection and P0.D follow-through:
-- add true bracket/OCO lifecycle management and an approved flatten workflow for positions whose required broker protection disappears after fill or reconnect
+Continue P0.D follow-through and remaining live hardening:
 - persist per-deal attribution in durable state/journal
 - add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills

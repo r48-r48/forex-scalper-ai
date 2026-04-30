@@ -761,6 +761,127 @@ def test_live_runtime_fail_safe_blocks_after_unprotected_position_reconciliation
     assert update.order.rejection_reason == "session_kill_switch"
 
 
+def test_live_runtime_approved_flatten_closes_unprotected_position_after_fail_safe(
+    tmp_path,
+) -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "mt5",
+                "mt5": {"require_stop_loss": True},
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    timestamp = datetime(2026, 4, 30, 11, 15, tzinfo=UTC)
+    adapter = _RecordingFlattenAdapter()
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+
+    class UnprotectedPositionProvider:
+        def list_broker_orders(self) -> tuple[BrokerOrderSnapshot, ...]:
+            return ()
+
+        def list_broker_positions(self) -> tuple[BrokerPositionSnapshot, ...]:
+            return (
+                BrokerPositionSnapshot(
+                    symbol="EURUSD",
+                    timestamp=timestamp,
+                    net_quantity=100_000.0,
+                    average_entry_price=1.1000,
+                    position_id="position-1",
+                    source_position_ids=("position-1",),
+                ),
+            )
+
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: adapter,
+        broker_snapshot_provider=UnprotectedPositionProvider(),
+        live_confirmation_token="ENABLE_ME",
+        state_store=store,
+    )
+    runtime.start()
+    runtime.health_snapshot()
+
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.1000,
+        ask=1.1001,
+        venue="broker-feed",
+    )
+    updates = runtime.flatten_unprotected_positions(
+        {"EURUSD": quote},
+        approval_token="ENABLE_ME",
+        created_at=timestamp,
+    )
+
+    assert len(updates) == 1
+    assert adapter.submit_count == 1
+    submitted_intent = adapter.submitted_intents[0]
+    assert submitted_intent.side is OrderSide.SELL
+    assert submitted_intent.reduce_only is True
+    assert submitted_intent.paper is False
+    assert submitted_intent.quantity == pytest.approx(100_000.0)
+    assert submitted_intent.metadata["reason"] == "position_protection_reconciliation_failed"
+    assert updates[0].order.status is ExecutionOrderStatus.FILLED
+    assert updates[0].position.net_quantity == pytest.approx(0.0)
+    assert any(
+        record.intent.intent_id == submitted_intent.intent_id
+        and record.status is OmsOrderStatus.FILLED
+        for record in runtime.oms_records
+    )
+    assert any(
+        event.event_type is JournalEventType.RISK
+        and event.payload["reason"] == "approved_position_protection_flatten"
+        for event in runtime.journal_events
+    )
+
+
+def test_live_runtime_approved_flatten_requires_confirmation_phrase(tmp_path) -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "mt5",
+                "mt5": {"require_stop_loss": True},
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    adapter = _RecordingFlattenAdapter()
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: adapter,
+        live_confirmation_token="ENABLE_ME",
+        state_store=SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite"),
+    )
+    runtime.start()
+
+    with pytest.raises(RuntimeError, match="confirmation phrase"):
+        runtime.flatten_unprotected_positions({}, approval_token="wrong")
+
+    assert adapter.submit_count == 0
+
+
 def test_live_startup_blocks_paper_fallback_when_recovered_live_order_is_open(tmp_path) -> None:
     store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
     timestamp = datetime(2026, 4, 30, 10, 25, tzinfo=UTC)
@@ -919,6 +1040,64 @@ class _RejectIfSubmittedAdapter:
         return None
 
     def get_position(self, symbol: str, *, quote: ExecutionQuote | None = None) -> object | None:
+        return None
+
+
+class _RecordingFlattenAdapter:
+    def __init__(self) -> None:
+        self.submit_count = 0
+        self.submitted_intents: list[OrderIntent] = []
+        self._orders: dict[str, ExecutionOrder] = {}
+
+    def submit_order(self, intent: OrderIntent, quote: ExecutionQuote) -> ExecutionUpdate:
+        self.submit_count += 1
+        self.submitted_intents.append(intent)
+        broker_order_id = f"flatten-order-{self.submit_count}"
+        order = ExecutionOrder(
+            intent=intent,
+            broker_order_id=broker_order_id,
+            status=ExecutionOrderStatus.FILLED,
+            submitted_at=quote.received_timestamp,
+            updated_at=quote.received_timestamp,
+            requested_quantity=float(intent.quantity or 1.0),
+            filled_quantity=float(intent.quantity or 1.0),
+            remaining_quantity=0.0,
+        )
+        self._orders[broker_order_id] = order
+        position = PositionState(
+            symbol=intent.symbol,
+            timestamp=quote.received_timestamp,
+            net_quantity=0.0,
+            average_entry_price=0.0,
+            mark_price=quote.mid_price,
+            realized_pnl=0.0,
+            unrealized_pnl=0.0,
+            exposure_quote=0.0,
+        )
+        return ExecutionUpdate(
+            order=order,
+            fills=(),
+            position=position,
+            cash_balance=100_000.0,
+            equity=100_000.0,
+            quote=quote,
+        )
+
+    def process_quote(self, quote: ExecutionQuote) -> tuple[ExecutionUpdate, ...]:
+        return ()
+
+    def cancel_order(self, broker_order_id: str, *, timestamp: datetime) -> ExecutionUpdate:
+        raise KeyError(broker_order_id)
+
+    def get_order(self, broker_order_id: str) -> ExecutionOrder | None:
+        return self._orders.get(broker_order_id)
+
+    def get_position(
+        self,
+        symbol: str,
+        *,
+        quote: ExecutionQuote | None = None,
+    ) -> PositionState | None:
         return None
 
 

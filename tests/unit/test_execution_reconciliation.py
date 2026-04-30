@@ -211,6 +211,136 @@ def test_reconcile_position_accepts_required_position_protection() -> None:
     assert issues == ()
 
 
+def test_build_reconciliation_report_flags_position_protection_from_filled_bracket_order() -> None:
+    timestamp = datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
+    order = _make_order(
+        status=ExecutionOrderStatus.FILLED,
+        filled_quantity=2.0,
+        remaining_quantity=0.0,
+        stop_loss_price=1.0900,
+        take_profit_price=1.1100,
+    )
+    internal_position = PositionState(
+        symbol="EURUSD",
+        timestamp=timestamp,
+        net_quantity=2.0,
+        average_entry_price=1.1000,
+        mark_price=1.1002,
+        realized_pnl=0.0,
+        unrealized_pnl=0.0004,
+        exposure_quote=2.2004,
+        position_mode=PositionMode.NETTING,
+    )
+    broker_position = BrokerPositionSnapshot(
+        symbol="EURUSD",
+        timestamp=timestamp,
+        net_quantity=2.0,
+        average_entry_price=1.1000,
+    )
+
+    report = build_reconciliation_report(
+        internal_orders=[order],
+        broker_orders={},
+        internal_position=internal_position,
+        broker_position=broker_position,
+    )
+
+    assert {issue.code for issue in report.issues} == {
+        "position_stop_loss_missing",
+        "position_take_profit_missing",
+    }
+    assert all(issue.severity is ReconciliationSeverity.ERROR for issue in report.issues)
+
+
+def test_build_reconciliation_report_flags_position_protection_mismatch() -> None:
+    timestamp = datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
+    order = _make_order(
+        status=ExecutionOrderStatus.FILLED,
+        filled_quantity=2.0,
+        remaining_quantity=0.0,
+        stop_loss_price=1.0900,
+        take_profit_price=1.1100,
+    )
+    internal_position = PositionState(
+        symbol="EURUSD",
+        timestamp=timestamp,
+        net_quantity=2.0,
+        average_entry_price=1.1000,
+        mark_price=1.1002,
+        realized_pnl=0.0,
+        unrealized_pnl=0.0004,
+        exposure_quote=2.2004,
+        position_mode=PositionMode.NETTING,
+    )
+    broker_position = BrokerPositionSnapshot(
+        symbol="EURUSD",
+        timestamp=timestamp,
+        net_quantity=2.0,
+        average_entry_price=1.1000,
+        stop_loss_price=1.0910,
+        take_profit_price=1.1090,
+    )
+
+    report = build_reconciliation_report(
+        internal_orders=[order],
+        broker_orders={},
+        internal_position=internal_position,
+        broker_position=broker_position,
+    )
+
+    assert {issue.code for issue in report.issues} == {
+        "position_stop_loss_mismatch",
+        "position_take_profit_mismatch",
+    }
+
+
+def test_build_reconciliation_report_flags_ambiguous_filled_bracket_protection() -> None:
+    timestamp = datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
+    first_order = _make_order(
+        status=ExecutionOrderStatus.FILLED,
+        filled_quantity=1.0,
+        remaining_quantity=1.0,
+        stop_loss_price=1.0900,
+        broker_order_id="broker-order-1",
+        intent_id="intent-1",
+    )
+    second_order = _make_order(
+        status=ExecutionOrderStatus.FILLED,
+        filled_quantity=1.0,
+        remaining_quantity=1.0,
+        stop_loss_price=1.0910,
+        broker_order_id="broker-order-2",
+        intent_id="intent-2",
+    )
+    internal_position = PositionState(
+        symbol="EURUSD",
+        timestamp=timestamp,
+        net_quantity=2.0,
+        average_entry_price=1.1000,
+        mark_price=1.1002,
+        realized_pnl=0.0,
+        unrealized_pnl=0.0004,
+        exposure_quote=2.2004,
+        position_mode=PositionMode.NETTING,
+    )
+    broker_position = BrokerPositionSnapshot(
+        symbol="EURUSD",
+        timestamp=timestamp,
+        net_quantity=2.0,
+        average_entry_price=1.1000,
+        stop_loss_price=1.0900,
+    )
+
+    report = build_reconciliation_report(
+        internal_orders=[first_order, second_order],
+        broker_orders={},
+        internal_position=internal_position,
+        broker_position=broker_position,
+    )
+
+    assert {issue.code for issue in report.issues} == {"position_stop_loss_ambiguous"}
+
+
 def test_build_reconciliation_report_collects_unknown_broker_orders() -> None:
     order = _make_order(
         status=ExecutionOrderStatus.FILLED,
@@ -309,10 +439,12 @@ def _make_order(
     remaining_quantity: float,
     stop_loss_price: float | None = None,
     take_profit_price: float | None = None,
+    broker_order_id: str = "broker-order-1",
+    intent_id: str = "intent-1",
 ) -> ExecutionOrder:
     created_at = datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
     intent = OrderIntent(
-        intent_id="intent-1",
+        intent_id=intent_id,
         strategy_id="strategy-1",
         symbol="EURUSD",
         created_at=created_at,
@@ -326,7 +458,7 @@ def _make_order(
     )
     return ExecutionOrder(
         intent=intent,
-        broker_order_id="broker-order-1",
+        broker_order_id=broker_order_id,
         status=status,
         submitted_at=created_at,
         updated_at=created_at,

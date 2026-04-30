@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from scalper_ai.domain import PositionMode, PositionState
+from scalper_ai.domain import OrderSide, PositionMode, PositionState
 from scalper_ai.execution.models import ExecutionOrder, ExecutionOrderStatus
 
 _ZERO_TOLERANCE = 1e-9
@@ -119,6 +119,36 @@ class BrokerPositionSnapshot:
         }.items():
             if value is not None and (value <= 0 or not math.isfinite(value)):
                 raise ValueError(f"{value_name} must be positive and finite when provided.")
+
+
+@dataclass(frozen=True)
+class ExpectedPositionProtection:
+    """Expected broker-side protection inferred from filled internal bracket intents."""
+
+    symbol: str
+    source_order_ids: tuple[str, ...]
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
+    ambiguous_fields: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.symbol.strip():
+            raise ValueError("symbol must be non-empty.")
+        if not self.source_order_ids:
+            raise ValueError("source_order_ids must be non-empty.")
+        for order_id in self.source_order_ids:
+            if not order_id.strip():
+                raise ValueError("source_order_ids must contain non-empty values.")
+        for value_name, value in {
+            "stop_loss_price": self.stop_loss_price,
+            "take_profit_price": self.take_profit_price,
+        }.items():
+            if value is not None and (value <= 0 or not math.isfinite(value)):
+                raise ValueError(f"{value_name} must be positive and finite when provided.")
+        allowed_fields = {"stop_loss_price", "take_profit_price"}
+        for field_name in self.ambiguous_fields:
+            if field_name not in allowed_fields:
+                raise ValueError("ambiguous_fields contains an unsupported field name.")
 
 
 @dataclass(frozen=True)
@@ -300,6 +330,7 @@ def reconcile_position(
     price_tolerance: float = _ZERO_TOLERANCE,
     require_stop_loss: bool = False,
     require_take_profit: bool = False,
+    expected_protection: ExpectedPositionProtection | None = None,
 ) -> tuple[ReconciliationIssue, ...]:
     """Compare one internal net position to one broker-side position snapshot."""
 
@@ -410,12 +441,33 @@ def reconcile_position(
             )
 
     if broker_position is not None:
+        if expected_protection is not None:
+            _compare_expected_position_protection(
+                issues,
+                broker_position=broker_position,
+                expected_protection=expected_protection,
+                tolerance=price_tolerance,
+            )
         _compare_required_position_protection(
             issues,
             broker_position,
             quantity_tolerance=quantity_tolerance,
             require_stop_loss=require_stop_loss,
             require_take_profit=require_take_profit,
+            skip_stop_loss=(
+                expected_protection is not None
+                and (
+                    expected_protection.stop_loss_price is not None
+                    or "stop_loss_price" in expected_protection.ambiguous_fields
+                )
+            ),
+            skip_take_profit=(
+                expected_protection is not None
+                and (
+                    expected_protection.take_profit_price is not None
+                    or "take_profit_price" in expected_protection.ambiguous_fields
+                )
+            ),
         )
 
     return tuple(issues)
@@ -469,6 +521,10 @@ def build_reconciliation_report_for_positions(
 
     issues: list[ReconciliationIssue] = []
     seen_order_ids = {order.broker_order_id for order in internal_orders}
+    expected_protections = _expected_position_protections_from_orders(
+        internal_orders,
+        internal_positions=internal_positions,
+    )
 
     for internal_order in internal_orders:
         issues.extend(
@@ -502,6 +558,7 @@ def build_reconciliation_report_for_positions(
                 broker_positions.get(symbol),
                 require_stop_loss=require_position_stop_loss,
                 require_take_profit=require_position_take_profit,
+                expected_protection=expected_protections.get(symbol),
             )
         )
 
@@ -584,6 +641,8 @@ def _compare_required_position_protection(
     quantity_tolerance: float,
     require_stop_loss: bool,
     require_take_profit: bool,
+    skip_stop_loss: bool = False,
+    skip_take_profit: bool = False,
 ) -> None:
     protected_exposure = (
         broker_position.gross_quantity
@@ -592,7 +651,7 @@ def _compare_required_position_protection(
     )
     if protected_exposure <= quantity_tolerance:
         return
-    if require_stop_loss and broker_position.stop_loss_price is None:
+    if require_stop_loss and not skip_stop_loss and broker_position.stop_loss_price is None:
         issues.append(
             ReconciliationIssue(
                 scope="position",
@@ -608,7 +667,11 @@ def _compare_required_position_protection(
                 },
             )
         )
-    if require_take_profit and broker_position.take_profit_price is None:
+    if (
+        require_take_profit
+        and not skip_take_profit
+        and broker_position.take_profit_price is None
+    ):
         issues.append(
             ReconciliationIssue(
                 scope="position",
@@ -624,3 +687,204 @@ def _compare_required_position_protection(
                 },
             )
         )
+
+
+def _expected_position_protections_from_orders(
+    internal_orders: Sequence[ExecutionOrder],
+    *,
+    internal_positions: Mapping[str, PositionState],
+) -> dict[str, ExpectedPositionProtection]:
+    expected: dict[str, ExpectedPositionProtection] = {}
+    orders_by_symbol: dict[str, list[ExecutionOrder]] = {}
+    for order in internal_orders:
+        if order.filled_quantity <= _ZERO_TOLERANCE:
+            continue
+        if order.intent.stop_loss_price is None and order.intent.take_profit_price is None:
+            continue
+        orders_by_symbol.setdefault(order.intent.symbol, []).append(order)
+
+    for symbol, position in internal_positions.items():
+        if math.isclose(float(position.net_quantity), 0.0, abs_tol=_ZERO_TOLERANCE):
+            continue
+        same_direction_orders = tuple(
+            order
+            for order in orders_by_symbol.get(symbol, ())
+            if _order_side_matches_position(order.intent.side, float(position.net_quantity))
+        )
+        if not same_direction_orders:
+            continue
+
+        stop_loss_price, stop_loss_ambiguous = _unique_protective_price(
+            same_direction_orders,
+            field_name="stop_loss_price",
+        )
+        take_profit_price, take_profit_ambiguous = _unique_protective_price(
+            same_direction_orders,
+            field_name="take_profit_price",
+        )
+        ambiguous_fields: list[str] = []
+        if stop_loss_ambiguous:
+            ambiguous_fields.append("stop_loss_price")
+        if take_profit_ambiguous:
+            ambiguous_fields.append("take_profit_price")
+        if (
+            stop_loss_price is None
+            and take_profit_price is None
+            and not ambiguous_fields
+        ):
+            continue
+
+        expected[symbol] = ExpectedPositionProtection(
+            symbol=symbol,
+            source_order_ids=tuple(
+                sorted(order.broker_order_id for order in same_direction_orders)
+            ),
+            stop_loss_price=stop_loss_price,
+            take_profit_price=take_profit_price,
+            ambiguous_fields=tuple(ambiguous_fields),
+        )
+    return expected
+
+
+def _compare_expected_position_protection(
+    issues: list[ReconciliationIssue],
+    *,
+    broker_position: BrokerPositionSnapshot,
+    expected_protection: ExpectedPositionProtection,
+    tolerance: float,
+) -> None:
+    if broker_position.symbol != expected_protection.symbol:
+        raise ValueError("expected_protection symbol must match broker_position symbol.")
+
+    reference_id = broker_position.position_id or broker_position.symbol
+    for field_name in expected_protection.ambiguous_fields:
+        issues.append(
+            ReconciliationIssue(
+                scope="position",
+                reference_id=reference_id,
+                severity=ReconciliationSeverity.ERROR,
+                code=_position_protection_code(field_name, "ambiguous"),
+                message=(
+                    "Filled internal bracket orders have conflicting expected "
+                    "position protection prices."
+                ),
+                details={
+                    "symbol": broker_position.symbol,
+                    "field_name": field_name,
+                    "source_order_ids": list(expected_protection.source_order_ids),
+                },
+            )
+        )
+
+    _compare_expected_position_protective_price(
+        issues,
+        broker_position=broker_position,
+        reference_id=reference_id,
+        field_name="stop_loss_price",
+        expected_value=expected_protection.stop_loss_price,
+        broker_value=broker_position.stop_loss_price,
+        source_order_ids=expected_protection.source_order_ids,
+        tolerance=tolerance,
+    )
+    _compare_expected_position_protective_price(
+        issues,
+        broker_position=broker_position,
+        reference_id=reference_id,
+        field_name="take_profit_price",
+        expected_value=expected_protection.take_profit_price,
+        broker_value=broker_position.take_profit_price,
+        source_order_ids=expected_protection.source_order_ids,
+        tolerance=tolerance,
+    )
+
+
+def _compare_expected_position_protective_price(
+    issues: list[ReconciliationIssue],
+    *,
+    broker_position: BrokerPositionSnapshot,
+    reference_id: str,
+    field_name: str,
+    expected_value: float | None,
+    broker_value: float | None,
+    source_order_ids: tuple[str, ...],
+    tolerance: float,
+) -> None:
+    if expected_value is None:
+        return
+    if broker_value is None:
+        issues.append(
+            ReconciliationIssue(
+                scope="position",
+                reference_id=reference_id,
+                severity=ReconciliationSeverity.ERROR,
+                code=_position_protection_code(field_name, "missing"),
+                message=(
+                    "Broker position is missing protection expected from filled "
+                    "internal bracket orders."
+                ),
+                details={
+                    "symbol": broker_position.symbol,
+                    "field_name": field_name,
+                    "expected_value": float(expected_value),
+                    "source_order_ids": list(source_order_ids),
+                },
+            )
+        )
+        return
+    if not math.isclose(float(expected_value), broker_value, abs_tol=tolerance):
+        issues.append(
+            ReconciliationIssue(
+                scope="position",
+                reference_id=reference_id,
+                severity=ReconciliationSeverity.ERROR,
+                code=_position_protection_code(field_name, "mismatch"),
+                message=(
+                    "Broker position protection does not match the filled internal "
+                    "bracket order."
+                ),
+                details={
+                    "symbol": broker_position.symbol,
+                    "field_name": field_name,
+                    "expected_value": float(expected_value),
+                    "broker_value": broker_value,
+                    "source_order_ids": list(source_order_ids),
+                },
+            )
+        )
+
+
+def _unique_protective_price(
+    orders: Sequence[ExecutionOrder],
+    *,
+    field_name: str,
+) -> tuple[float | None, bool]:
+    values = [
+        float(value)
+        for order in orders
+        if (value := getattr(order.intent, field_name)) is not None
+    ]
+    if not values:
+        return None, False
+    first_value = values[0]
+    if any(
+        not math.isclose(first_value, value, abs_tol=_ZERO_TOLERANCE)
+        for value in values[1:]
+    ):
+        return None, True
+    return first_value, False
+
+
+def _order_side_matches_position(side: OrderSide, net_quantity: float) -> bool:
+    if net_quantity > _ZERO_TOLERANCE:
+        return side is OrderSide.BUY
+    if net_quantity < -_ZERO_TOLERANCE:
+        return side is OrderSide.SELL
+    return False
+
+
+def _position_protection_code(field_name: str, suffix: str) -> str:
+    prefix = {
+        "stop_loss_price": "position_stop_loss",
+        "take_profit_price": "position_take_profit",
+    }[field_name]
+    return f"{prefix}_{suffix}"

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -19,7 +19,7 @@ from scalper_ai.deployment.health import (
     HealthStatus,
 )
 from scalper_ai.deployment.metrics import MetricsRegistry
-from scalper_ai.domain import OrderIntent, PositionState
+from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionState
 from scalper_ai.execution import (
     BrokerConnectivityProvider,
     BrokerConnectivitySnapshot,
@@ -39,7 +39,7 @@ from scalper_ai.execution import (
     build_snapshot_reconciliation_report,
 )
 from scalper_ai.journal import JournalEvent, JournalEventType
-from scalper_ai.risk import RiskContext, RiskDecision, RiskEngine, RiskLimits
+from scalper_ai.risk import RiskContext, RiskDecision, RiskDecisionStatus, RiskEngine, RiskLimits
 from scalper_ai.services import OmsOrderRecord, OmsOrderStatus, transition_order
 from scalper_ai.utils import get_logger, resolve_repo_root
 
@@ -85,7 +85,11 @@ RiskContextProvider = Callable[[OrderIntent, ExecutionQuote, ExecutionStateTrack
 _POSITION_PROTECTION_ISSUE_CODES = frozenset(
     {
         "position_stop_loss_missing",
+        "position_stop_loss_mismatch",
+        "position_stop_loss_ambiguous",
         "position_take_profit_missing",
+        "position_take_profit_mismatch",
+        "position_take_profit_ambiguous",
     }
 )
 
@@ -396,6 +400,107 @@ class DeploymentRuntime:
             self._increment_rejected_metric(intent)
             return update
 
+        return self._submit_risk_approved_order(intent, quote, risk_decision)
+
+    def flatten_unprotected_positions(
+        self,
+        quotes_by_symbol: Mapping[str, ExecutionQuote],
+        *,
+        approval_token: str,
+        created_at: datetime | None = None,
+        strategy_id: str = "runtime-position-protection",
+    ) -> tuple[ExecutionUpdate, ...]:
+        """Submit approved reduce-only flatten orders for unprotected live positions."""
+
+        self._validate_position_flatten_approval(approval_token)
+        if self.effective_mode != "live":
+            raise RuntimeError(
+                "Approved position-protection flattening is only available in live mode."
+            )
+
+        snapshot_provider = self._resolved_broker_snapshot_provider()
+        if snapshot_provider is None:
+            raise RuntimeError("Cannot flatten unprotected positions without broker snapshots.")
+
+        report = self._last_reconciliation_report
+        if report is None:
+            report_provider = self._resolved_reconciliation_report_provider()
+            if report_provider is None:
+                raise RuntimeError("Cannot flatten unprotected positions without reconciliation.")
+            report = report_provider()
+            if report is None:
+                raise RuntimeError(
+                    "Cannot flatten unprotected positions without a reconciliation report."
+                )
+            self._last_reconciliation_report = report
+        self._activate_position_protection_fail_safe(report)
+
+        target_symbols = _position_protection_issue_symbols(report)
+        if not target_symbols:
+            return ()
+
+        timestamp = created_at or datetime.now(UTC)
+        updates: list[ExecutionUpdate] = []
+        for index, broker_position in enumerate(
+            sorted(snapshot_provider.list_broker_positions(), key=lambda item: item.symbol),
+            start=1,
+        ):
+            if broker_position.symbol not in target_symbols:
+                continue
+            if abs(float(broker_position.net_quantity)) <= 1e-9:
+                continue
+            quote = quotes_by_symbol.get(broker_position.symbol)
+            if quote is None:
+                raise KeyError(
+                    f"Missing quote for approved flatten symbol: {broker_position.symbol}"
+                )
+            if quote.symbol != broker_position.symbol:
+                raise ValueError("Flatten quote symbol must match broker position symbol.")
+
+            side = (
+                OrderSide.SELL
+                if float(broker_position.net_quantity) > 0
+                else OrderSide.BUY
+            )
+            intent = OrderIntent(
+                intent_id=(
+                    "approved-flatten-"
+                    f"{broker_position.symbol}-{timestamp.strftime('%Y%m%dT%H%M%S%fZ')}-{index}"
+                ),
+                strategy_id=strategy_id,
+                symbol=broker_position.symbol,
+                created_at=timestamp,
+                side=side,
+                order_type=OrderType.MARKET,
+                quantity=abs(float(broker_position.net_quantity)),
+                reduce_only=True,
+                paper=False,
+                metadata={
+                    "reason": "position_protection_reconciliation_failed",
+                    "source_position_ids": list(broker_position.source_position_ids),
+                    "position_id": broker_position.position_id,
+                },
+            )
+            decision = RiskDecision(
+                status=RiskDecisionStatus.APPROVED,
+                checked_at=quote.received_timestamp,
+                intent_id=intent.intent_id,
+                symbol=intent.symbol,
+                reason="approved_position_protection_flatten",
+                projected_position=0.0,
+            )
+            self._record_risk_decision(decision)
+            updates.append(self._submit_risk_approved_order(intent, quote, decision))
+
+        return tuple(updates)
+
+    def _submit_risk_approved_order(
+        self,
+        intent: OrderIntent,
+        quote: ExecutionQuote,
+        risk_decision: RiskDecision,
+    ) -> ExecutionUpdate:
+        oms_record = OmsOrderRecord.new(intent)
         checked_record = transition_order(
             oms_record,
             OmsOrderStatus.CHECKED,
@@ -426,7 +531,7 @@ class DeploymentRuntime:
                 requested_mode=self.requested_mode,
                 effective_mode=self.effective_mode,
                 paper=str(intent.paper).lower(),
-        )
+            )
         return update
 
     def process_quote(self, quote: ExecutionQuote) -> tuple[ExecutionUpdate, ...]:
@@ -1268,6 +1373,10 @@ class DeploymentRuntime:
                 )
             )
 
+    def _validate_position_flatten_approval(self, approval_token: str) -> None:
+        if approval_token != self.config.deployment.live_confirmation_phrase:
+            raise RuntimeError("Approved flatten workflow requires the live confirmation phrase.")
+
     def _require_position_stop_loss(self) -> bool:
         return (
             self.effective_mode == "live"
@@ -1288,6 +1397,23 @@ class DeploymentRuntime:
         close_method = getattr(self._live_adapter, "close", None)
         if callable(close_method):
             close_method()
+
+
+def _position_protection_issue_symbols(report: ReconciliationReport) -> frozenset[str]:
+    symbols: set[str] = set()
+    for issue in report.issues:
+        if issue.code not in _POSITION_PROTECTION_ISSUE_CODES:
+            continue
+        symbol = None
+        if issue.details is not None:
+            raw_symbol = issue.details.get("symbol")
+            if isinstance(raw_symbol, str) and raw_symbol.strip():
+                symbol = raw_symbol
+        if symbol is None and issue.scope == "position":
+            symbol = issue.reference_id
+        if symbol is not None and symbol.strip():
+            symbols.add(symbol)
+    return frozenset(symbols)
 
 
 def _oms_record_to_payload(record: OmsOrderRecord, *, stage: str) -> dict[str, object]:

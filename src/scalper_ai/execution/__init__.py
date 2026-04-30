@@ -35,6 +35,7 @@ from scalper_ai.execution.paper import PaperExecutionAdapter, PaperExecutionConf
 from scalper_ai.execution.reconciliation import (
     BrokerOrderSnapshot,
     BrokerPositionSnapshot,
+    ExpectedPositionProtection,
     ReconciliationIssue,
     ReconciliationReport,
     ReconciliationSeverity,
@@ -69,6 +70,7 @@ __all__ = [
     "ExecutionStateStore",
     "ExecutionStateTracker",
     "ExecutionUpdate",
+    "ExpectedPositionProtection",
     "KillSwitchScope",
     "KillSwitchState",
     "LiveExecutionStubAdapter",
