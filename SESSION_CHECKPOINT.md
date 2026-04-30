@@ -246,6 +246,18 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - targeted pytest for MT5 live/client, deployment bootstrap, broker-probe script, and demo-order script tests passed with `22 passed`
   - `.venv/bin/python -m compileall src tests scripts` passed
   - full `.venv/bin/pytest` passed with `183 passed`
+- 2026-04-30 completed the first P0.E protective-order slice:
+  - `OrderIntent` now carries optional `stop_loss_price` and `take_profit_price`
+  - pending-order domain validation rejects obviously inverted protective prices when an entry reference price exists
+  - `Mt5OrderRequest` and `Mt5OrderState` carry protective SL/TP fields
+  - `Mt5TerminalClient` maps requested protection into MT5 native `sl` and `tp` payload fields and normalizes broker-acknowledged `sl`/`tp`
+  - `Mt5ExecutionConfig` and app config can require stop loss and/or take profit for exposure-increasing MT5 orders; missing required protection is rejected before broker submission
+  - broker order snapshots and reconciliation now flag missing or mismatched protective prices after acknowledgement
+  - `mt5_smoke.py` now serializes protective order fields in order diagnostics
+  - targeted Ruff passed for domain trading, MT5 live/client, reconciliation, config, live factory, smoke script, and touched tests
+  - targeted pytest for domain trading, MT5 live/client, reconciliation, config, and bootstrap passed with `43 passed`
+  - `.venv/bin/python -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `188 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -412,6 +424,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py tests/unit/test_scripts_mt5_broker_probe.py tests/unit/test_scripts_mt5_demo_order.py` -> `22 passed`
 - 2026-04-30: `.venv/bin/python -m compileall src tests scripts` -> passed after P0.D
 - 2026-04-30: `.venv/bin/pytest` -> `183 passed`
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/domain/trading.py src/scalper_ai/execution/mt5_live.py src/scalper_ai/execution/mt5_client.py src/scalper_ai/execution/reconciliation.py src/scalper_ai/config/models.py src/scalper_ai/config/loader.py src/scalper_ai/deployment/live_factory.py scripts/mt5_smoke.py tests/unit/test_domain_trading.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_reconciliation.py tests/unit/test_config_loader.py` -> passed after P0.E
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_domain_trading.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_reconciliation.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` -> `43 passed` after P0.E
+- 2026-04-30: `.venv/bin/python -m compileall src tests scripts` -> passed after P0.E
+- 2026-04-30: `.venv/bin/pytest` -> `188 passed` after P0.E
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -429,8 +445,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Continue P0.E and P0.D follow-through:
-- add protective TP/SL/bracket management and reconciliation
+Continue richer bracket/OCO protection and P0.D follow-through:
+- add bracket/OCO lifecycle management and fail-safe handling for missing protection after fill or reconnect
 - persist per-deal attribution in durable state/journal
 - add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills

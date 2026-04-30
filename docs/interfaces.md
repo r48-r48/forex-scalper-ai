@@ -91,13 +91,14 @@ Current contracts:
 - broker-source-of-truth MT5 sizing refresh for target-position and reduce-only decisions
 - hedging-aware MT5 position snapshots with position tickets, gross exposure, and source ticket ids
 - deal-based MT5 order state with normalized deal ids, costs, and unseen-deal fill creation
+- protective SL/TP fields on order intents, MT5 native `sl`/`tp` payload/state mapping, config-gated missing-protection rejection, and broker protective-price reconciliation
 
 Target direction:
 
 - MT5 live submission now runs `order_check` before `order_send`; full journal correlation and reconciliation flow continue through the journal/OMS work
 - broker adapters should remain separated from domain logic and OMS/risk decisions
 - runtime recovery should reload durable execution state before new orders and block unsafe live startup when recovered open orders cannot be reconciled
-- protective order reconciliation, durable per-deal attribution, and symbol-specific quantization are the next broker-adapter hardening targets
+- richer bracket/OCO lifecycle management, durable per-deal attribution, and symbol-specific quantization are the next broker-adapter hardening targets
 
 ### Journal
 
@@ -204,7 +205,7 @@ Target direction:
 
 Do next:
 
-1. Add protective TP/SL/bracket management and reconciliation.
+1. Add richer bracket/OCO lifecycle management and fail-safe handling for missing protection after fill or reconnect.
 2. Persist per-deal attribution in durable state and journal events.
 3. Add symbol-specific MT5 capability discovery and conservative quantization.
 4. Reuse existing domain, execution, deployment, journal, OMS/risk, and validation surfaces wherever possible.

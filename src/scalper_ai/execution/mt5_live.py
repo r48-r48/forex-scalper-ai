@@ -53,6 +53,8 @@ class Mt5ExecutionConfig:
     base_units_per_lot: float = 100_000.0
     min_volume_lots: float = 0.01
     volume_step_lots: float = 0.01
+    require_stop_loss: bool = False
+    require_take_profit: bool = False
     symbol_map: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -93,6 +95,8 @@ class Mt5OrderRequest:
     time_in_force: TimeInForce | None = None
     limit_price: float | None = None
     stop_price: float | None = None
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
     reduce_only: bool = False
     position_ticket: str | None = None
 
@@ -159,6 +163,8 @@ class Mt5OrderState:
     requested_volume_lots: float
     filled_volume_lots: float
     remaining_volume_lots: float
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
     average_fill_price: float | None = None
     rejection_reason: str | None = None
     cancel_reason: str | None = None
@@ -175,6 +181,12 @@ class Mt5OrderState:
             raise ValueError("filled_volume_lots must be non-negative.")
         if self.remaining_volume_lots < 0:
             raise ValueError("remaining_volume_lots must be non-negative.")
+        for value_name, value in {
+            "stop_loss_price": self.stop_loss_price,
+            "take_profit_price": self.take_profit_price,
+        }.items():
+            if value is not None and (value <= 0 or not math.isfinite(value)):
+                raise ValueError(f"{value_name} must be a positive finite value when provided.")
         if self.submitted_at.tzinfo is None or self.submitted_at.utcoffset() is None:
             raise ValueError("submitted_at must be timezone-aware.")
         if self.updated_at.tzinfo is None or self.updated_at.utcoffset() is None:
@@ -374,6 +386,22 @@ class Mt5ExecutionAdapter:
                 reason="MT5 sizing did not produce a trade quantity.",
             )
 
+        missing_protection = self._missing_required_protection(
+            intent,
+            requested_quantity=sizing.requested_quantity,
+            broker_position=broker_position,
+        )
+        if missing_protection:
+            return self._build_rejected_update(
+                intent,
+                quote=quote,
+                requested_quantity=sizing.requested_quantity,
+                reason=(
+                    "required protective prices are missing for exposure-increasing MT5 order: "
+                    f"{', '.join(missing_protection)}."
+                ),
+            )
+
         request = Mt5OrderRequest(
             client_order_id=intent.intent_id,
             broker_symbol=self._broker_symbol_for(intent.symbol),
@@ -384,6 +412,12 @@ class Mt5ExecutionAdapter:
             time_in_force=intent.time_in_force,
             limit_price=None if intent.limit_price is None else float(intent.limit_price),
             stop_price=None if intent.stop_price is None else float(intent.stop_price),
+            stop_loss_price=(
+                None if intent.stop_loss_price is None else float(intent.stop_loss_price)
+            ),
+            take_profit_price=(
+                None if intent.take_profit_price is None else float(intent.take_profit_price)
+            ),
             reduce_only=intent.reduce_only,
             position_ticket=sizing.position_ticket,
         )
@@ -475,6 +509,8 @@ class Mt5ExecutionAdapter:
                 requested_quantity=self._lots_to_base_units(state.requested_volume_lots),
                 filled_quantity=self._lots_to_base_units(state.filled_volume_lots),
                 remaining_quantity=self._lots_to_base_units(state.remaining_volume_lots),
+                stop_loss_price=state.stop_loss_price,
+                take_profit_price=state.take_profit_price,
             )
             for state in self._client.list_orders()
         ]
@@ -912,6 +948,52 @@ class Mt5ExecutionAdapter:
             requested_quantity=requested_quantity,
             position_ticket=position.position_ticket,
         )
+
+    def _missing_required_protection(
+        self,
+        intent: OrderIntent,
+        *,
+        requested_quantity: float,
+        broker_position: Mt5PositionState | None,
+    ) -> tuple[str, ...]:
+        if not self._trade_increases_exposure(
+            intent,
+            requested_quantity=requested_quantity,
+            broker_position=broker_position,
+        ):
+            return ()
+
+        missing: list[str] = []
+        if self._config.require_stop_loss and intent.stop_loss_price is None:
+            missing.append("stop_loss_price")
+        if self._config.require_take_profit and intent.take_profit_price is None:
+            missing.append("take_profit_price")
+        return tuple(missing)
+
+    def _trade_increases_exposure(
+        self,
+        intent: OrderIntent,
+        *,
+        requested_quantity: float,
+        broker_position: Mt5PositionState | None,
+    ) -> bool:
+        if intent.reduce_only:
+            return False
+        if requested_quantity <= _ZERO_TOLERANCE:
+            return False
+        if self._config.account_mode is PositionMode.HEDGING:
+            return True
+
+        current_quantity = (
+            0.0
+            if broker_position is None
+            else self._lots_to_base_units(broker_position.net_volume_lots)
+        )
+        signed_quantity = (
+            requested_quantity if intent.side is OrderSide.BUY else -requested_quantity
+        )
+        next_quantity = current_quantity + signed_quantity
+        return abs(next_quantity) - abs(current_quantity) > _ZERO_TOLERANCE
 
     @staticmethod
     def _reducible_quantity(current_quantity: float, *, side: OrderSide) -> float:

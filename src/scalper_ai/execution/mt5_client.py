@@ -394,6 +394,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             requested_volume_lots=current_state.requested_volume_lots,
             filled_volume_lots=current_state.filled_volume_lots,
             remaining_volume_lots=current_state.remaining_volume_lots,
+            stop_loss_price=current_state.stop_loss_price,
+            take_profit_price=current_state.take_profit_price,
             average_fill_price=current_state.average_fill_price,
             cancel_reason="user_requested",
         )
@@ -533,6 +535,10 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
                 payload["stoplimit"] = request.limit_price
         if request.position_ticket is not None:
             payload["position"] = int(request.position_ticket)
+        if request.stop_loss_price is not None:
+            payload["sl"] = request.stop_loss_price
+        if request.take_profit_price is not None:
+            payload["tp"] = request.take_profit_price
         return payload
 
     def _market_price(self, broker_symbol: str, *, side: OrderSide) -> float:
@@ -617,6 +623,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             requested_volume_lots=requested_volume_lots,
             filled_volume_lots=fill_quantity_lots,
             remaining_volume_lots=remaining_volume_lots,
+            stop_loss_price=self._coerce_positive_optional_float(payload.get("sl")),
+            take_profit_price=self._coerce_positive_optional_float(payload.get("tp")),
             average_fill_price=average_fill_price,
             rejection_reason=rejection_reason,
             cancel_reason=cancel_reason,
@@ -792,6 +800,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             requested_volume_lots=request.volume_lots,
             filled_volume_lots=0.0,
             remaining_volume_lots=request.volume_lots,
+            stop_loss_price=request.stop_loss_price,
+            take_profit_price=request.take_profit_price,
             rejection_reason=reason,
         )
 
@@ -816,6 +826,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             requested_volume_lots=request.volume_lots,
             filled_volume_lots=filled_volume_lots,
             remaining_volume_lots=remaining_volume_lots,
+            stop_loss_price=request.stop_loss_price,
+            take_profit_price=request.take_profit_price,
             average_fill_price=average_fill_price,
         )
 
@@ -999,6 +1011,13 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         if value is None:
             return None
         return float(value)
+
+    @staticmethod
+    def _coerce_positive_optional_float(value: Any) -> float | None:
+        if value is None:
+            return None
+        numeric_value = float(value)
+        return numeric_value if numeric_value > 0 else None
 
     @staticmethod
     def _coerce_int(value: Any) -> int | None:

@@ -60,6 +60,57 @@ def test_reconcile_order_flags_quantity_mismatch() -> None:
     assert all(issue.severity is ReconciliationSeverity.ERROR for issue in issues)
 
 
+def test_reconcile_order_flags_missing_protective_prices() -> None:
+    order = _make_order(
+        status=ExecutionOrderStatus.ACCEPTED,
+        filled_quantity=0.0,
+        remaining_quantity=2.0,
+        stop_loss_price=1.0900,
+        take_profit_price=1.1100,
+    )
+    broker = BrokerOrderSnapshot(
+        broker_order_id=order.broker_order_id,
+        symbol=order.intent.symbol,
+        status=ExecutionOrderStatus.ACCEPTED,
+        updated_at=order.updated_at,
+        requested_quantity=2.0,
+        filled_quantity=0.0,
+        remaining_quantity=2.0,
+    )
+
+    issues = reconcile_order(order, broker)
+
+    assert {issue.code for issue in issues} == {
+        "stop_loss_price_missing",
+        "take_profit_price_missing",
+    }
+    assert all(issue.severity is ReconciliationSeverity.ERROR for issue in issues)
+
+
+def test_reconcile_order_flags_protective_price_mismatch() -> None:
+    order = _make_order(
+        status=ExecutionOrderStatus.ACCEPTED,
+        filled_quantity=0.0,
+        remaining_quantity=2.0,
+        stop_loss_price=1.0900,
+    )
+    broker = BrokerOrderSnapshot(
+        broker_order_id=order.broker_order_id,
+        symbol=order.intent.symbol,
+        status=ExecutionOrderStatus.ACCEPTED,
+        updated_at=order.updated_at,
+        requested_quantity=2.0,
+        filled_quantity=0.0,
+        remaining_quantity=2.0,
+        stop_loss_price=1.0910,
+    )
+
+    issues = reconcile_order(order, broker)
+
+    assert {issue.code for issue in issues} == {"stop_loss_price_mismatch"}
+    assert issues[0].details["broker_value"] == 1.0910
+
+
 def test_reconcile_position_flags_quantity_and_entry_mismatches() -> None:
     internal_position = PositionState(
         symbol="EURUSD",
@@ -202,6 +253,8 @@ def _make_order(
     status: ExecutionOrderStatus,
     filled_quantity: float,
     remaining_quantity: float,
+    stop_loss_price: float | None = None,
+    take_profit_price: float | None = None,
 ) -> ExecutionOrder:
     created_at = datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
     intent = OrderIntent(
@@ -213,6 +266,8 @@ def _make_order(
         order_type=OrderType.LIMIT,
         quantity=2.0,
         limit_price=1.1000,
+        stop_loss_price=stop_loss_price,
+        take_profit_price=take_profit_price,
         paper=False,
     )
     return ExecutionOrder(

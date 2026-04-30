@@ -60,6 +60,8 @@ broker:
     history_lookback_hours: 24
     account_mode: netting
     order_comment_prefix: scalper_ai
+    require_stop_loss: false
+    require_take_profit: false
     symbol_map: {}
 
 monitoring:

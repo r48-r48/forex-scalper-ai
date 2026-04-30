@@ -70,6 +70,8 @@ def build_mt5_execution_adapter(
             base_units_per_lot=mt5_config.base_units_per_lot,
             min_volume_lots=mt5_config.min_volume_lots,
             volume_step_lots=mt5_config.volume_step_lots,
+            require_stop_loss=mt5_config.require_stop_loss,
+            require_take_profit=mt5_config.require_take_profit,
             symbol_map=mt5_config.symbol_map,
         ),
     )

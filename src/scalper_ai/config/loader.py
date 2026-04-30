@@ -52,6 +52,8 @@ _ENV_FIELD_ALIASES = {
     "broker_mt5_history_lookback_hours": "BROKER_MT5_HISTORY_LOOKBACK_HOURS",
     "broker_mt5_account_mode": "BROKER_MT5_ACCOUNT_MODE",
     "broker_mt5_order_comment_prefix": "BROKER_MT5_ORDER_COMMENT_PREFIX",
+    "broker_mt5_require_stop_loss": "BROKER_MT5_REQUIRE_STOP_LOSS",
+    "broker_mt5_require_take_profit": "BROKER_MT5_REQUIRE_TAKE_PROFIT",
     "broker_mt5_symbol_map_json": "BROKER_MT5_SYMBOL_MAP_JSON",
     "monitoring_health_enabled": "MONITORING_HEALTH_ENABLED",
     "monitoring_metrics_enabled": "MONITORING_METRICS_ENABLED",
@@ -130,6 +132,14 @@ class _EnvOverridesMixin:
     broker_mt5_order_comment_prefix: str | None = Field(
         default=None,
         alias="BROKER_MT5_ORDER_COMMENT_PREFIX",
+    )
+    broker_mt5_require_stop_loss: bool | None = Field(
+        default=None,
+        alias="BROKER_MT5_REQUIRE_STOP_LOSS",
+    )
+    broker_mt5_require_take_profit: bool | None = Field(
+        default=None,
+        alias="BROKER_MT5_REQUIRE_TAKE_PROFIT",
     )
     broker_mt5_symbol_map_json: str | None = Field(default=None, alias="BROKER_MT5_SYMBOL_MAP_JSON")
     monitoring_health_enabled: bool | None = Field(default=None, alias="MONITORING_HEALTH_ENABLED")
@@ -239,6 +249,10 @@ class _EnvOverridesMixin:
             mt5_overrides["account_mode"] = self.broker_mt5_account_mode
         if self.broker_mt5_order_comment_prefix is not None:
             mt5_overrides["order_comment_prefix"] = self.broker_mt5_order_comment_prefix
+        if self.broker_mt5_require_stop_loss is not None:
+            mt5_overrides["require_stop_loss"] = self.broker_mt5_require_stop_loss
+        if self.broker_mt5_require_take_profit is not None:
+            mt5_overrides["require_take_profit"] = self.broker_mt5_require_take_profit
         if self.broker_mt5_symbol_map_json is not None:
             mt5_overrides["symbol_map"] = json.loads(self.broker_mt5_symbol_map_json)
         if not mt5_overrides:

@@ -33,6 +33,8 @@ class BrokerOrderSnapshot:
     requested_quantity: float
     filled_quantity: float
     remaining_quantity: float
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
 
     def __post_init__(self) -> None:
         if not self.broker_order_id.strip():
@@ -47,6 +49,12 @@ class BrokerOrderSnapshot:
             raise ValueError("filled_quantity must be non-negative.")
         if self.remaining_quantity < 0:
             raise ValueError("remaining_quantity must be non-negative.")
+        for value_name, value in {
+            "stop_loss_price": self.stop_loss_price,
+            "take_profit_price": self.take_profit_price,
+        }.items():
+            if value is not None and (value <= 0 or not math.isfinite(value)):
+                raise ValueError(f"{value_name} must be positive and finite when provided.")
         quantity_gap = (self.filled_quantity + self.remaining_quantity) - self.requested_quantity
         if not math.isclose(quantity_gap, 0.0, abs_tol=_ZERO_TOLERANCE):
             raise ValueError(
@@ -162,6 +170,7 @@ def reconcile_order(
     broker_order: BrokerOrderSnapshot | None,
     *,
     quantity_tolerance: float = _ZERO_TOLERANCE,
+    price_tolerance: float = _ZERO_TOLERANCE,
     allow_missing_terminal_order: bool = True,
 ) -> tuple[ReconciliationIssue, ...]:
     """Compare one internal order to one broker-side snapshot."""
@@ -254,6 +263,22 @@ def reconcile_order(
         internal_value=internal_order.remaining_quantity,
         broker_value=broker_order.remaining_quantity,
         tolerance=quantity_tolerance,
+    )
+    _compare_protective_price(
+        issues,
+        reference_id=internal_order.broker_order_id,
+        field_name="stop_loss_price",
+        internal_value=internal_order.intent.stop_loss_price,
+        broker_value=broker_order.stop_loss_price,
+        tolerance=price_tolerance,
+    )
+    _compare_protective_price(
+        issues,
+        reference_id=internal_order.broker_order_id,
+        field_name="take_profit_price",
+        internal_value=internal_order.intent.take_profit_price,
+        broker_value=broker_order.take_profit_price,
+        tolerance=price_tolerance,
     )
 
     return tuple(issues)
@@ -479,6 +504,46 @@ def _compare_quantity(
                 message=message,
                 details={
                     "internal_value": internal_value,
+                    "broker_value": broker_value,
+                },
+            )
+        )
+
+
+def _compare_protective_price(
+    issues: list[ReconciliationIssue],
+    *,
+    reference_id: str,
+    field_name: str,
+    internal_value: float | None,
+    broker_value: float | None,
+    tolerance: float,
+) -> None:
+    if internal_value is None:
+        return
+    if broker_value is None:
+        issues.append(
+            ReconciliationIssue(
+                scope="order",
+                reference_id=reference_id,
+                severity=ReconciliationSeverity.ERROR,
+                code=f"{field_name}_missing",
+                message="Broker order is missing a protective price requested internally.",
+                details={"field_name": field_name, "internal_value": float(internal_value)},
+            )
+        )
+        return
+    if not math.isclose(float(internal_value), broker_value, abs_tol=tolerance):
+        issues.append(
+            ReconciliationIssue(
+                scope="order",
+                reference_id=reference_id,
+                severity=ReconciliationSeverity.ERROR,
+                code=f"{field_name}_mismatch",
+                message="Internal and broker protective prices do not match.",
+                details={
+                    "field_name": field_name,
+                    "internal_value": float(internal_value),
                     "broker_value": broker_value,
                 },
             )

@@ -60,9 +60,9 @@ Already implemented:
 Known gaps:
 - RiskEngine and OMS are now mandatory in `DeploymentRuntime.submit_order()` for the first runtime gate slice
 - first durable state storage and startup recovery wiring exists through `SqliteExecutionStateStore`, but deeper live recovery fault injection still needs broker-side scenarios for open orders, broker-only positions, and missing/partial history
-- first broker-source-of-truth MT5 sizing and hedging-aware ticket handling exists; remaining work includes multi-ticket close workflows, protective orders, symbol specs, and live fault injection
+- first broker-source-of-truth MT5 sizing and hedging-aware ticket handling exists; remaining work includes multi-ticket close workflows, richer protection workflows, symbol specs, and live fault injection
 - first deal-based live accounting slice exists with normalized MT5 deal records and deal-id fill creation; remaining work includes real-broker non-empty history validation, richer per-deal attribution in durable state/journal, and account-currency cost semantics
-- protective TP/SL/bracket management is not yet implemented as a production order-management mechanism
+- first protective TP/SL slice exists with domain fields, MT5 native `sl`/`tp` payload/state mapping, configurable missing-protection rejection, and reconciliation checks; remaining work includes true bracket/OCO lifecycle management and flatten/fail-safe handling when broker-side protection disappears after fill
 - symbol-specific capability discovery and conservative quantization are still pending
 - MT5 non-empty history/deal normalization is still unresolved because Dukascopy history APIs returned zero rows even after controlled demo fills
 - MT5 execution/reconciliation needs hedging-aware behavior for accounts with `margin_mode=2`
@@ -103,7 +103,8 @@ Known gaps:
 - P0.B Durable State Store And Startup Recovery first slice: completed on 2026-04-30 with SQLite state persistence, runtime reload, duplicate-intent recovery, and open-live-order startup blocking.
 - P0.C Broker-Source-Of-Truth MT5 Position Handling first slice: completed on 2026-04-30 with broker-position refresh before sizing, hedging ticket tracking, gross exposure reconciliation, ticket-specific reduce-only close payloads, ambiguous multi-ticket close rejection, and `182 passed` full pytest validation.
 - P0.D Deal-Based Live Accounting first slice: completed on 2026-04-30 with `Mt5DealState`, deal records on `Mt5OrderState`, unseen-deal-id fill creation, commission/fee/swap cost propagation into fill commissions, script JSON serialization, and `183 passed` full pytest validation.
-- Current next task: continue with P0.E protective TP/SL/bracket handling, deeper broker-side startup recovery, symbol-specific quantization, durable/journal deal attribution, and real-broker history API investigation.
+- P0.E Protective Order / Bracket Management first slice: completed on 2026-04-30 with `OrderIntent.stop_loss_price`/`take_profit_price`, MT5 native `sl`/`tp` mapping, optional config enforcement for exposure-increasing orders, broker protective-price reconciliation, script serialization, targeted Ruff, `43 passed` targeted pytest validation, compileall, and `188 passed` full pytest validation.
+- Current next task: continue with richer bracket/OCO protection workflows, deeper broker-side startup recovery, symbol-specific quantization, durable/journal deal attribution, and real-broker history API investigation.
 
 ## P0 Workstream
 

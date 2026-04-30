@@ -49,6 +49,8 @@ def test_mt5_execution_adapter_submits_live_market_order_and_exports_snapshots()
             side=OrderSide.BUY,
             order_type=OrderType.MARKET,
             quantity=100_000.0,
+            stop_loss_price=1.0950,
+            take_profit_price=1.1050,
             paper=False,
         ),
         quote,
@@ -64,6 +66,8 @@ def test_mt5_execution_adapter_submits_live_market_order_and_exports_snapshots()
         time_in_force=None,
         limit_price=None,
         stop_price=None,
+        stop_loss_price=1.0950,
+        take_profit_price=1.1050,
         reduce_only=False,
     )
     assert update.order.status is ExecutionOrderStatus.FILLED
@@ -77,6 +81,8 @@ def test_mt5_execution_adapter_submits_live_market_order_and_exports_snapshots()
     connectivity = adapter.describe_broker_connectivity()
     assert broker_orders[0].symbol == "EURUSD"
     assert broker_orders[0].requested_quantity == pytest.approx(100_000.0)
+    assert broker_orders[0].stop_loss_price == pytest.approx(1.0950)
+    assert broker_orders[0].take_profit_price == pytest.approx(1.1050)
     assert broker_positions[0].net_quantity == pytest.approx(100_000.0)
     assert connectivity.connected is True
     assert connectivity.venue == "MT5"
@@ -332,6 +338,47 @@ def test_mt5_execution_adapter_rejects_ambiguous_hedging_reduce_only() -> None:
     )
 
 
+def test_mt5_execution_adapter_blocks_required_missing_protection() -> None:
+    client = _ImmediateFillMt5Client()
+    adapter = Mt5ExecutionAdapter(
+        client,
+        config=Mt5ExecutionConfig(
+            base_units_per_lot=100_000.0,
+            require_stop_loss=True,
+            require_take_profit=True,
+        ),
+    )
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-unprotected",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="broker-feed",
+        ),
+    )
+
+    assert client.requests == []
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == (
+        "required protective prices are missing for exposure-increasing MT5 order: "
+        "stop_loss_price, take_profit_price."
+    )
+
+
 def test_mt5_execution_adapter_rejects_paper_orders() -> None:
     adapter = Mt5ExecutionAdapter(_ImmediateFillMt5Client())
     timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
@@ -376,6 +423,8 @@ class _ImmediateFillMt5Client:
             requested_volume_lots=request.volume_lots,
             filled_volume_lots=request.volume_lots,
             remaining_volume_lots=0.0,
+            stop_loss_price=request.stop_loss_price,
+            take_profit_price=request.take_profit_price,
             average_fill_price=1.1002,
         )
         self._orders[state.broker_order_id] = state

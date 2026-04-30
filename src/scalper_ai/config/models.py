@@ -122,6 +122,8 @@ class Mt5BrokerConfig(BaseModel):
     history_lookback_hours: int = Field(default=24, gt=0)
     account_mode: Literal["netting", "hedging"] = "netting"
     order_comment_prefix: str = "scalper_ai"
+    require_stop_loss: bool = False
+    require_take_profit: bool = False
     symbol_map: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("password", "server", "order_comment_prefix")

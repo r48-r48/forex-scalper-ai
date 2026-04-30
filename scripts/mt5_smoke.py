@@ -116,6 +116,8 @@ def main() -> None:
                     "requested_volume_lots": order.requested_volume_lots,
                     "filled_volume_lots": order.filled_volume_lots,
                     "remaining_volume_lots": order.remaining_volume_lots,
+                    "stop_loss_price": order.stop_loss_price,
+                    "take_profit_price": order.take_profit_price,
                     "average_fill_price": order.average_fill_price,
                     "deals": [
                         {

@@ -33,8 +33,8 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
    - Remaining work: durable/journal per-deal persistence, real-terminal non-empty history validation, and richer account-currency cost/credit semantics.
 
 5. Production bracket / TP / SL handling is absent.
-   - `src/scalper_ai/domain/trading.py:19` defines `OrderIntent` with market/limit/stop/stop_limit fields, but no bracket, parent-child, stop-loss, take-profit, or OCO semantics.
-   - `src/scalper_ai/execution/mt5_client.py:491` builds MT5 requests without `sl` or `tp` fields.
+   - First slice completed on `2026-04-30`: `OrderIntent` now carries optional stop-loss and take-profit prices, `Mt5TerminalClient` maps them to MT5 native `sl`/`tp`, MT5 order state carries broker-acknowledged protective prices, and reconciliation flags missing/mismatched broker protection.
+   - Remaining work: true bracket/OCO lifecycle management, fail-safe flatten/block policies if broker-side protection disappears after fill, and real-terminal validation of broker echo/position protection behavior.
 
 6. MT5 account-mode assumptions are currently unsafe for Dukascopy hedging behavior.
    - First slice completed on `2026-04-30`: MT5 config/client/adapter now accept `account_mode='hedging'`, the MT5 overlay defaults to hedging for the observed Dukascopy demo behavior, and ticket-specific reduce-only closes pass the MT5 `position` field.
@@ -124,13 +124,17 @@ Required behavior:
 
 ### P0.E - Protective Order / Bracket Management
 
+Status: first protective-order slice completed on `2026-04-30`.
+
 Goal: ensure every live position has an explicit worst-case exit path.
 
 Required behavior:
-- Extend domain contracts for protective order semantics or bracket groups.
-- Support MT5 native `sl`/`tp` for the first production slice.
-- Reconcile protective order presence after broker acknowledgement.
-- Block or flatten when required protective orders are missing.
+- Completed: extend `OrderIntent` with optional `stop_loss_price` and `take_profit_price`.
+- Completed: support MT5 native `sl`/`tp` for the first production slice.
+- Completed: reconcile protective order presence after broker acknowledgement through `BrokerOrderSnapshot`.
+- Completed: block exposure-increasing MT5 orders when config requires missing SL and/or TP.
+- Pending: true bracket/OCO parent-child lifecycle management.
+- Pending: flatten or fail-safe workflow when broker-side protection disappears after a fill or reconnect.
 
 ### P1 - Symbol Specs, Reconnect, And Risk Config Completion
 
@@ -150,4 +154,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue with P0.E plus P0.D follow-through: protective TP/SL/bracket management, durable/journal per-deal persistence, real broker history investigation, broker-side recovery fault tests, and symbol-specific quantization on top of the mandatory runtime Risk/OMS, durable recovery, broker-source MT5 hedging, and first deal-accounting gates.
+Continue with richer bracket/OCO protection plus P0.D follow-through: durable/journal per-deal persistence, real broker history investigation, broker-side recovery fault tests, fail-safe handling for missing protection after fills/reconnects, and symbol-specific quantization on top of the mandatory runtime Risk/OMS, durable recovery, broker-source MT5 hedging, first deal-accounting gate, and first protective SL/TP gate.

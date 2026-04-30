@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import FiniteFloat, model_validator
 
@@ -25,17 +25,19 @@ class OrderIntent(DomainModel):
     created_at: UtcDatetime
     side: OrderSide
     order_type: OrderType
-    time_in_force: Optional[TimeInForce] = None
-    quantity: Optional[PositiveFiniteFloat] = None
-    limit_price: Optional[PositiveFiniteFloat] = None
-    stop_price: Optional[PositiveFiniteFloat] = None
-    target_position: Optional[FiniteFloat] = None
+    time_in_force: TimeInForce | None = None
+    quantity: PositiveFiniteFloat | None = None
+    limit_price: PositiveFiniteFloat | None = None
+    stop_price: PositiveFiniteFloat | None = None
+    stop_loss_price: PositiveFiniteFloat | None = None
+    take_profit_price: PositiveFiniteFloat | None = None
+    target_position: FiniteFloat | None = None
     reduce_only: bool = False
     paper: bool = True
-    metadata: Optional[dict[NonEmptyStr, Any]] = None
+    metadata: dict[NonEmptyStr, Any] | None = None
 
     @model_validator(mode="after")
-    def validate_order_shape(self) -> "OrderIntent":
+    def validate_order_shape(self) -> OrderIntent:
         objective_count = int(self.quantity is not None) + int(self.target_position is not None)
         if objective_count != 1:
             raise ValueError("Exactly one of quantity or target_position must be provided.")
@@ -45,7 +47,9 @@ class OrderIntent(DomainModel):
                 raise ValueError("Market orders must not include limit_price or stop_price.")
         elif self.order_type == OrderType.LIMIT:
             if self.limit_price is None or self.stop_price is not None:
-                raise ValueError("Limit orders require limit_price and must not include stop_price.")
+                raise ValueError(
+                    "Limit orders require limit_price and must not include stop_price."
+                )
         elif self.order_type == OrderType.STOP:
             if self.stop_price is None or self.limit_price is not None:
                 raise ValueError("Stop orders require stop_price and must not include limit_price.")
@@ -53,7 +57,42 @@ class OrderIntent(DomainModel):
             if self.stop_price is None or self.limit_price is None:
                 raise ValueError("Stop-limit orders require both stop_price and limit_price.")
 
+        reference_price = self._protective_reference_price()
+        if reference_price is not None:
+            self._validate_protective_prices(reference_price)
+
         return self
+
+    def _protective_reference_price(self) -> float | None:
+        if self.order_type in {OrderType.LIMIT, OrderType.STOP_LIMIT}:
+            return None if self.limit_price is None else float(self.limit_price)
+        if self.order_type == OrderType.STOP:
+            return None if self.stop_price is None else float(self.stop_price)
+        return None
+
+    def _validate_protective_prices(self, reference_price: float) -> None:
+        if self.side is OrderSide.BUY:
+            if (
+                self.stop_loss_price is not None
+                and float(self.stop_loss_price) >= reference_price
+            ):
+                raise ValueError("Buy stop_loss_price must be below the entry reference price.")
+            if (
+                self.take_profit_price is not None
+                and float(self.take_profit_price) <= reference_price
+            ):
+                raise ValueError("Buy take_profit_price must be above the entry reference price.")
+        else:
+            if (
+                self.stop_loss_price is not None
+                and float(self.stop_loss_price) <= reference_price
+            ):
+                raise ValueError("Sell stop_loss_price must be above the entry reference price.")
+            if (
+                self.take_profit_price is not None
+                and float(self.take_profit_price) >= reference_price
+            ):
+                raise ValueError("Sell take_profit_price must be below the entry reference price.")
 
 
 class FillEvent(DomainModel):
@@ -61,7 +100,7 @@ class FillEvent(DomainModel):
 
     fill_id: NonEmptyStr
     intent_id: NonEmptyStr
-    broker_order_id: Optional[NonEmptyStr] = None
+    broker_order_id: NonEmptyStr | None = None
     symbol: NonEmptyStr
     event_timestamp: UtcDatetime
     received_timestamp: UtcDatetime
@@ -72,7 +111,7 @@ class FillEvent(DomainModel):
     spread_cost: NonNegativeFiniteFloat = 0.0
     slippage_cost: NonNegativeFiniteFloat = 0.0
     liquidity_flag: LiquidityFlag = LiquidityFlag.UNKNOWN
-    venue: Optional[NonEmptyStr] = None
+    venue: NonEmptyStr | None = None
 
 
 class PositionState(DomainModel):
@@ -86,11 +125,11 @@ class PositionState(DomainModel):
     realized_pnl: FiniteFloat
     unrealized_pnl: FiniteFloat
     exposure_quote: FiniteFloat
-    last_fill_id: Optional[NonEmptyStr] = None
-    position_mode: Optional[PositionMode] = None
+    last_fill_id: NonEmptyStr | None = None
+    position_mode: PositionMode | None = None
 
     @model_validator(mode="after")
-    def validate_entry_price(self) -> "PositionState":
+    def validate_entry_price(self) -> PositionState:
         if self.net_quantity == 0:
             return self
         if self.average_entry_price <= 0:

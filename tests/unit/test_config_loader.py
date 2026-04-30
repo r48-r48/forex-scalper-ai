@@ -57,6 +57,8 @@ def test_load_app_config_applies_mt5_env_override(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("SCALPER_AI_BROKER_MT5_LOGIN", "777777")
     monkeypatch.setenv("SCALPER_AI_BROKER_MT5_SERVER", "MetaQuotes-Demo")
     monkeypatch.setenv("SCALPER_AI_BROKER_MT5_PASSWORD", "secret")
+    monkeypatch.setenv("SCALPER_AI_BROKER_MT5_REQUIRE_STOP_LOSS", "true")
+    monkeypatch.setenv("SCALPER_AI_BROKER_MT5_REQUIRE_TAKE_PROFIT", "true")
     monkeypatch.setenv("SCALPER_AI_BROKER_MT5_SYMBOL_MAP_JSON", '{"EURUSD":"EURUSD.a"}')
 
     config = load_app_config(config_dir=resolve_repo_root() / "configs")
@@ -65,6 +67,8 @@ def test_load_app_config_applies_mt5_env_override(monkeypatch: pytest.MonkeyPatc
     assert config.broker.mt5.login == 777777
     assert config.broker.mt5.server == "MetaQuotes-Demo"
     assert config.broker.mt5.password == "secret"
+    assert config.broker.mt5.require_stop_loss is True
+    assert config.broker.mt5.require_take_profit is True
     assert config.broker.mt5.symbol_map == {"EURUSD": "EURUSD.a"}
 
 

@@ -39,6 +39,8 @@ def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission(
             order_type=OrderType.MARKET,
             submitted_at=submitted_at,
             volume_lots=1.0,
+            stop_loss_price=1.0950,
+            take_profit_price=1.1050,
         )
     )
 
@@ -49,10 +51,14 @@ def test_mt5_terminal_client_initializes_and_normalizes_market_order_submission(
     assert module.last_order_send_payload["action"] == module.TRADE_ACTION_DEAL
     assert module.last_order_send_payload["symbol"] == "EURUSD.a"
     assert module.last_order_send_payload["price"] == 1.1002
+    assert module.last_order_send_payload["sl"] == 1.0950
+    assert module.last_order_send_payload["tp"] == 1.1050
     assert state.broker_order_id == "9001"
     assert state.status is ExecutionOrderStatus.FILLED
     assert state.filled_volume_lots == 1.0
     assert state.average_fill_price == 1.1002
+    assert state.stop_loss_price == 1.0950
+    assert state.take_profit_price == 1.1050
     assert len(state.deals) == 1
     assert state.deals[0].broker_deal_id == "9901"
     assert state.deals[0].broker_order_id == "9001"
@@ -250,6 +256,31 @@ def test_mt5_terminal_client_includes_position_ticket_for_hedging_close() -> Non
     assert module.last_order_check_payload["position"] == 111
 
 
+def test_mt5_terminal_client_includes_protective_prices_in_order_check() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    check = client.check_order(
+        Mt5OrderRequest(
+            client_order_id="protected",
+            broker_symbol="EURUSD",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            volume_lots=0.01,
+            stop_loss_price=1.0950,
+            take_profit_price=1.1050,
+        )
+    )
+
+    assert check.accepted is True
+    assert module.last_order_check_payload["sl"] == 1.0950
+    assert module.last_order_check_payload["tp"] == 1.1050
+
+
 def test_discover_mt5_terminal_path_finds_macos_bundle_executable(tmp_path: Path) -> None:
     applications_root = tmp_path / "Applications"
     executable = (
@@ -373,6 +404,8 @@ class _FakeMetaTrader5Module:
             state=self.ORDER_STATE_FILLED,
             volume_initial=request["volume"],
             volume_current=0.0,
+            sl=request.get("sl", 0.0),
+            tp=request.get("tp", 0.0),
             time_setup=1_774_670_400,
             time_done=1_774_670_400,
             comment="done",
