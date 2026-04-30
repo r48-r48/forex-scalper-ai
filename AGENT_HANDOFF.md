@@ -435,6 +435,7 @@ Current repository status:
 - Session updated on: 2026-04-30
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - P0.C Broker-Source-Of-Truth MT5 Position Handling first slice is complete: MT5 sizing now refreshes broker positions before target/reduce-only decisions, hedging mode tracks position tickets and gross exposure, ticket-specific reduce-only closes pass MT5 `position`, ambiguous multi-ticket closes are rejected before broker submission, reconciliation flags hidden hedged gross exposure, `configs/mt5.yaml` defaults to hedging for observed Dukascopy demo behavior, and full `.venv/bin/pytest` passed with `182 passed`
   - P0.B Durable State Store And Startup Recovery first slice is complete: `scalper_ai.execution.state_store` provides `SqliteExecutionStateStore`, runtime recovery reloads execution/OMS/account state before accepting new orders, duplicate intents after restart are blocked from recovered state, recovered open live orders block unsafe fallback or unreconciled startup, and full `.venv/bin/pytest` passed with `176 passed`
   - P0.A Runtime Risk/OMS Gate first slice is complete: `DeploymentRuntime.submit_order()` evaluates `RiskEngine` before router/broker submission, drives OMS transitions, journals risk/OMS/execution/fill/position events, and returns normalized risk-rejected execution updates without broker submission
   - P2.3 Release Runbooks is complete: `docs/runbooks/`, `docs/production-checklist.md`, `docs/incident-template.md`, and `docs/postmortem-template.md` now provide normal and incident procedures
@@ -479,7 +480,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, non-empty history/deal normalization, and protective order management
+  - continue P0.D deal-based live accounting, P0.E protective order management, deeper broker-side recovery/fault injection, symbol-specific MT5 quantization, and non-empty history/deal normalization
   - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## Constraints To Preserve
@@ -527,6 +528,8 @@ In this thread, the following checks passed:
 cd '/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai'
 .venv/bin/python -m compileall src tests scripts
 .venv/bin/pytest
+.venv/bin/ruff check src/scalper_ai/deployment/live_factory.py src/scalper_ai/deployment/mt5_preflight.py src/scalper_ai/execution/mt5_client.py src/scalper_ai/execution/mt5_live.py src/scalper_ai/execution/reconciliation.py src/scalper_ai/execution/__init__.py scripts/mt5_broker_probe.py scripts/mt5_demo_order.py tests/unit/test_config_loader.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_reconciliation.py tests/integration/test_deployment_bootstrap.py
+.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_reconciliation.py tests/unit/test_config_loader.py tests/unit/test_deployment_mt5_preflight.py tests/integration/test_deployment_bootstrap.py
 .venv/bin/ruff check src/scalper_ai/validation/gate.py src/scalper_ai/validation/shadow.py src/scalper_ai/models/baseline_filter.py src/scalper_ai/validation/supervised_filter.py tests/unit/test_validation_gate.py tests/unit/test_validation_shadow.py tests/unit/test_models_baseline_filter.py tests/integration/test_supervised_filter_walk_forward.py
 python3 -m compileall src tests scripts
 python3 -m pytest

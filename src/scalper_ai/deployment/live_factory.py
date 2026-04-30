@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from scalper_ai.config import AppConfig
+from scalper_ai.domain import PositionMode
 from scalper_ai.execution import (
     ExecutionAdapter,
     LiveExecutionStubAdapter,
@@ -55,12 +56,17 @@ def build_mt5_execution_adapter(
     mt5_config = config.broker.mt5
     client = build_mt5_terminal_client(config, mt5_module=mt5_module)
     account_snapshot = client.describe_account()
-    initial_cash = 100_000.0 if account_snapshot.balance is None else float(account_snapshot.balance)
+    initial_cash = (
+        100_000.0
+        if account_snapshot.balance is None
+        else float(account_snapshot.balance)
+    )
     return Mt5ExecutionAdapter(
         client,
         config=Mt5ExecutionConfig(
             initial_cash=initial_cash,
             default_venue="MT5",
+            account_mode=PositionMode(mt5_config.account_mode),
             base_units_per_lot=mt5_config.base_units_per_lot,
             min_volume_lots=mt5_config.min_volume_lots,
             volume_step_lots=mt5_config.volume_step_lots,
@@ -73,7 +79,7 @@ def resolve_live_adapter_factory(
     config: AppConfig,
     *,
     mt5_module: MetaTrader5ModuleProtocol | None = None,
-) -> Optional[Callable[[], ExecutionAdapter]]:
+) -> Callable[[], ExecutionAdapter] | None:
     """Return a configured live adapter factory when the config names one we can build."""
 
     adapter_name = config.broker.live_adapter.strip().lower()

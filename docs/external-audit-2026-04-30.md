@@ -21,9 +21,8 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
    - `src/scalper_ai/risk/engine.py` and `src/scalper_ai/services/oms.py` exist and are tested, but are not enforced by `DeploymentRuntime.submit_order()`.
 
 2. MT5 live sizing uses local adapter state instead of broker state.
-   - `src/scalper_ai/execution/mt5_live.py:189` resolves current position through `self.get_position(...)`.
-   - `src/scalper_ai/execution/mt5_live.py:251` returns the latest marked internal position, not a refreshed broker position.
-   - Broker snapshot methods exist, but they are not used as the source of truth before target-position or reduce-only sizing.
+   - First slice completed on `2026-04-30`: `Mt5ExecutionAdapter.submit_order()` now refreshes broker positions before target-position and reduce-only sizing, `get_position()` refreshes from broker state when a quote is available, and broker position snapshots carry gross exposure and source tickets.
+   - Remaining work: richer multi-ticket close workflows, broker fault-injection tests, deal-based accounting, protective order handling, and symbol-specific lot constraints.
 
 3. Durable restart recovery was absent at audit time.
    - First slice completed on `2026-04-30`: `state_store.py` now provides SQLite persistence for runtime order/risk/OMS/execution/fill/position/kill-switch state, and `DeploymentRuntime.start()` reloads state before new orders.
@@ -38,7 +37,7 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
    - `src/scalper_ai/execution/mt5_client.py:491` builds MT5 requests without `sl` or `tp` fields.
 
 6. MT5 account-mode assumptions are currently unsafe for Dukascopy hedging behavior.
-   - `src/scalper_ai/execution/mt5_client.py:47` currently accepts only `account_mode='netting'`.
+   - First slice completed on `2026-04-30`: MT5 config/client/adapter now accept `account_mode='hedging'`, the MT5 overlay defaults to hedging for the observed Dukascopy demo behavior, and ticket-specific reduce-only closes pass the MT5 `position` field.
    - The real Parallels demo validation on 2026-04-29 proved Dukascopy `margin_mode=2` behaves as hedging: an opposite order opened a second position until ticket-specific flattening closed both positions.
 
 ### Confirmed P1 Findings
@@ -98,13 +97,17 @@ Required behavior:
 
 ### P0.C - Broker-Source-Of-Truth MT5 Position Handling
 
+Status: first broker-source MT5 hedging slice completed on `2026-04-30`.
+
 Goal: prevent local-cache sizing errors.
 
 Required behavior:
-- Refresh broker positions before target-position and reduce-only sizing.
-- Support hedging accounts by tracking position tickets, not just net symbol exposure.
-- Keep Dukascopy EURUSD on IOC unless a fresh broker probe proves otherwise.
-- Reconcile broker snapshots back through existing snapshot contracts.
+- Completed: refresh broker positions before target-position and reduce-only sizing.
+- Completed: support hedging accounts by tracking position tickets and gross exposure, not just net symbol exposure.
+- Completed: pass a single unambiguous position ticket to MT5 reduce-only close requests and reject ambiguous multi-ticket closes.
+- Completed: keep Dukascopy EURUSD overlay on hedging mode and IOC operational knowledge unless a fresh broker probe proves otherwise.
+- Completed: reconcile broker snapshots back through existing snapshot contracts, including hidden gross hedged exposure detection.
+- Pending: add richer explicit multi-ticket close orchestration and live fault-injection coverage.
 
 ### P0.D - Deal-Based Live Accounting
 
@@ -144,4 +147,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue with P0.C/P0.D: broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, and deal/history normalization on top of the mandatory runtime Risk/OMS and durable recovery gates.
+Continue with P0.D/P0.E: deal/history normalization, commission/fee/swap attribution, and protective TP/SL/bracket management on top of the mandatory runtime Risk/OMS, durable recovery, and first broker-source MT5 hedging gates.

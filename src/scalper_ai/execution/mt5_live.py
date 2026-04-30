@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timezone
-from typing import Protocol, Sequence
+from datetime import UTC, datetime
+from typing import Protocol
 
 from scalper_ai.backtesting.accounting import (
     apply_fill_to_cash,
@@ -36,11 +37,19 @@ _ZERO_TOLERANCE = 1e-12
 
 
 @dataclass(frozen=True)
+class _ResolvedMt5Sizing:
+    requested_quantity: float | None
+    rejection_reason: str | None = None
+    position_ticket: str | None = None
+
+
+@dataclass(frozen=True)
 class Mt5ExecutionConfig:
     """Configuration for the MT5 execution adapter skeleton."""
 
     initial_cash: float = 100_000.0
     default_venue: str = "MT5"
+    account_mode: PositionMode = PositionMode.NETTING
     base_units_per_lot: float = 100_000.0
     min_volume_lots: float = 0.01
     volume_step_lots: float = 0.01
@@ -57,6 +66,15 @@ class Mt5ExecutionConfig:
             raise ValueError("volume_step_lots must be greater than zero.")
         if not self.default_venue.strip():
             raise ValueError("default_venue must be non-empty.")
+        try:
+            account_mode = (
+                self.account_mode
+                if isinstance(self.account_mode, PositionMode)
+                else PositionMode(str(self.account_mode))
+            )
+        except ValueError as exc:
+            raise ValueError("account_mode must be 'netting' or 'hedging'.") from exc
+        object.__setattr__(self, "account_mode", account_mode)
         for internal_symbol, broker_symbol in self.symbol_map.items():
             if not internal_symbol.strip() or not broker_symbol.strip():
                 raise ValueError("symbol_map keys and values must be non-empty.")
@@ -76,6 +94,7 @@ class Mt5OrderRequest:
     limit_price: float | None = None
     stop_price: float | None = None
     reduce_only: bool = False
+    position_ticket: str | None = None
 
 
 @dataclass(frozen=True)
@@ -113,12 +132,16 @@ class Mt5OrderState:
 
 @dataclass(frozen=True)
 class Mt5PositionState:
-    """Normalized MT5 netting position state expressed in lots."""
+    """Normalized MT5 position state expressed in lots."""
 
     broker_symbol: str
     timestamp: datetime
     net_volume_lots: float
     average_entry_price: float
+    position_ticket: str | None = None
+    position_mode: PositionMode = PositionMode.NETTING
+    gross_volume_lots: float | None = None
+    source_position_tickets: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.broker_symbol.strip():
@@ -129,6 +152,71 @@ class Mt5PositionState:
             raise ValueError("net_volume_lots must be finite.")
         if self.average_entry_price < 0:
             raise ValueError("average_entry_price must be non-negative.")
+        if self.position_ticket is not None and not self.position_ticket.strip():
+            raise ValueError("position_ticket must be non-empty when provided.")
+        if self.gross_volume_lots is not None:
+            if self.gross_volume_lots < 0:
+                raise ValueError("gross_volume_lots must be non-negative when provided.")
+            if abs(self.net_volume_lots) - self.gross_volume_lots > _ZERO_TOLERANCE:
+                raise ValueError("gross_volume_lots must not be smaller than absolute net volume.")
+        for ticket in self.source_position_tickets:
+            if not ticket.strip():
+                raise ValueError("source_position_tickets must contain non-empty values.")
+
+    @property
+    def gross_lots(self) -> float:
+        """Return gross lot exposure when available."""
+
+        return (
+            abs(self.net_volume_lots)
+            if self.gross_volume_lots is None
+            else self.gross_volume_lots
+        )
+
+
+def aggregate_mt5_positions(
+    positions: Sequence[Mt5PositionState],
+    *,
+    broker_symbol: str | None = None,
+    position_mode: PositionMode | None = None,
+) -> Mt5PositionState | None:
+    """Aggregate one or more MT5 position tickets into a broker-source snapshot."""
+
+    selected = tuple(
+        position
+        for position in positions
+        if broker_symbol is None or position.broker_symbol == broker_symbol
+    )
+    if not selected:
+        return None
+    if len(selected) == 1:
+        position = selected[0]
+        source_tickets = _source_position_tickets(selected)
+        return replace(
+            position,
+            position_mode=position_mode or position.position_mode,
+            gross_volume_lots=position.gross_lots,
+            source_position_tickets=source_tickets,
+        )
+
+    net_volume_lots = sum(position.net_volume_lots for position in selected)
+    gross_volume_lots = sum(position.gross_lots for position in selected)
+    timestamp = max(position.timestamp for position in selected)
+    resolved_mode = position_mode or (
+        PositionMode.HEDGING
+        if any(position.position_mode is PositionMode.HEDGING for position in selected)
+        else PositionMode.NETTING
+    )
+    return Mt5PositionState(
+        broker_symbol=selected[0].broker_symbol,
+        timestamp=timestamp,
+        net_volume_lots=net_volume_lots,
+        average_entry_price=_weighted_entry_price(selected, net_volume_lots=net_volume_lots),
+        position_ticket=None,
+        position_mode=resolved_mode,
+        gross_volume_lots=gross_volume_lots,
+        source_position_tickets=_source_position_tickets(selected),
+    )
 
 
 class Mt5ExecutionClientProtocol(Protocol):
@@ -162,7 +250,12 @@ class Mt5ExecutionClientProtocol(Protocol):
 class Mt5ExecutionAdapter:
     """Broker-specific live adapter skeleton that normalizes MT5 state into core models."""
 
-    def __init__(self, client: Mt5ExecutionClientProtocol, *, config: Mt5ExecutionConfig | None = None) -> None:
+    def __init__(
+        self,
+        client: Mt5ExecutionClientProtocol,
+        *,
+        config: Mt5ExecutionConfig | None = None,
+    ) -> None:
         self._client = client
         self._config = config or Mt5ExecutionConfig()
         self._cash_balance = float(self._config.initial_cash)
@@ -187,10 +280,40 @@ class Mt5ExecutionAdapter:
             raise ValueError("ExecutionQuote symbol must match the submitted OrderIntent symbol.")
 
         self._remember_quote(quote)
-        current_position = self.get_position(intent.symbol, quote=quote) or self._mark_current_position(intent.symbol, quote)
-        requested_quantity, rejection_reason = self._resolve_requested_quantity(intent, current_position=current_position)
-        if rejection_reason is not None:
-            return self._build_rejected_update(intent, quote=quote, requested_quantity=requested_quantity, reason=rejection_reason)
+        broker_positions = self._broker_positions_for_symbol(intent.symbol)
+        broker_position = aggregate_mt5_positions(
+            broker_positions,
+            broker_symbol=self._broker_symbol_for(intent.symbol),
+            position_mode=self._config.account_mode,
+        )
+        if broker_position is not None:
+            self._positions[intent.symbol] = self._position_state_from_broker(
+                intent.symbol,
+                broker_position,
+                quote=quote,
+            )
+        else:
+            self._positions[intent.symbol] = self._flat_position(intent.symbol, quote=quote)
+
+        sizing = self._resolve_requested_quantity(
+            intent,
+            broker_position=broker_position,
+            broker_positions=broker_positions,
+        )
+        if sizing.rejection_reason is not None:
+            return self._build_rejected_update(
+                intent,
+                quote=quote,
+                requested_quantity=sizing.requested_quantity,
+                reason=sizing.rejection_reason,
+            )
+        if sizing.requested_quantity is None:
+            return self._build_rejected_update(
+                intent,
+                quote=quote,
+                requested_quantity=None,
+                reason="MT5 sizing did not produce a trade quantity.",
+            )
 
         request = Mt5OrderRequest(
             client_order_id=intent.intent_id,
@@ -198,11 +321,12 @@ class Mt5ExecutionAdapter:
             side=intent.side,
             order_type=intent.order_type,
             submitted_at=quote.received_timestamp,
-            volume_lots=self._base_units_to_lots(requested_quantity),
+            volume_lots=self._base_units_to_lots(sizing.requested_quantity),
             time_in_force=intent.time_in_force,
             limit_price=None if intent.limit_price is None else float(intent.limit_price),
             stop_price=None if intent.stop_price is None else float(intent.stop_price),
             reduce_only=intent.reduce_only,
+            position_ticket=sizing.position_ticket,
         )
         state = self._client.submit_order(request)
         return self._sync_order_state(intent, state, quote=quote)
@@ -211,7 +335,7 @@ class Mt5ExecutionAdapter:
         """Poll MT5 order state for open orders after a fresh quote update."""
 
         self._remember_quote(quote)
-        self._mark_current_position(quote.symbol, quote)
+        self.get_position(quote.symbol, quote=quote)
 
         updates: list[ExecutionUpdate] = []
         for broker_order_id in list(self._open_order_ids_by_symbol.get(quote.symbol, ())):
@@ -232,7 +356,10 @@ class Mt5ExecutionAdapter:
             raise KeyError(f"Unknown broker_order_id: {broker_order_id}")
         current_quote = self._last_quotes.get(existing_order.intent.symbol)
         if current_quote is None:
-            raise RuntimeError("Cannot cancel an order before at least one quote has been observed for its symbol.")
+            raise RuntimeError(
+                "Cannot cancel an order before at least one quote has been observed "
+                "for its symbol."
+            )
 
         quote = replace(
             current_quote,
@@ -248,8 +375,13 @@ class Mt5ExecutionAdapter:
 
         return self._orders.get(broker_order_id)
 
-    def get_position(self, symbol: str, *, quote: ExecutionQuote | None = None) -> PositionState | None:
-        """Return the latest marked internal position for one symbol."""
+    def get_position(
+        self,
+        symbol: str,
+        *,
+        quote: ExecutionQuote | None = None,
+    ) -> PositionState | None:
+        """Return the latest broker-source-of-truth position for one symbol."""
 
         if quote is not None:
             if quote.symbol != symbol:
@@ -259,7 +391,18 @@ class Mt5ExecutionAdapter:
         latest_quote = quote or self._last_quotes.get(symbol)
         if latest_quote is None:
             return self._positions.get(symbol)
-        return self._mark_current_position(symbol, latest_quote)
+
+        broker_position = aggregate_mt5_positions(
+            self._broker_positions_for_symbol(symbol),
+            broker_symbol=self._broker_symbol_for(symbol),
+            position_mode=self._config.account_mode,
+        )
+        if broker_position is None:
+            position = self._flat_position(symbol, quote=latest_quote)
+        else:
+            position = self._position_state_from_broker(symbol, broker_position, quote=latest_quote)
+        self._positions[symbol] = position
+        return position
 
     def list_broker_orders(self) -> tuple[BrokerOrderSnapshot, ...]:
         """Return normalized broker-side order snapshots for reconciliation."""
@@ -281,22 +424,37 @@ class Mt5ExecutionAdapter:
     def list_broker_positions(self) -> tuple[BrokerPositionSnapshot, ...]:
         """Return normalized broker-side net positions for reconciliation."""
 
-        snapshots = [
-            BrokerPositionSnapshot(
-                symbol=self._internal_symbol_for(position.broker_symbol),
-                timestamp=position.timestamp,
-                net_quantity=self._lots_to_base_units(position.net_volume_lots),
-                average_entry_price=position.average_entry_price,
-                position_mode=PositionMode.NETTING,
+        positions_by_symbol: dict[str, list[Mt5PositionState]] = {}
+        for position in self._client.list_positions():
+            positions_by_symbol.setdefault(position.broker_symbol, []).append(position)
+
+        snapshots: list[BrokerPositionSnapshot] = []
+        for broker_symbol, positions in positions_by_symbol.items():
+            position = aggregate_mt5_positions(
+                positions,
+                broker_symbol=broker_symbol,
+                position_mode=self._config.account_mode,
             )
-            for position in self._client.list_positions()
-        ]
+            if position is None:
+                continue
+            snapshots.append(
+                BrokerPositionSnapshot(
+                    symbol=self._internal_symbol_for(position.broker_symbol),
+                    timestamp=position.timestamp,
+                    net_quantity=self._lots_to_base_units(position.net_volume_lots),
+                    average_entry_price=position.average_entry_price,
+                    position_mode=position.position_mode,
+                    position_id=position.position_ticket,
+                    gross_quantity=self._lots_to_base_units(position.gross_lots),
+                    source_position_ids=position.source_position_tickets,
+                )
+            )
         return tuple(sorted(snapshots, key=lambda snapshot: snapshot.symbol))
 
     def describe_broker_connectivity(self) -> BrokerConnectivitySnapshot:
         """Return the current MT5 dependency snapshot for runtime health checks."""
 
-        checked_at = datetime.now(timezone.utc)
+        checked_at = datetime.now(UTC)
         connected = self._client.is_connected()
         latest_broker_timestamp = self._latest_broker_snapshot_timestamp()
         return BrokerConnectivitySnapshot(
@@ -354,7 +512,7 @@ class Mt5ExecutionAdapter:
             fills = (fill,)
             order_fills = order_fills + fills
         else:
-            self._mark_current_position(intent.symbol, quote)
+            self.get_position(intent.symbol, quote=quote)
 
         normalized_order = ExecutionOrder(
             intent=intent,
@@ -434,7 +592,9 @@ class Mt5ExecutionAdapter:
         *,
         quote: ExecutionQuote,
     ) -> ExecutionUpdate:
-        position = self._mark_current_position(order.intent.symbol, quote)
+        position = self.get_position(order.intent.symbol, quote=quote)
+        if position is None:
+            position = self._flat_position(order.intent.symbol, quote=quote)
         equity = calculate_equity(self._cash_balance, position)
         return ExecutionUpdate(
             order=order,
@@ -456,6 +616,51 @@ class Mt5ExecutionAdapter:
         self._positions[symbol] = marked
         return marked
 
+    def _flat_position(self, symbol: str, *, quote: ExecutionQuote) -> PositionState:
+        return PositionState(
+            symbol=symbol,
+            timestamp=quote.received_timestamp,
+            net_quantity=0.0,
+            average_entry_price=0.0,
+            mark_price=quote.mid_price,
+            realized_pnl=0.0,
+            unrealized_pnl=0.0,
+            exposure_quote=0.0,
+            position_mode=self._config.account_mode,
+        )
+
+    def _position_state_from_broker(
+        self,
+        symbol: str,
+        broker_position: Mt5PositionState,
+        *,
+        quote: ExecutionQuote,
+    ) -> PositionState:
+        net_quantity = self._lots_to_base_units(broker_position.net_volume_lots)
+        average_entry_price = (
+            0.0
+            if math.isclose(net_quantity, 0.0, abs_tol=_ZERO_TOLERANCE)
+            else broker_position.average_entry_price
+        )
+        unrealized_pnl = (
+            0.0
+            if math.isclose(net_quantity, 0.0, abs_tol=_ZERO_TOLERANCE)
+            else (quote.mid_price - average_entry_price) * net_quantity
+        )
+        current_position = self._positions.get(symbol)
+        return PositionState(
+            symbol=symbol,
+            timestamp=quote.received_timestamp,
+            net_quantity=net_quantity,
+            average_entry_price=average_entry_price,
+            mark_price=quote.mid_price,
+            realized_pnl=0.0 if current_position is None else float(current_position.realized_pnl),
+            unrealized_pnl=unrealized_pnl,
+            exposure_quote=net_quantity * quote.mid_price,
+            last_fill_id=None if current_position is None else current_position.last_fill_id,
+            position_mode=broker_position.position_mode,
+        )
+
     def _persist_order(self, order: ExecutionOrder) -> None:
         self._orders[order.broker_order_id] = order
         symbol_open_orders = self._open_order_ids_by_symbol.setdefault(order.intent.symbol, [])
@@ -472,29 +677,115 @@ class Mt5ExecutionAdapter:
         self,
         intent: OrderIntent,
         *,
-        current_position: PositionState,
-    ) -> tuple[float | None, str | None]:
-        current_quantity = float(current_position.net_quantity)
+        broker_position: Mt5PositionState | None,
+        broker_positions: Sequence[Mt5PositionState],
+    ) -> _ResolvedMt5Sizing:
+        current_quantity = (
+            0.0
+            if broker_position is None
+            else self._lots_to_base_units(broker_position.net_volume_lots)
+        )
         if intent.target_position is not None:
             delta_quantity = float(intent.target_position) - current_quantity
             if math.isclose(delta_quantity, 0.0, abs_tol=_ZERO_TOLERANCE):
-                return None, "target_position resolves to zero trade quantity."
+                return _ResolvedMt5Sizing(
+                    requested_quantity=None,
+                    rejection_reason="target_position resolves to zero trade quantity.",
+                )
             implied_side = OrderSide.BUY if delta_quantity > 0 else OrderSide.SELL
             if intent.side is not implied_side:
-                return None, "side is inconsistent with the requested target_position."
+                return _ResolvedMt5Sizing(
+                    requested_quantity=None,
+                    rejection_reason="side is inconsistent with the requested target_position.",
+                )
             requested_quantity = abs(delta_quantity)
         else:
             if intent.quantity is None:
-                return None, "quantity must be provided when target_position is absent."
+                return _ResolvedMt5Sizing(
+                    requested_quantity=None,
+                    rejection_reason="quantity must be provided when target_position is absent.",
+                )
             requested_quantity = float(intent.quantity)
+
+        if self._config.account_mode is PositionMode.HEDGING:
+            return self._resolve_hedging_sizing(
+                intent,
+                requested_quantity=requested_quantity,
+                current_quantity=current_quantity,
+                broker_positions=broker_positions,
+            )
 
         if intent.reduce_only:
             reducible_quantity = self._reducible_quantity(current_quantity, side=intent.side)
             if reducible_quantity <= 0:
-                return None, "reduce_only order would not reduce the current position."
+                return _ResolvedMt5Sizing(
+                    requested_quantity=None,
+                    rejection_reason="reduce_only order would not reduce the current position.",
+                )
             if requested_quantity - reducible_quantity > _ZERO_TOLERANCE:
-                return None, "reduce_only order quantity exceeds the reducible position size."
-        return requested_quantity, None
+                return _ResolvedMt5Sizing(
+                    requested_quantity=requested_quantity,
+                    rejection_reason=(
+                        "reduce_only order quantity exceeds the reducible position size."
+                    ),
+                )
+        return _ResolvedMt5Sizing(requested_quantity=requested_quantity)
+
+    def _resolve_hedging_sizing(
+        self,
+        intent: OrderIntent,
+        *,
+        requested_quantity: float,
+        current_quantity: float,
+        broker_positions: Sequence[Mt5PositionState],
+    ) -> _ResolvedMt5Sizing:
+        reduces_net = self._reducible_quantity(current_quantity, side=intent.side) > 0
+        if not intent.reduce_only:
+            if intent.target_position is not None and reduces_net:
+                return _ResolvedMt5Sizing(
+                    requested_quantity=requested_quantity,
+                    rejection_reason=(
+                        "hedging target_position reductions require reduce_only so MT5 can "
+                        "close a broker position ticket instead of opening an opposite hedge."
+                    ),
+                )
+            return _ResolvedMt5Sizing(requested_quantity=requested_quantity)
+
+        reducible_positions = tuple(
+            position
+            for position in broker_positions
+            if _position_is_reduced_by(position, intent.side)
+        )
+        if not reducible_positions:
+            return _ResolvedMt5Sizing(
+                requested_quantity=None,
+                rejection_reason="reduce_only order would not reduce any broker position ticket.",
+            )
+        if len(reducible_positions) > 1:
+            return _ResolvedMt5Sizing(
+                requested_quantity=requested_quantity,
+                rejection_reason=(
+                    "reduce_only hedging order is ambiguous across multiple broker position "
+                    "tickets."
+                ),
+            )
+
+        position = reducible_positions[0]
+        if position.position_ticket is None:
+            return _ResolvedMt5Sizing(
+                requested_quantity=requested_quantity,
+                rejection_reason="reduce_only hedging order requires a broker position ticket.",
+            )
+        reducible_quantity = self._lots_to_base_units(abs(position.net_volume_lots))
+        if requested_quantity - reducible_quantity > _ZERO_TOLERANCE:
+            return _ResolvedMt5Sizing(
+                requested_quantity=requested_quantity,
+                rejection_reason="reduce_only order quantity exceeds the broker position ticket.",
+            )
+        return _ResolvedMt5Sizing(
+            requested_quantity=requested_quantity,
+            position_ticket=position.position_ticket,
+        )
 
     @staticmethod
     def _reducible_quantity(current_quantity: float, *, side: OrderSide) -> float:
@@ -506,9 +797,12 @@ class Mt5ExecutionAdapter:
 
     def _base_units_to_lots(self, quantity: float) -> float:
         raw_lots = float(quantity) / self._config.base_units_per_lot
-        normalized_lots = round(round(raw_lots / self._config.volume_step_lots) * self._config.volume_step_lots, 8)
+        step_count = math.floor((raw_lots + _ZERO_TOLERANCE) / self._config.volume_step_lots)
+        normalized_lots = round(step_count * self._config.volume_step_lots, 8)
         if normalized_lots < self._config.min_volume_lots - _ZERO_TOLERANCE:
-            raise ValueError("Requested base-unit quantity is smaller than the broker minimum lot size.")
+            raise ValueError(
+                "Requested base-unit quantity is smaller than the broker minimum lot size."
+            )
         return normalized_lots
 
     def _lots_to_base_units(self, volume_lots: float) -> float:
@@ -523,6 +817,18 @@ class Mt5ExecutionAdapter:
                 return internal_symbol
         return broker_symbol
 
+    def _broker_positions_for_symbol(self, symbol: str) -> tuple[Mt5PositionState, ...]:
+        broker_symbol = self._broker_symbol_for(symbol)
+        positions = tuple(
+            position
+            for position in self._client.list_positions()
+            if position.broker_symbol == broker_symbol
+        )
+        if positions:
+            return positions
+        aggregate_position = self._client.get_position(broker_symbol)
+        return () if aggregate_position is None else (aggregate_position,)
+
     def _latest_broker_snapshot_timestamp(self) -> datetime | None:
         timestamps = [state.updated_at for state in self._client.list_orders()]
         timestamps.extend(position.timestamp for position in self._client.list_positions())
@@ -534,3 +840,44 @@ class Mt5ExecutionAdapter:
         fill_id = f"mt5-fill-{self._next_fill_id:06d}"
         self._next_fill_id += 1
         return fill_id
+
+
+def _source_position_tickets(positions: Sequence[Mt5PositionState]) -> tuple[str, ...]:
+    tickets: list[str] = []
+    for position in positions:
+        if position.position_ticket is not None:
+            tickets.append(position.position_ticket)
+        tickets.extend(position.source_position_tickets)
+    return tuple(sorted(set(tickets)))
+
+
+def _weighted_entry_price(
+    positions: Sequence[Mt5PositionState],
+    *,
+    net_volume_lots: float,
+) -> float:
+    if math.isclose(net_volume_lots, 0.0, abs_tol=_ZERO_TOLERANCE):
+        return 0.0
+    net_sign = 1.0 if net_volume_lots > 0 else -1.0
+    same_direction = [
+        position
+        for position in positions
+        if not math.isclose(position.net_volume_lots, 0.0, abs_tol=_ZERO_TOLERANCE)
+        and math.copysign(1.0, position.net_volume_lots) == net_sign
+    ]
+    total_volume = sum(abs(position.net_volume_lots) for position in same_direction)
+    if total_volume <= 0:
+        return 0.0
+    weighted_notional = sum(
+        abs(position.net_volume_lots) * position.average_entry_price
+        for position in same_direction
+    )
+    return weighted_notional / total_volume
+
+
+def _position_is_reduced_by(position: Mt5PositionState, side: OrderSide) -> bool:
+    if side is OrderSide.BUY and position.net_volume_lots < 0:
+        return True
+    if side is OrderSide.SELL and position.net_volume_lots > 0:
+        return True
+    return False

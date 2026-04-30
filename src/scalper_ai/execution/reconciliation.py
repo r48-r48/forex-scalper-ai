@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Mapping, Optional, Sequence
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from scalper_ai.domain import PositionMode, PositionState
 from scalper_ai.execution.models import ExecutionOrder, ExecutionOrderStatus
@@ -14,7 +14,7 @@ from scalper_ai.execution.models import ExecutionOrder, ExecutionOrderStatus
 _ZERO_TOLERANCE = 1e-9
 
 
-class ReconciliationSeverity(str, Enum):
+class ReconciliationSeverity(StrEnum):
     """Severity levels for reconciliation issues."""
 
     INFO = "info"
@@ -49,7 +49,9 @@ class BrokerOrderSnapshot:
             raise ValueError("remaining_quantity must be non-negative.")
         quantity_gap = (self.filled_quantity + self.remaining_quantity) - self.requested_quantity
         if not math.isclose(quantity_gap, 0.0, abs_tol=_ZERO_TOLERANCE):
-            raise ValueError("filled_quantity and remaining_quantity must reconcile to requested_quantity.")
+            raise ValueError(
+                "filled_quantity and remaining_quantity must reconcile to requested_quantity."
+            )
 
     @property
     def is_open(self) -> bool:
@@ -71,6 +73,9 @@ class BrokerPositionSnapshot:
     net_quantity: float
     average_entry_price: float = 0.0
     position_mode: PositionMode = PositionMode.NETTING
+    position_id: str | None = None
+    gross_quantity: float | None = None
+    source_position_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.symbol.strip():
@@ -83,8 +88,21 @@ class BrokerPositionSnapshot:
             abs_tol=_ZERO_TOLERANCE,
         ):
             raise ValueError("Flat positions must not carry a non-zero average_entry_price.")
-        if not math.isclose(self.net_quantity, 0.0, abs_tol=_ZERO_TOLERANCE) and self.average_entry_price <= 0:
+        if (
+            not math.isclose(self.net_quantity, 0.0, abs_tol=_ZERO_TOLERANCE)
+            and self.average_entry_price <= 0
+        ):
             raise ValueError("Non-flat positions require a positive average_entry_price.")
+        if self.position_id is not None and not self.position_id.strip():
+            raise ValueError("position_id must be non-empty when provided.")
+        if self.gross_quantity is not None:
+            if self.gross_quantity < 0:
+                raise ValueError("gross_quantity must be non-negative when provided.")
+            if abs(self.net_quantity) - self.gross_quantity > _ZERO_TOLERANCE:
+                raise ValueError("gross_quantity must not be smaller than absolute net_quantity.")
+        for position_id in self.source_position_ids:
+            if not position_id.strip():
+                raise ValueError("source_position_ids must contain non-empty values.")
 
 
 @dataclass(frozen=True)
@@ -96,7 +114,7 @@ class ReconciliationIssue:
     severity: ReconciliationSeverity
     code: str
     message: str
-    details: Optional[dict[str, object]] = None
+    details: dict[str, object] | None = None
 
     def __post_init__(self) -> None:
         if not self.scope.strip():
@@ -141,7 +159,7 @@ class ReconciliationReport:
 
 def reconcile_order(
     internal_order: ExecutionOrder,
-    broker_order: Optional[BrokerOrderSnapshot],
+    broker_order: BrokerOrderSnapshot | None,
     *,
     quantity_tolerance: float = _ZERO_TOLERANCE,
     allow_missing_terminal_order: bool = True,
@@ -242,8 +260,8 @@ def reconcile_order(
 
 
 def reconcile_position(
-    internal_position: Optional[PositionState],
-    broker_position: Optional[BrokerPositionSnapshot],
+    internal_position: PositionState | None,
+    broker_position: BrokerPositionSnapshot | None,
     *,
     quantity_tolerance: float = _ZERO_TOLERANCE,
     price_tolerance: float = _ZERO_TOLERANCE,
@@ -253,7 +271,11 @@ def reconcile_position(
     issues: list[ReconciliationIssue] = []
     internal_quantity = 0.0 if internal_position is None else float(internal_position.net_quantity)
     internal_symbol = None if internal_position is None else internal_position.symbol
-    internal_entry = 0.0 if internal_position is None else float(internal_position.average_entry_price)
+    internal_entry = (
+        0.0
+        if internal_position is None
+        else float(internal_position.average_entry_price)
+    )
 
     broker_quantity = 0.0 if broker_position is None else float(broker_position.net_quantity)
     broker_symbol = None if broker_position is None else broker_position.symbol
@@ -261,7 +283,11 @@ def reconcile_position(
 
     reference_id = broker_symbol or internal_symbol or "position"
 
-    if internal_symbol is not None and broker_symbol is not None and internal_symbol != broker_symbol:
+    if (
+        internal_symbol is not None
+        and broker_symbol is not None
+        and internal_symbol != broker_symbol
+    ):
         issues.append(
             ReconciliationIssue(
                 scope="position",
@@ -327,6 +353,27 @@ def reconcile_position(
                 )
             )
 
+    if broker_position is not None and broker_position.gross_quantity is not None:
+        gross_excess = broker_position.gross_quantity - abs(broker_quantity)
+        if gross_excess > quantity_tolerance:
+            issues.append(
+                ReconciliationIssue(
+                    scope="position",
+                    reference_id=reference_id,
+                    severity=ReconciliationSeverity.ERROR,
+                    code="hedged_gross_exposure",
+                    message=(
+                        "Broker hedging positions carry gross exposure that is hidden by "
+                        "net quantity."
+                    ),
+                    details={
+                        "broker_net_quantity": broker_quantity,
+                        "broker_gross_quantity": broker_position.gross_quantity,
+                        "source_position_ids": list(broker_position.source_position_ids),
+                    },
+                )
+            )
+
     return tuple(issues)
 
 
@@ -334,9 +381,9 @@ def build_reconciliation_report(
     *,
     internal_orders: Sequence[ExecutionOrder],
     broker_orders: Mapping[str, BrokerOrderSnapshot],
-    internal_position: Optional[PositionState],
-    broker_position: Optional[BrokerPositionSnapshot],
-    checked_at: Optional[datetime] = None,
+    internal_position: PositionState | None,
+    broker_position: BrokerPositionSnapshot | None,
+    checked_at: datetime | None = None,
     allow_missing_terminal_orders: bool = True,
 ) -> ReconciliationReport:
     """Build one aggregated reconciliation report."""
@@ -365,7 +412,7 @@ def build_reconciliation_report_for_positions(
     broker_orders: Mapping[str, BrokerOrderSnapshot],
     internal_positions: Mapping[str, PositionState],
     broker_positions: Mapping[str, BrokerPositionSnapshot],
-    checked_at: Optional[datetime] = None,
+    checked_at: datetime | None = None,
     allow_missing_terminal_orders: bool = True,
 ) -> ReconciliationReport:
     """Build one aggregated reconciliation report across many symbols."""
@@ -390,16 +437,24 @@ def build_reconciliation_report_for_positions(
                     reference_id=broker_order_id,
                     severity=ReconciliationSeverity.WARN,
                     code="unknown_broker_order",
-                    message="Broker reconciliation data contains an order unknown to internal state.",
+                    message=(
+                        "Broker reconciliation data contains an order unknown to "
+                        "internal state."
+                    ),
                     details={"symbol": broker_order.symbol, "status": broker_order.status.value},
                 )
             )
 
     for symbol in sorted(set(internal_positions) | set(broker_positions)):
-        issues.extend(reconcile_position(internal_positions.get(symbol), broker_positions.get(symbol)))
+        issues.extend(
+            reconcile_position(
+                internal_positions.get(symbol),
+                broker_positions.get(symbol),
+            )
+        )
 
     return ReconciliationReport(
-        checked_at=checked_at or datetime.now(timezone.utc),
+        checked_at=checked_at or datetime.now(UTC),
         issues=tuple(issues),
     )
 

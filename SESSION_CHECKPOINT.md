@@ -14,7 +14,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Current Snapshot
 
-- Date: `2026-04-28`
+- Date: `2026-04-30`
 - Repo phase status: `PHASE 1-12 complete`
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
@@ -221,6 +221,20 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - targeted Ruff passed for the new state store, runtime, execution exports, and touched tests
   - `.venv/bin/pytest tests/unit/test_execution_state_store.py tests/unit/test_deployment_runtime.py` passed with `18 passed`
   - full `.venv/bin/pytest` passed with `176 passed`
+- 2026-04-30 completed the first P0.C broker-source-of-truth MT5 hedging slice:
+  - `Mt5ExecutionAdapter.submit_order()` now refreshes broker positions before target-position or reduce-only sizing
+  - `Mt5ExecutionAdapter.get_position()` refreshes from broker-source positions when a quote is available
+  - `Mt5PositionState` now tracks `position_ticket`, `position_mode`, `gross_volume_lots`, and `source_position_tickets`
+  - `aggregate_mt5_positions()` aggregates hedging tickets into net/gross broker-source snapshots
+  - hedging reduce-only closes now require one unambiguous reducible broker position ticket and pass MT5 `position` through `Mt5OrderRequest`
+  - ambiguous multi-ticket reduce-only closes are rejected before broker submission
+  - broker snapshots and reconciliation now carry gross exposure/source ids and flag hidden hedged gross exposure
+  - `Mt5TerminalClient` now accepts hedging mode, lists individual positions, aggregates hedging positions by symbol, and includes `position` for ticket-specific closes
+  - `configs/mt5.yaml` defaults to `account_mode: hedging` for the observed Dukascopy demo behavior
+  - targeted Ruff for the touched MT5/reconciliation/preflight/config/scripts/bootstrap files passed
+  - targeted pytest for MT5 live/client, reconciliation, config, preflight, and bootstrap passed with `33 passed`
+  - `.venv/bin/python -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `182 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -379,7 +393,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-29: Parallels Windows 11 controlled MT5 demo order -> minimum EURUSD IOC order filled, initial opposite flatten created hedged positions, ticket-specific flatten closed both, final smoke had zero orders/positions
 - 2026-04-29: `.venv/bin/ruff check scripts/mt5_demo_order.py scripts/mt5_flatten_positions.py tests/unit/test_scripts_mt5_demo_order.py tests/unit/test_scripts_mt5_flatten_positions.py` -> passed
 - 2026-04-29: `.venv/bin/pytest tests/unit/test_scripts_mt5_demo_order.py tests/unit/test_scripts_mt5_flatten_positions.py` -> `5 passed`
-- `.venv/bin/pytest` -> `165 passed`
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/deployment/live_factory.py src/scalper_ai/deployment/mt5_preflight.py src/scalper_ai/execution/mt5_client.py src/scalper_ai/execution/mt5_live.py src/scalper_ai/execution/reconciliation.py src/scalper_ai/execution/__init__.py scripts/mt5_broker_probe.py scripts/mt5_demo_order.py tests/unit/test_config_loader.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_reconciliation.py tests/integration/test_deployment_bootstrap.py` -> passed
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_reconciliation.py tests/unit/test_config_loader.py tests/unit/test_deployment_mt5_preflight.py tests/integration/test_deployment_bootstrap.py` -> `33 passed`
+- 2026-04-30: `.venv/bin/python -m compileall src tests scripts` -> passed
+- 2026-04-30: `.venv/bin/pytest` -> `182 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -397,11 +414,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Recommended Next Move
 
-Continue MT5 demo validation when the Windows terminal is available:
+Continue P0.D/P0.E hardening:
+- add deal-based live accounting and commission/fee/swap attribution
+- add protective TP/SL/bracket management and reconciliation
+- add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
-- add hedging-aware MT5 execution/reconciliation support for accounts with `margin_mode=2`
-- lock in broker-specific IOC behavior for Dukascopy EURUSD
-- reconcile resulting order/deal/position state through existing snapshot contracts
+- add symbol-specific MT5 capability discovery and conservative quantization
 
 If further MT5 validation is paused:
 - validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup

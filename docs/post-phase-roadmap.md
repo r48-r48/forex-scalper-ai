@@ -60,7 +60,7 @@ Already implemented:
 Known gaps:
 - RiskEngine and OMS are now mandatory in `DeploymentRuntime.submit_order()` for the first runtime gate slice
 - first durable state storage and startup recovery wiring exists through `SqliteExecutionStateStore`, but deeper live recovery fault injection still needs broker-side scenarios for open orders, broker-only positions, and missing/partial history
-- MT5 live sizing still needs broker-source-of-truth refresh before target-position/reduce-only decisions
+- first broker-source-of-truth MT5 sizing and hedging-aware ticket handling exists; remaining work includes multi-ticket close workflows, deal-based accounting, protective orders, symbol specs, and live fault injection
 - live accounting still needs deal-level commission/fee/swap attribution
 - protective TP/SL/bracket management is not yet implemented as a production order-management mechanism
 - symbol-specific capability discovery and conservative quantization are still pending
@@ -101,7 +101,8 @@ Known gaps:
 - Parallels MT5 read-only validation and runtime availability check: completed on 2026-04-28 without order_send; IOC is required for Dukascopy EURUSD, one-year history is empty, terminal-side trading permission is disabled, Docker is unavailable locally, and local paper runtime describe/health/metrics passed.
 - Controlled Parallels MT5 demo-order validation: completed on 2026-04-29 with explicit operator approval, minimum EURUSD IOC demo fill, ticket-specific flattening, and zero remaining open positions.
 - P0.B Durable State Store And Startup Recovery first slice: completed on 2026-04-30 with SQLite state persistence, runtime reload, duplicate-intent recovery, and open-live-order startup blocking.
-- Current next task: continue with broker-source-of-truth MT5 sizing, hedging-aware MT5 execution/reconciliation, and history API investigation.
+- P0.C Broker-Source-Of-Truth MT5 Position Handling first slice: completed on 2026-04-30 with broker-position refresh before sizing, hedging ticket tracking, gross exposure reconciliation, ticket-specific reduce-only close payloads, ambiguous multi-ticket close rejection, and `182 passed` full pytest validation.
+- Current next task: continue with P0.D deal-based live accounting, P0.E protective TP/SL/bracket handling, deeper broker-side startup recovery, symbol-specific quantization, and history API investigation.
 
 ## P0 Workstream
 

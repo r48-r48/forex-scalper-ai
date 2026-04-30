@@ -10,13 +10,14 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, Protocol
 
-from scalper_ai.domain import OrderSide, OrderType, TimeInForce
+from scalper_ai.domain import OrderSide, OrderType, PositionMode, TimeInForce
 from scalper_ai.execution.models import ExecutionOrderStatus
 from scalper_ai.execution.mt5_live import (
     Mt5ExecutionClientProtocol,
     Mt5OrderRequest,
     Mt5OrderState,
     Mt5PositionState,
+    aggregate_mt5_positions,
 )
 
 
@@ -44,8 +45,14 @@ class Mt5TerminalClientConfig:
             raise ValueError("deviation_points must be non-negative.")
         if self.history_lookback_hours <= 0:
             raise ValueError("history_lookback_hours must be greater than zero.")
-        if self.account_mode != "netting":
-            raise ValueError("Mt5TerminalClient currently supports only account_mode='netting'.")
+        account_mode = (
+            self.account_mode.value
+            if isinstance(self.account_mode, PositionMode)
+            else str(self.account_mode)
+        )
+        if account_mode not in {PositionMode.NETTING.value, PositionMode.HEDGING.value}:
+            raise ValueError("account_mode must be 'netting' or 'hedging'.")
+        object.__setattr__(self, "account_mode", account_mode)
         if not self.order_comment_prefix.strip():
             raise ValueError("order_comment_prefix must be non-empty.")
 
@@ -425,21 +432,36 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         positions = self._positions_get(symbol=broker_symbol)
         if not positions:
             return None
+        normalized_positions = tuple(
+            self._normalize_position_record(position) for position in positions
+        )
         if len(positions) > 1:
-            raise RuntimeError(
-                "MT5 client expects one netting position per symbol, "
-                "but multiple positions were found."
+            if self._config.account_mode == PositionMode.NETTING.value:
+                raise RuntimeError(
+                    "MT5 client expects one netting position per symbol, "
+                    "but multiple positions were found."
+                )
+            return aggregate_mt5_positions(
+                normalized_positions,
+                broker_symbol=broker_symbol,
+                position_mode=PositionMode.HEDGING,
             )
-        return self._normalize_position_record(positions[0])
+        return normalized_positions[0]
 
     def list_positions(self) -> tuple[Mt5PositionState, ...]:
         """Return normalized broker positions for reconciliation."""
 
         self._ensure_initialized()
         positions = [
-            self._normalize_position_record(raw_position) for raw_position in self._positions_get()
+            self._normalize_position_record(raw_position)
+            for raw_position in self._positions_get()
         ]
-        return tuple(sorted(positions, key=lambda position: position.broker_symbol))
+        return tuple(
+            sorted(
+                positions,
+                key=lambda position: (position.broker_symbol, position.position_ticket or ""),
+            )
+        )
 
     def is_connected(self) -> bool:
         """Return whether the terminal and account dependencies are reachable."""
@@ -508,6 +530,8 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             payload["price"] = self._pending_order_price(request)
             if request.order_type is OrderType.STOP_LIMIT:
                 payload["stoplimit"] = request.limit_price
+        if request.position_ticket is not None:
+            payload["position"] = int(request.position_ticket)
         return payload
 
     def _market_price(self, broker_symbol: str, *, side: OrderSide) -> float:
@@ -602,11 +626,16 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         volume_lots = self._coerce_float(payload.get("volume"))
         if volume_lots is None:
             raise ValueError("MT5 position payload is missing volume.")
+        position_ticket = self._coerce_optional_str(payload.get("ticket"))
         return Mt5PositionState(
             broker_symbol=str(payload["symbol"]),
             timestamp=self._payload_timestamp(payload, primary="time_msc", fallback="time"),
             net_volume_lots=direction * volume_lots,
             average_entry_price=float(payload.get("price_open", 0.0)),
+            position_ticket=position_ticket,
+            position_mode=PositionMode(self._config.account_mode),
+            gross_volume_lots=abs(volume_lots),
+            source_position_tickets=() if position_ticket is None else (position_ticket,),
         )
 
     def _deal_fill_summary(self, ticket: int) -> tuple[float, float | None]:

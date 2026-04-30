@@ -6,7 +6,7 @@
 
 ## Current Next Step
 
-- Continue acting on the 2026-04-30 external audit triage after the first runtime Risk/OMS gate and durable recovery slices: next add broker-source-of-truth MT5 sizing, hedging-aware position handling, deal-based accounting, and protective TP/SL/bracket handling.
+- Continue acting on the 2026-04-30 external audit triage after the first runtime Risk/OMS gate, durable recovery, and broker-source MT5 hedging slices: next add deal-based live accounting, protective TP/SL/bracket handling, deeper broker-side recovery fault tests, and symbol-specific quantization.
 - Keep the completed Parallels MT5 demo-order findings in scope while doing this work: Dukascopy `margin_mode=2` behaved as hedging, IOC is required for EURUSD, and `history_orders_get` / `history_deals_get` still returned zero rows after controlled demo fills.
 - If further MT5 work is paused, validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with small-batch Ruff/mypy cleanup from `docs/post-phase-roadmap.md`.
 
@@ -46,6 +46,7 @@
 - External live-readiness audit triage — completed on 2026-04-30 as `docs/external-audit-2026-04-30.md`; confirmed P0 gaps are mandatory Risk/OMS runtime wiring, durable state/recovery, broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, deal-based accounting, and protective order management
 - P0.A first runtime gate slice — completed on 2026-04-30: `DeploymentRuntime.submit_order()` now enforces RiskEngine before router/broker submit, drives OMS checked/sent/final/process-update or risk-rejected states, and records risk/OMS/execution journal events; targeted Ruff passed and full `.venv/bin/pytest` passed with `173 passed`
 - P0.B first durable recovery slice — completed on 2026-04-30: `SqliteExecutionStateStore` persists runtime order/risk/OMS/execution/fill/position/kill-switch state, `DeploymentRuntime.start()` reloads state before new orders, duplicate intents after restart are blocked by recovered state, open live recovered orders block unsafe paper fallback or unreconciled live startup, and full `.venv/bin/pytest` passed with `176 passed`
+- P0.C first broker-source MT5 hedging slice — completed on 2026-04-30: MT5 sizing refreshes broker positions before target/reduce-only decisions, hedging mode tracks tickets and gross exposure, single-ticket reduce-only closes pass MT5 `position`, ambiguous multi-ticket closes are rejected, reconciliation flags hidden hedged gross exposure, the MT5 overlay defaults to hedging for Dukascopy demo behavior, targeted Ruff passed, targeted pytest passed with `33 passed`, and full `.venv/bin/pytest` passed with `182 passed`
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for Docker/Compose runtime validation, network alert transport wiring, and dependency supervision beyond the current broker health checks
 - production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics

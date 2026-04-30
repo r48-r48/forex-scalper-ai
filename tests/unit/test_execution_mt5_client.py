@@ -6,7 +6,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
-from scalper_ai.domain import OrderSide, OrderType
+import pytest
+
+from scalper_ai.domain import OrderSide, OrderType, PositionMode
 from scalper_ai.execution import ExecutionOrderStatus
 from scalper_ai.execution.mt5_client import (
     Mt5TerminalClient,
@@ -180,6 +182,66 @@ def test_mt5_terminal_client_describes_account_positions_and_closes_cleanly() ->
     assert module.shutdown_called is True
 
 
+def test_mt5_terminal_client_aggregates_hedging_positions_by_symbol() -> None:
+    module = _FakeMetaTrader5Module()
+    module._positions = {
+        "EURUSD-111": SimpleNamespace(
+            ticket=111,
+            symbol="EURUSD",
+            type=module.POSITION_TYPE_BUY,
+            volume=0.03,
+            price_open=1.1000,
+            time=1_774_670_400,
+        ),
+        "EURUSD-222": SimpleNamespace(
+            ticket=222,
+            symbol="EURUSD",
+            type=module.POSITION_TYPE_SELL,
+            volume=0.01,
+            price_open=1.1010,
+            time=1_774_670_401,
+        ),
+    }
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(account_mode="hedging"),
+        module=module,
+    )
+
+    position = client.get_position("EURUSD")
+    raw_positions = client.list_positions()
+
+    assert position is not None
+    assert position.position_mode is PositionMode.HEDGING
+    assert position.net_volume_lots == pytest.approx(0.02)
+    assert position.gross_volume_lots == pytest.approx(0.04)
+    assert position.source_position_tickets == ("111", "222")
+    assert {raw_position.position_ticket for raw_position in raw_positions} == {"111", "222"}
+
+
+def test_mt5_terminal_client_includes_position_ticket_for_hedging_close() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(account_mode="hedging"),
+        module=module,
+    )
+
+    check = client.check_order(
+        Mt5OrderRequest(
+            client_order_id="close-ticket",
+            broker_symbol="EURUSD",
+            side=OrderSide.SELL,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            volume_lots=0.01,
+            reduce_only=True,
+            position_ticket="111",
+        )
+    )
+
+    assert check.accepted is True
+    assert module.last_order_check_payload["position"] == 111
+
+
 def test_discover_mt5_terminal_path_finds_macos_bundle_executable(tmp_path: Path) -> None:
     applications_root = tmp_path / "Applications"
     executable = (
@@ -334,8 +396,7 @@ class _FakeMetaTrader5Module:
         symbol = kwargs.get("symbol")
         if symbol is None:
             return tuple(self._positions.values())
-        position = self._positions.get(str(symbol))
-        return () if position is None else (position,)
+        return tuple(position for position in self._positions.values() if position.symbol == symbol)
 
     def history_orders_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
         ticket = kwargs.get("ticket")

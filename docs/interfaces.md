@@ -88,12 +88,15 @@ Current contracts:
 - paper execution adapter
 - live stub adapter
 - MT5 live adapter and terminal client wrapper
+- broker-source-of-truth MT5 sizing refresh for target-position and reduce-only decisions
+- hedging-aware MT5 position snapshots with position tickets, gross exposure, and source ticket ids
 
 Target direction:
 
 - MT5 live submission now runs `order_check` before `order_send`; full journal correlation and reconciliation flow continue through the journal/OMS work
 - broker adapters should remain separated from domain logic and OMS/risk decisions
 - runtime recovery should reload durable execution state before new orders and block unsafe live startup when recovered open orders cannot be reconciled
+- deal-based accounting, protective order reconciliation, and symbol-specific quantization are the next broker-adapter hardening targets
 
 ### Journal
 
@@ -200,6 +203,7 @@ Target direction:
 
 Do next:
 
-1. Validate the MT5 path against a real terminal when package, credentials, and live confirmation are available.
-2. If MT5 remains unavailable, continue with P1.1 execution-aware simulator work.
-3. Reuse existing domain, execution, deployment, journal, OMS/risk, and validation surfaces wherever possible.
+1. Add deal-based live accounting and commission/fee/swap attribution.
+2. Add protective TP/SL/bracket management and reconciliation.
+3. Add symbol-specific MT5 capability discovery and conservative quantization.
+4. Reuse existing domain, execution, deployment, journal, OMS/risk, and validation surfaces wherever possible.

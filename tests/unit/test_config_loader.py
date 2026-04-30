@@ -37,7 +37,7 @@ def test_load_app_config_supports_mt5_overlay() -> None:
     assert config.runtime.mode == "live"
     assert config.broker.live_enabled is True
     assert config.broker.live_adapter == "mt5"
-    assert config.broker.mt5.account_mode == "netting"
+    assert config.broker.mt5.account_mode == "hedging"
 
 
 def test_load_app_config_applies_env_override(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -11,9 +11,18 @@ from scalper_ai.deployment.mt5_preflight import build_mt5_preflight_report
 from scalper_ai.utils.paths import resolve_repo_root
 
 
-def test_build_mt5_preflight_report_surfaces_missing_package_and_autodiscovered_path(tmp_path: Path) -> None:
+def test_build_mt5_preflight_report_surfaces_missing_package_and_path(
+    tmp_path: Path,
+) -> None:
     config = load_app_config(config_name="mt5", config_dir=resolve_repo_root() / "configs")
-    executable = tmp_path / "Applications" / "MetaTrader 5.app" / "Wrapper" / "MetaTrader5Terminal.app" / "MetaTrader5Terminal"
+    executable = (
+        tmp_path
+        / "Applications"
+        / "MetaTrader 5.app"
+        / "Wrapper"
+        / "MetaTrader5Terminal.app"
+        / "MetaTrader5Terminal"
+    )
     executable.parent.mkdir(parents=True)
     executable.write_text("binary", encoding="utf-8")
 
@@ -29,9 +38,12 @@ def test_build_mt5_preflight_report_surfaces_missing_package_and_autodiscovered_
     assert report.ready_for_connection is False
     assert any("MetaTrader5 Python package is not installed" in error for error in report.errors)
     assert any("Auto-discovered MT5 terminal executable" in note for note in report.notes)
+    assert any("account_mode='hedging'" in note for note in report.notes)
 
 
-def test_build_mt5_preflight_report_rejects_invalid_configured_terminal_path(tmp_path: Path) -> None:
+def test_build_mt5_preflight_report_rejects_invalid_configured_terminal_path(
+    tmp_path: Path,
+) -> None:
     missing_terminal = tmp_path / "missing-terminal"
     base_config = load_app_config(config_name="mt5", config_dir=resolve_repo_root() / "configs")
     broker_config = base_config.broker.model_copy(
@@ -91,4 +103,10 @@ class _FactoryFakeMetaTrader5Module:
         return SimpleNamespace(name="MT5")
 
     def account_info(self) -> SimpleNamespace:
-        return SimpleNamespace(login=1, server="demo", balance=1000.0, equity=1000.0, leverage=100)
+        return SimpleNamespace(
+            login=1,
+            server="demo",
+            balance=1000.0,
+            equity=1000.0,
+            leverage=100,
+        )

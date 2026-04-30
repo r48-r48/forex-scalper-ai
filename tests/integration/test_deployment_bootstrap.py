@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from datetime import datetime, timezone
 
 import pytest
 
@@ -20,7 +20,7 @@ def test_bootstrap_runtime_in_paper_mode_routes_orders_safely() -> None:
     )
 
     try:
-        timestamp = datetime(2025, 1, 1, 9, 30, tzinfo=timezone.utc)
+        timestamp = datetime(2025, 1, 1, 9, 30, tzinfo=UTC)
         quote = ExecutionQuote(
             symbol="EURUSD",
             event_timestamp=timestamp,
@@ -78,7 +78,7 @@ def test_bootstrap_runtime_can_auto_build_mt5_live_adapter(monkeypatch: pytest.M
         assert summary.effective_mode == "live"
         assert summary.execution_enabled is True
 
-        timestamp = datetime(2026, 3, 28, 15, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2026, 3, 28, 15, 0, tzinfo=UTC)
         update = runtime.submit_order(
             OrderIntent(
                 intent_id="intent-mt5-1",
@@ -168,11 +168,15 @@ class _BootstrapFakeMetaTrader5Module:
         return SimpleNamespace(bid=1.1000, ask=1.1002)
 
     def order_check(self, request: dict[str, object]) -> SimpleNamespace:
-        return SimpleNamespace(retcode=0, comment="check passed", time=int(datetime.now(timezone.utc).timestamp()))
+        return SimpleNamespace(
+            retcode=0,
+            comment="check passed",
+            time=int(datetime.now(UTC).timestamp()),
+        )
 
     def order_send(self, request: dict[str, object]) -> SimpleNamespace:
         order_id = 9101
-        current_epoch = int(datetime.now(timezone.utc).timestamp())
+        current_epoch = int(datetime.now(UTC).timestamp())
         self._history_orders[order_id] = SimpleNamespace(
             ticket=order_id,
             symbol=request["symbol"],
@@ -184,7 +188,11 @@ class _BootstrapFakeMetaTrader5Module:
             comment="done",
         )
         self._deals[order_id] = [
-            SimpleNamespace(order=order_id, volume=request["volume"], price=request["price"])
+            SimpleNamespace(
+                order=order_id,
+                volume=request["volume"],
+                price=request["price"],
+            )
         ]
         self._positions[str(request["symbol"])] = SimpleNamespace(
             symbol=request["symbol"],

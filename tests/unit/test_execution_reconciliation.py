@@ -2,27 +2,31 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionMode, PositionState
 from scalper_ai.execution import (
     BrokerOrderSnapshot,
     BrokerPositionSnapshot,
-    ExecutionQuote,
     ExecutionOrder,
     ExecutionOrderStatus,
+    ExecutionQuote,
     ExecutionStateTracker,
     PaperExecutionAdapter,
     ReconciliationSeverity,
-    build_snapshot_reconciliation_report,
     build_reconciliation_report,
+    build_snapshot_reconciliation_report,
     reconcile_order,
     reconcile_position,
 )
 
 
 def test_reconcile_order_flags_missing_open_broker_order() -> None:
-    order = _make_order(status=ExecutionOrderStatus.ACCEPTED, filled_quantity=0.0, remaining_quantity=2.0)
+    order = _make_order(
+        status=ExecutionOrderStatus.ACCEPTED,
+        filled_quantity=0.0,
+        remaining_quantity=2.0,
+    )
 
     issues = reconcile_order(order, None)
 
@@ -32,7 +36,11 @@ def test_reconcile_order_flags_missing_open_broker_order() -> None:
 
 
 def test_reconcile_order_flags_quantity_mismatch() -> None:
-    order = _make_order(status=ExecutionOrderStatus.PARTIALLY_FILLED, filled_quantity=1.0, remaining_quantity=1.0)
+    order = _make_order(
+        status=ExecutionOrderStatus.PARTIALLY_FILLED,
+        filled_quantity=1.0,
+        remaining_quantity=1.0,
+    )
     broker = BrokerOrderSnapshot(
         broker_order_id=order.broker_order_id,
         symbol=order.intent.symbol,
@@ -45,14 +53,17 @@ def test_reconcile_order_flags_quantity_mismatch() -> None:
 
     issues = reconcile_order(order, broker)
 
-    assert {issue.code for issue in issues} == {"filled_quantity_mismatch", "remaining_quantity_mismatch"}
+    assert {issue.code for issue in issues} == {
+        "filled_quantity_mismatch",
+        "remaining_quantity_mismatch",
+    }
     assert all(issue.severity is ReconciliationSeverity.ERROR for issue in issues)
 
 
 def test_reconcile_position_flags_quantity_and_entry_mismatches() -> None:
     internal_position = PositionState(
         symbol="EURUSD",
-        timestamp=datetime(2026, 3, 27, 10, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 3, 27, 10, 0, tzinfo=UTC),
         net_quantity=2.0,
         average_entry_price=1.1000,
         mark_price=1.1002,
@@ -63,26 +74,50 @@ def test_reconcile_position_flags_quantity_and_entry_mismatches() -> None:
     )
     broker_position = BrokerPositionSnapshot(
         symbol="EURUSD",
-        timestamp=datetime(2026, 3, 27, 10, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2026, 3, 27, 10, 0, tzinfo=UTC),
         net_quantity=1.0,
         average_entry_price=1.1010,
     )
 
     issues = reconcile_position(internal_position, broker_position)
 
-    assert {issue.code for issue in issues} == {"position_quantity_mismatch", "average_entry_mismatch"}
+    assert {issue.code for issue in issues} == {
+        "position_quantity_mismatch",
+        "average_entry_mismatch",
+    }
     assert any(issue.severity is ReconciliationSeverity.ERROR for issue in issues)
     assert any(issue.severity is ReconciliationSeverity.WARN for issue in issues)
 
 
+def test_reconcile_position_flags_hedged_gross_exposure() -> None:
+    broker_position = BrokerPositionSnapshot(
+        symbol="EURUSD",
+        timestamp=datetime(2026, 3, 27, 10, 0, tzinfo=UTC),
+        net_quantity=0.0,
+        average_entry_price=0.0,
+        position_mode=PositionMode.HEDGING,
+        gross_quantity=2_000.0,
+        source_position_ids=("111", "222"),
+    )
+
+    issues = reconcile_position(None, broker_position)
+
+    assert {issue.code for issue in issues} == {"hedged_gross_exposure"}
+    assert issues[0].severity is ReconciliationSeverity.ERROR
+
+
 def test_build_reconciliation_report_collects_unknown_broker_orders() -> None:
-    order = _make_order(status=ExecutionOrderStatus.FILLED, filled_quantity=2.0, remaining_quantity=0.0)
+    order = _make_order(
+        status=ExecutionOrderStatus.FILLED,
+        filled_quantity=2.0,
+        remaining_quantity=0.0,
+    )
     broker_orders = {
         "broker-extra": BrokerOrderSnapshot(
             broker_order_id="broker-extra",
             symbol="EURUSD",
             status=ExecutionOrderStatus.ACCEPTED,
-            updated_at=datetime(2026, 3, 27, 10, 0, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 3, 27, 10, 0, tzinfo=UTC),
             requested_quantity=1.0,
             filled_quantity=0.0,
             remaining_quantity=1.0,
@@ -102,7 +137,7 @@ def test_build_reconciliation_report_collects_unknown_broker_orders() -> None:
 
 
 def test_build_snapshot_reconciliation_report_uses_tracked_internal_state() -> None:
-    timestamp = datetime(2026, 3, 27, 10, 0, tzinfo=timezone.utc)
+    timestamp = datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
     adapter = PaperExecutionAdapter()
     state_tracker = ExecutionStateTracker()
     quote = ExecutionQuote(
@@ -168,7 +203,7 @@ def _make_order(
     filled_quantity: float,
     remaining_quantity: float,
 ) -> ExecutionOrder:
-    created_at = datetime(2026, 3, 27, 10, 0, tzinfo=timezone.utc)
+    created_at = datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
     intent = OrderIntent(
         intent_id="intent-1",
         strategy_id="strategy-1",

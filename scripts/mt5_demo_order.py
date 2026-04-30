@@ -454,6 +454,7 @@ def _order_state_to_dict(order: Mt5OrderState) -> dict[str, Any]:
 def _position_state_to_dict(position: Mt5PositionState) -> dict[str, Any]:
     payload = asdict(position)
     payload["timestamp"] = position.timestamp.isoformat()
+    payload["position_mode"] = position.position_mode.value
     return payload
 
 

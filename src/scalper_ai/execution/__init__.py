@@ -26,6 +26,7 @@ from scalper_ai.execution.mt5_live import (
     Mt5OrderRequest,
     Mt5OrderState,
     Mt5PositionState,
+    aggregate_mt5_positions,
 )
 from scalper_ai.execution.paper import PaperExecutionAdapter, PaperExecutionConfig
 from scalper_ai.execution.reconciliation import (
@@ -85,6 +86,7 @@ __all__ = [
     "ReconciliationReport",
     "ReconciliationSeverity",
     "SqliteExecutionStateStore",
+    "aggregate_mt5_positions",
     "build_reconciliation_report",
     "build_reconciliation_report_for_positions",
     "build_snapshot_reconciliation_report",

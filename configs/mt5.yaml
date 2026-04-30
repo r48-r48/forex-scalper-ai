@@ -12,7 +12,7 @@ broker:
   live_enabled: true
   live_adapter: mt5
   mt5:
-    account_mode: netting
+    account_mode: hedging
 
 monitoring:
   service_name: scalper_ai_mt5_runtime

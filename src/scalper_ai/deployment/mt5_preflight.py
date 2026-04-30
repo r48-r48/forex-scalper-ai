@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from scalper_ai.config import AppConfig
-from scalper_ai.execution.mt5_client import discover_mt5_terminal_path, is_metatrader5_package_available
+from scalper_ai.execution.mt5_client import (
+    discover_mt5_terminal_path,
+    is_metatrader5_package_available,
+)
 
 LIVE_CONFIRMATION_ENV_VAR = "SCALPER_AI_LIVE_CONFIRMATION"
 
@@ -51,7 +55,9 @@ class Mt5PreflightReport:
             "discovered_terminal_path": None
             if self.discovered_terminal_path is None
             else str(self.discovered_terminal_path),
-            "resolved_terminal_path": None if self.resolved_terminal_path is None else str(self.resolved_terminal_path),
+            "resolved_terminal_path": None
+            if self.resolved_terminal_path is None
+            else str(self.resolved_terminal_path),
             "login_configured": self.login_configured,
             "password_configured": self.password_configured,
             "server_configured": self.server_configured,
@@ -75,9 +81,16 @@ def build_mt5_preflight_report(
 
     env_map = os.environ if env is None else env
     mt5_config = config.broker.mt5
-    configured_terminal_path = None if mt5_config.terminal_path is None else mt5_config.terminal_path.expanduser()
+    configured_terminal_path = (
+        None
+        if mt5_config.terminal_path is None
+        else mt5_config.terminal_path.expanduser()
+    )
     discovered_terminal_path = discover_mt5_terminal_path(search_roots=search_roots)
-    resolved_terminal_path = discover_mt5_terminal_path(configured_terminal_path, search_roots=search_roots)
+    resolved_terminal_path = discover_mt5_terminal_path(
+        configured_terminal_path,
+        search_roots=search_roots,
+    )
     package_installed = is_metatrader5_package_available(module_loader=module_loader)
 
     errors: list[str] = []
@@ -87,18 +100,25 @@ def build_mt5_preflight_report(
     adapter_name = config.broker.live_adapter.strip().lower()
     if adapter_name != "mt5":
         warnings.append(f"Selected live adapter is '{config.broker.live_adapter}', not 'mt5'.")
-    if mt5_config.account_mode != "netting":
-        errors.append("MT5 live integration currently supports only account_mode='netting'.")
+    if mt5_config.account_mode == "hedging":
+        notes.append(
+            "MT5 account_mode='hedging' is enabled; live reduce-only orders must close an "
+            "unambiguous broker position ticket."
+        )
 
     if configured_terminal_path is not None and resolved_terminal_path is None:
-        errors.append(f"Configured MT5 terminal_path does not resolve to a file: {configured_terminal_path}")
+        errors.append(
+            f"Configured MT5 terminal_path does not resolve to a file: {configured_terminal_path}"
+        )
         if discovered_terminal_path is not None:
             notes.append(
-                f"An auto-discovered MT5 terminal executable is available at {discovered_terminal_path}, but the explicit terminal_path takes precedence."
+                "An auto-discovered MT5 terminal executable is available at "
+                f"{discovered_terminal_path}, but the explicit terminal_path takes precedence."
             )
     elif configured_terminal_path is None and resolved_terminal_path is None:
         warnings.append(
-            "No MT5 terminal executable was configured or auto-discovered. MetaTrader5 will rely on its default search path."
+            "No MT5 terminal executable was configured or auto-discovered. MetaTrader5 "
+            "will rely on its default search path."
         )
     elif configured_terminal_path is None and resolved_terminal_path is not None:
         notes.append(f"Auto-discovered MT5 terminal executable at {resolved_terminal_path}.")
@@ -106,16 +126,26 @@ def build_mt5_preflight_report(
     if not package_installed:
         errors.append("MetaTrader5 Python package is not installed in this environment.")
     if mt5_config.login is None:
-        warnings.append("MT5 login is not configured. Initialization will rely on an already authorized terminal session.")
+        warnings.append(
+            "MT5 login is not configured. Initialization will rely on an already "
+            "authorized terminal session."
+        )
     if mt5_config.password is None:
-        warnings.append("MT5 password is not configured. Initialization will rely on terminal-side saved credentials.")
+        warnings.append(
+            "MT5 password is not configured. Initialization will rely on terminal-side "
+            "saved credentials."
+        )
     if mt5_config.server is None:
-        warnings.append("MT5 server is not configured. Initialization will rely on terminal-side saved broker server state.")
+        warnings.append(
+            "MT5 server is not configured. Initialization will rely on terminal-side "
+            "saved broker server state."
+        )
 
     live_confirmation = env_map.get(LIVE_CONFIRMATION_ENV_VAR, "").strip()
     if config.deployment.require_live_confirmation and not live_confirmation:
         warnings.append(
-            "SCALPER_AI_LIVE_CONFIRMATION is not set. Runtime bootstrap will refuse true live mode until it is provided."
+            "SCALPER_AI_LIVE_CONFIRMATION is not set. Runtime bootstrap will refuse "
+            "true live mode until it is provided."
         )
 
     return Mt5PreflightReport(
