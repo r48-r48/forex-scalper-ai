@@ -258,6 +258,32 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - targeted pytest for domain trading, MT5 live/client, reconciliation, config, and bootstrap passed with `43 passed`
   - `.venv/bin/python -m compileall src tests scripts` passed
   - full `.venv/bin/pytest` passed with `188 passed`
+- 2026-04-30 rechecked `/Users/dzhabrailtalkanov/Downloads/deep-research-report (1).md` against the current repo after P0.A-P0.E:
+  - the report remains directionally correct, but its original P0 runtime/Risk/OMS, durable-state, broker-source, deal-accounting, and native protective-order findings are now partly stale because first production slices are implemented
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md` so future context does not treat P0.A as still fully open
+  - verification passed: `.venv/bin/python -m compileall src tests scripts`, targeted safety pytest with `56 passed`, and full `.venv/bin/pytest` with `188 passed`
+  - next confirmed work order remains: richer bracket/OCO and protection fail-safe behavior, durable per-deal attribution, broker-side recovery/fault-injection tests, MT5 history investigation, symbol-specific quantization, reconnect/circuit breaker, and risk-config completion
+- 2026-04-30 completed the first P1 risk-config guard slice:
+  - `RiskRejectCode` now includes max spread, loss cooldown, volatility guard, news guard, stale features, and model health reject reasons
+  - `RiskLimits.from_risk_config()` now wires `max_spread_pips`, `cooldown_after_loss_burst_seconds`, `volatility_filter_enabled`, and `news_filter_enabled`
+  - `RiskContext` now carries `current_spread_pips`, `recent_loss_timestamps`, volatility/news guard state, feature/model health, and recovered kill-switch state
+  - `DeploymentRuntime` injects current live quote spread into the mandatory risk path before broker/router submission
+  - `DeploymentRuntime.start()` now restores active durable session and symbol kill switches from `SqliteExecutionStateStore` and uses them in later risk decisions
+  - targeted Ruff passed for risk/runtime and touched tests
+  - `.venv/bin/pytest tests/unit/test_risk_engine.py tests/unit/test_deployment_runtime.py tests/unit/test_execution_state_store.py tests/integration/test_deployment_bootstrap.py` passed with `40 passed`
+  - `.venv/bin/python -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `196 passed`
+- 2026-04-30 completed the first P1 MT5 symbol-spec quantization slice:
+  - added `Mt5SymbolSpec` for broker symbol volume/price/protection metadata
+  - `Mt5TerminalClient.get_symbol_spec()` now reads and normalizes MT5 `symbol_info`
+  - `Mt5ExecutionAdapter` caches symbol specs from clients that expose `get_symbol_spec()`, with config fallback for replay/mock clients
+  - MT5 lot sizing now uses `Decimal` `ROUND_DOWN` against symbol `volume_min`, `volume_step`, and `volume_max`, returning structured rejected updates for below-minimum or above-maximum quantities
+  - broker lot-to-base-unit normalization now also uses the symbol contract size, so broker snapshots/fills/positions stay consistent with the request sizing for non-default contract sizes
+  - targeted Ruff passed for MT5 live/client/export and touched MT5/bootstrap tests
+  - `.venv/bin/pytest tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py` passed with `23 passed`
+  - combined targeted safety/MT5 pytest passed with `61 passed`
+  - `.venv/bin/python -m compileall src tests scripts` passed
+  - full `.venv/bin/pytest` passed with `199 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:
@@ -428,6 +454,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-30: `.venv/bin/pytest tests/unit/test_domain_trading.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_reconciliation.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` -> `43 passed` after P0.E
 - 2026-04-30: `.venv/bin/python -m compileall src tests scripts` -> passed after P0.E
 - 2026-04-30: `.venv/bin/pytest` -> `188 passed` after P0.E
+- 2026-04-30: `.venv/bin/ruff check src/scalper_ai/risk/engine.py src/scalper_ai/deployment/runtime.py src/scalper_ai/execution/mt5_live.py src/scalper_ai/execution/mt5_client.py src/scalper_ai/execution/__init__.py tests/unit/test_risk_engine.py tests/unit/test_deployment_runtime.py tests/unit/test_execution_state_store.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py` -> passed after P1 risk-config and MT5 symbol-spec slices
+- 2026-04-30: `.venv/bin/pytest tests/unit/test_risk_engine.py tests/unit/test_deployment_runtime.py tests/unit/test_execution_state_store.py tests/unit/test_execution_mt5_live.py tests/unit/test_execution_mt5_client.py tests/integration/test_deployment_bootstrap.py` -> `61 passed` after P1 risk-config and MT5 symbol-spec slices
+- 2026-04-30: `.venv/bin/python -m compileall src tests scripts` -> passed after P1 risk-config and MT5 symbol-spec slices
+- 2026-04-30: `git diff --check` -> passed after P1 risk-config and MT5 symbol-spec slices
+- 2026-04-30: `.venv/bin/pytest` -> `199 passed` after P1 risk-config and MT5 symbol-spec slices
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -450,7 +481,8 @@ Continue richer bracket/OCO protection and P0.D follow-through:
 - persist per-deal attribution in durable state/journal
 - add deeper broker-side startup recovery and fault-injection tests
 - investigate why MT5 history APIs still return no raw orders/deals after controlled Dukascopy demo fills
-- add symbol-specific MT5 capability discovery and conservative quantization
+- extend symbol-specific metadata enforcement to price precision, stops/freeze levels, trade mode, and filling mode
+- add MT5 reconnect supervision/circuit breaker and connect real volatility/news/model/feature health providers into the new risk guard fields
 
 If further MT5 validation is paused:
 - validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup

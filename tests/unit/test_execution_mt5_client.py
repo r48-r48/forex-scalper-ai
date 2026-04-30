@@ -281,6 +281,26 @@ def test_mt5_terminal_client_includes_protective_prices_in_order_check() -> None
     assert module.last_order_check_payload["tp"] == 1.1050
 
 
+def test_mt5_terminal_client_normalizes_symbol_spec() -> None:
+    module = _FakeMetaTrader5Module()
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    spec = client.get_symbol_spec("EURUSD.a")
+
+    assert spec.broker_symbol == "EURUSD.a"
+    assert spec.base_units_per_lot == pytest.approx(100_000.0)
+    assert spec.volume_min_lots == pytest.approx(0.01)
+    assert spec.volume_step_lots == pytest.approx(0.01)
+    assert spec.volume_max_lots == pytest.approx(100.0)
+    assert spec.digits == 5
+    assert spec.point == pytest.approx(0.00001)
+    assert spec.stops_level_points == 10
+    assert spec.freeze_level_points == 5
+
+
 def test_discover_mt5_terminal_path_finds_macos_bundle_executable(tmp_path: Path) -> None:
     applications_root = tmp_path / "Applications"
     executable = (
@@ -387,6 +407,19 @@ class _FakeMetaTrader5Module:
 
     def symbol_info_tick(self, symbol: str) -> SimpleNamespace:
         return SimpleNamespace(bid=1.1000, ask=1.1002)
+
+    def symbol_info(self, symbol: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            name=symbol,
+            trade_contract_size=100_000.0,
+            volume_min=0.01,
+            volume_step=0.01,
+            volume_max=100.0,
+            digits=5,
+            point=0.00001,
+            trade_stops_level=10,
+            trade_freeze_level=5,
+        )
 
     def order_check(self, request: dict[str, object]) -> SimpleNamespace | None:
         self.last_order_check_payload = dict(request)

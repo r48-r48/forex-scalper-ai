@@ -22,6 +22,8 @@ from scalper_ai.execution import (
     ExecutionOrderStatus,
     ExecutionQuote,
     ExecutionUpdate,
+    KillSwitchScope,
+    KillSwitchState,
     LiveExecutionStubAdapter,
     Mt5ExecutionAdapter,
     Mt5ExecutionConfig,
@@ -403,6 +405,64 @@ def test_runtime_risk_rejects_before_router_submit_and_records_oms() -> None:
     assert "scalper_ai_execution_orders_rejected_total" in runtime.metrics_text()
 
 
+def test_live_runtime_rejects_wide_spread_before_router_submit() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+            "risk": {"max_spread_pips": 1.0},
+        }
+    )
+    adapter = _RejectIfSubmittedAdapter()
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: adapter,
+        reconciliation_report_provider=lambda: ReconciliationReport(
+            checked_at=datetime(2026, 4, 30, 10, 2, tzinfo=UTC),
+            issues=(),
+        ),
+        live_confirmation_token="ENABLE_ME",
+    )
+    runtime.start()
+
+    timestamp = datetime(2026, 4, 30, 10, 2, tzinfo=UTC)
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="wide-spread-live-intent",
+            strategy_id="risk-runtime-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=2.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0999,
+            ask=1.1001,
+            venue="broker-feed",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "max_spread"
+
+
 def test_runtime_success_path_records_risk_oms_and_execution_journal_events() -> None:
     config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
     writer = _RecordingJournalWriter()
@@ -565,6 +625,52 @@ def test_runtime_recovers_durable_state_and_blocks_duplicate_intent(tmp_path) ->
     assert retry_update.order.rejection_reason == "duplicate_intent"
 
 
+def test_runtime_recovers_durable_kill_switch_before_router_submit(tmp_path) -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+    timestamp = datetime(2026, 4, 30, 10, 23, tzinfo=UTC)
+    store.save_kill_switch_state(
+        KillSwitchState(
+            scope=KillSwitchScope.SESSION,
+            enabled=True,
+            updated_at=timestamp,
+            reason="operator_pause",
+        )
+    )
+    adapter = _RejectIfSubmittedAdapter()
+    runtime = DeploymentRuntime(
+        config,
+        paper_adapter_factory=lambda: adapter,
+        state_store=store,
+    )
+    runtime.start()
+
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="blocked-by-recovered-kill-switch",
+            strategy_id="runtime-recovery-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=2.0,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "session_kill_switch"
+
+
 def test_live_startup_blocks_paper_fallback_when_recovered_live_order_is_open(tmp_path) -> None:
     store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
     timestamp = datetime(2026, 4, 30, 10, 25, tzinfo=UTC)
@@ -684,7 +790,7 @@ def test_live_runtime_can_use_live_stub_adapter_with_snapshot_reconciliation() -
             symbol="EURUSD",
             event_timestamp=timestamp,
             received_timestamp=timestamp,
-            bid=1.0999,
+            bid=1.1000,
             ask=1.1001,
             venue="broker-feed",
         ),
@@ -836,7 +942,7 @@ def test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provi
             symbol="EURUSD",
             event_timestamp=timestamp,
             received_timestamp=timestamp,
-            bid=1.0999,
+            bid=1.1000,
             ask=1.1001,
             venue="broker-feed",
         ),

@@ -32,6 +32,7 @@ from scalper_ai.execution import (
     ExecutionStateStore,
     ExecutionStateTracker,
     ExecutionUpdate,
+    KillSwitchScope,
     PaperExecutionAdapter,
     ReconciliationReport,
     build_snapshot_reconciliation_report,
@@ -130,6 +131,8 @@ class DeploymentRuntime:
         self._journal_events: list[JournalEvent] = []
         self._last_cash_balance_by_route: dict[bool, float] = {}
         self._last_equity_by_route: dict[bool, float] = {}
+        self._session_kill_switch_enabled = False
+        self._symbol_kill_switches: set[str] = set()
         self._recovered_execution_update_count = 0
         self._recovered_oms_record_count = 0
         self._router: ExecutionRouter | None = None
@@ -444,6 +447,8 @@ class DeploymentRuntime:
         self._oms_records.clear()
         self._last_cash_balance_by_route.clear()
         self._last_equity_by_route.clear()
+        self._session_kill_switch_enabled = False
+        self._symbol_kill_switches.clear()
         self._recovered_execution_update_count = 0
         self._recovered_oms_record_count = 0
 
@@ -457,6 +462,13 @@ class DeploymentRuntime:
             self._remember_account_state(update)
         for record in self._state_store.list_oms_records():
             self._remember_oms_record(record, persist=False)
+        for state in self._state_store.list_kill_switch_states():
+            if not state.enabled:
+                continue
+            if state.scope is KillSwitchScope.SESSION:
+                self._session_kill_switch_enabled = True
+            elif state.symbol is not None:
+                self._symbol_kill_switches.add(state.symbol)
 
         self._recovered_execution_update_count = len(execution_updates)
         self._recovered_oms_record_count = len(self._oms_records)
@@ -517,13 +529,16 @@ class DeploymentRuntime:
                 if order.status is ExecutionOrderStatus.REJECTED
             ),
             latest_market_data_at=quote.received_timestamp,
+            current_spread_pips=(
+                _spread_pips_for_quote(quote) if not intent.paper else None
+            ),
             realized_pnl_today=sum(
                 float(position.realized_pnl) for position in route_positions.values()
             ),
             starting_equity=self._last_equity_by_route.get(intent.paper),
             current_equity=self._last_equity_by_route.get(intent.paper),
-            session_kill_switch=False,
-            symbol_kill_switches=frozenset(),
+            session_kill_switch=self._session_kill_switch_enabled,
+            symbol_kill_switches=frozenset(self._symbol_kill_switches),
         )
 
     def _build_risk_rejected_update(
@@ -1289,6 +1304,17 @@ def _quote_to_payload(quote: ExecutionQuote) -> dict[str, object]:
         "spread": quote.spread,
         "venue": quote.venue,
     }
+
+
+def _spread_pips_for_quote(quote: ExecutionQuote) -> float:
+    return quote.spread / _default_pip_size_for_symbol(quote.symbol)
+
+
+def _default_pip_size_for_symbol(symbol: str) -> float:
+    normalized = symbol.upper()
+    if normalized.endswith("JPY"):
+        return 0.01
+    return 0.0001
 
 
 def _execution_update_to_payload(update: ExecutionUpdate) -> dict[str, object]:

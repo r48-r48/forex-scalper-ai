@@ -12,13 +12,14 @@ The audit is directionally correct. The project has a strong research and platfo
 
 The highest priority is to make RiskEngine, OMS, durable state, broker-source-of-truth reconciliation, hedging-aware MT5 behavior, deal-based accounting, and protective order handling mandatory before any live-risking order can pass.
 
-## Findings Verified Against Current Code
+## Findings Rechecked Against Current Code
 
-### Confirmed P0 Findings
+### P0 Findings From The Report
 
-1. RiskEngine and OMS are not mandatory on the runtime submit path.
-   - `src/scalper_ai/deployment/runtime.py:290` calls `require_execution_router().submit_order(...)` directly.
-   - `src/scalper_ai/risk/engine.py` and `src/scalper_ai/services/oms.py` exist and are tested, but are not enforced by `DeploymentRuntime.submit_order()`.
+1. RiskEngine and OMS were not mandatory on the runtime submit path at audit time.
+   - First slice completed on `2026-04-30`: `DeploymentRuntime.submit_order()` now builds a `RiskContext`, evaluates `RiskEngine` before router/broker submission, records the risk decision, drives OMS transitions, and returns a normalized rejected `ExecutionUpdate` without touching the router when risk rejects an order.
+   - Risk-config follow-up completed on `2026-04-30`: `RiskEngine` now has gates for max spread, post-loss cooldown, volatility guard, news guard, stale feature health, model health, and recovered durable kill switches.
+   - Remaining work: connect real volatility/news/model/feature providers and symbol-specific pip/spec metadata instead of relying on the default runtime spread fallback.
 
 2. MT5 live sizing uses local adapter state instead of broker state.
    - First slice completed on `2026-04-30`: `Mt5ExecutionAdapter.submit_order()` now refreshes broker positions before target-position and reduce-only sizing, `get_position()` refreshes from broker state when a quote is available, and broker position snapshots carry gross exposure and source tickets.
@@ -43,13 +44,13 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
 ### Confirmed P1 Findings
 
 1. Symbol specs and quantization are not broker-symbol specific.
-   - `src/scalper_ai/execution/mt5_live.py:507` uses global `base_units_per_lot`, `min_volume_lots`, and `volume_step_lots`.
-   - It uses `round()`, which can round volume upward. Live risk sizing should conservatively round down by symbol-specific `volume_step`, `volume_min`, and `volume_max`.
+   - First symbol-spec slice completed on `2026-04-30`: `Mt5TerminalClient.get_symbol_spec()` now normalizes MT5 `symbol_info`, `Mt5ExecutionAdapter` uses broker symbol specs when available, and lot volume normalization plus broker lot-to-base-unit conversion use symbol contract size with `Decimal` `ROUND_DOWN` against symbol `volume_min`, `volume_step`, and `volume_max`.
+   - Remaining work: apply `digits`, `point`, stop/freeze levels, trade mode, and filling-mode metadata to price/protective-order validation and request construction.
 
 2. Several risk config fields are not wired into enforced live risk decisions.
    - `configs/base.yaml:26` defines max spread, cooldown, volatility filter, and news filter settings.
-   - `src/scalper_ai/risk/engine.py:48` `RiskLimits` currently covers position, daily loss/drawdown, order rate, stale data, and reject burst, but not max spread, post-loss cooldown, volatility guard, or news guard.
-   - Runtime does not invoke RiskEngine yet, so even wired limits are not mandatory on the submit path.
+   - First risk-config wiring slice completed on `2026-04-30`: `RiskLimits` and `RiskContext` now represent max spread, post-loss cooldown, volatility/news guards, feature/model health, and recovered kill-switch state; live runtime injects current spread into mandatory pre-trade risk decisions.
+   - Remaining work: wire real signal-quality providers for volatility/news/model/feature health and replace default pip fallback with broker symbol specs.
 
 3. Reconnect and MT5 supervision are partial.
    - `src/scalper_ai/execution/mt5_client.py:468` returns immediately when `_initialized` is true.
@@ -140,8 +141,10 @@ Required behavior:
 
 Required behavior:
 - Add symbol capability discovery and conservative Decimal-based quantization.
+- Completed first slice: broker `symbol_info` is normalized and lot sizing is conservatively quantized by symbol volume constraints.
 - Add MT5 reconnect policy, circuit breaker, and mandatory post-reconnect reconciliation.
-- Wire max spread, cooldown, volatility, news/model/feature health guards into enforced risk decisions.
+- Completed first slice: wire max spread, cooldown, volatility, news/model/feature health guards, and recovered kill switches into enforced risk decisions.
+- Pending: connect those guards to real providers and symbol-specific broker metadata.
 - Add fault-injection tests for the live execution failure modes listed above.
 
 ## Explicit Non-Goals For The Next Slice

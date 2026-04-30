@@ -18,6 +18,7 @@ from scalper_ai.execution.mt5_live import (
     Mt5OrderRequest,
     Mt5OrderState,
     Mt5PositionState,
+    Mt5SymbolSpec,
     aggregate_mt5_positions,
 )
 
@@ -121,6 +122,9 @@ class MetaTrader5ModuleProtocol(Protocol):
 
     def symbol_info_tick(self, symbol: str) -> Any:
         """Return the latest top-of-book snapshot for one symbol."""
+
+    def symbol_info(self, symbol: str) -> Any:
+        """Return broker symbol metadata for one symbol."""
 
     def order_check(self, request: Mapping[str, Any]) -> Any:
         """Validate one trading request without sending it."""
@@ -427,6 +431,38 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             state = self._normalize_order_record(raw_order, historical=False)
             states[state.broker_order_id] = state
         return tuple(sorted(states.values(), key=lambda state: state.broker_order_id))
+
+    def get_symbol_spec(self, broker_symbol: str) -> Mt5SymbolSpec:
+        """Return normalized broker symbol trading constraints."""
+
+        self._ensure_initialized()
+        self._ensure_symbol_selected(broker_symbol)
+        raw_info = self._module.symbol_info(broker_symbol)
+        if raw_info is None:
+            raise RuntimeError(
+                f"MT5 symbol_info returned no metadata for {broker_symbol}: "
+                f"{self._last_error_message()}"
+            )
+        payload = self._coerce_mapping(raw_info)
+        return Mt5SymbolSpec(
+            broker_symbol=broker_symbol,
+            base_units_per_lot=(
+                self._coerce_positive_optional_float(payload.get("trade_contract_size"))
+                or self._coerce_positive_optional_float(payload.get("contract_size"))
+                or 100_000.0
+            ),
+            volume_min_lots=(
+                self._coerce_positive_optional_float(payload.get("volume_min")) or 0.01
+            ),
+            volume_step_lots=(
+                self._coerce_positive_optional_float(payload.get("volume_step")) or 0.01
+            ),
+            volume_max_lots=self._coerce_positive_optional_float(payload.get("volume_max")),
+            digits=self._coerce_int(payload.get("digits")),
+            point=self._coerce_positive_optional_float(payload.get("point")),
+            stops_level_points=self._coerce_int(payload.get("trade_stops_level")),
+            freeze_level_points=self._coerce_int(payload.get("trade_freeze_level")),
+        )
 
     def get_position(self, broker_symbol: str) -> Mt5PositionState | None:
         """Return one normalized broker position if present."""

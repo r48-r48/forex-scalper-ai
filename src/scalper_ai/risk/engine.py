@@ -28,7 +28,13 @@ class RiskRejectCode(StrEnum):
     DUPLICATE_BROKER_ORDER = "duplicate_broker_order"
     REJECT_BURST = "reject_burst"
     STALE_MARKET_DATA = "stale_market_data"
+    STALE_FEATURES = "stale_features"
+    MODEL_UNHEALTHY = "model_unhealthy"
+    MAX_SPREAD = "max_spread"
     MAX_ORDER_RATE = "max_order_rate"
+    LOSS_COOLDOWN = "loss_cooldown"
+    VOLATILITY_GUARD = "volatility_guard"
+    NEWS_GUARD = "news_guard"
     MAX_DAILY_LOSS = "max_daily_loss"
     MAX_DAILY_DRAWDOWN = "max_daily_drawdown"
     MAX_POSITION = "max_position"
@@ -40,9 +46,13 @@ class RiskConfigLike(Protocol):
 
     max_position_size: float
     max_daily_drawdown: float
+    max_spread_pips: float
     max_order_frequency_per_minute: int
     stale_quote_seconds: float
+    cooldown_after_loss_burst_seconds: int
     loss_burst_threshold: int
+    volatility_filter_enabled: bool
+    news_filter_enabled: bool
 
 
 @dataclass(frozen=True)
@@ -52,10 +62,15 @@ class RiskLimits:
     max_position_size: float
     max_daily_loss: float | None = None
     max_daily_drawdown: float | None = None
+    max_spread_pips: float | None = None
     max_order_rate_per_minute: int = 30
     stale_market_data_seconds: float = 2.0
     reject_burst_threshold: int = 3
     reject_burst_window_seconds: float = 60.0
+    post_loss_cooldown_seconds: float = 0.0
+    loss_burst_threshold: int = 3
+    volatility_filter_enabled: bool = True
+    news_filter_enabled: bool = True
 
     def __post_init__(self) -> None:
         if self.max_position_size <= 0:
@@ -64,6 +79,8 @@ class RiskLimits:
             raise ValueError("max_daily_loss must be greater than zero when provided.")
         if self.max_daily_drawdown is not None and self.max_daily_drawdown <= 0:
             raise ValueError("max_daily_drawdown must be greater than zero when provided.")
+        if self.max_spread_pips is not None and self.max_spread_pips <= 0:
+            raise ValueError("max_spread_pips must be greater than zero when provided.")
         if self.max_order_rate_per_minute <= 0:
             raise ValueError("max_order_rate_per_minute must be greater than zero.")
         if self.stale_market_data_seconds <= 0:
@@ -72,6 +89,10 @@ class RiskLimits:
             raise ValueError("reject_burst_threshold must be greater than zero.")
         if self.reject_burst_window_seconds <= 0:
             raise ValueError("reject_burst_window_seconds must be greater than zero.")
+        if self.post_loss_cooldown_seconds < 0:
+            raise ValueError("post_loss_cooldown_seconds must be non-negative.")
+        if self.loss_burst_threshold <= 0:
+            raise ValueError("loss_burst_threshold must be greater than zero.")
 
     @classmethod
     def from_risk_config(cls, config: RiskConfigLike) -> RiskLimits:
@@ -80,9 +101,14 @@ class RiskLimits:
         return cls(
             max_position_size=float(config.max_position_size),
             max_daily_drawdown=float(config.max_daily_drawdown),
+            max_spread_pips=float(config.max_spread_pips),
             max_order_rate_per_minute=int(config.max_order_frequency_per_minute),
             stale_market_data_seconds=float(config.stale_quote_seconds),
             reject_burst_threshold=int(config.loss_burst_threshold),
+            post_loss_cooldown_seconds=float(config.cooldown_after_loss_burst_seconds),
+            loss_burst_threshold=int(config.loss_burst_threshold),
+            volatility_filter_enabled=bool(config.volatility_filter_enabled),
+            news_filter_enabled=bool(config.news_filter_enabled),
         )
 
 
@@ -96,12 +122,18 @@ class RiskContext:
     known_intent_ids: frozenset[str] = frozenset()
     known_broker_order_ids: frozenset[str] = frozenset()
     recent_rejection_timestamps: Sequence[datetime] = ()
+    recent_loss_timestamps: Sequence[datetime] = ()
     latest_market_data_at: datetime | None = None
+    current_spread_pips: float | None = None
     realized_pnl_today: float = 0.0
     starting_equity: float | None = None
     current_equity: float | None = None
     session_kill_switch: bool = False
     symbol_kill_switches: frozenset[str] = frozenset()
+    volatility_guard_active: bool = False
+    news_guard_active: bool = False
+    features_healthy: bool = True
+    model_healthy: bool = True
 
     def __post_init__(self) -> None:
         _ensure_aware(self.checked_at, field_name="checked_at")
@@ -109,8 +141,12 @@ class RiskContext:
             _ensure_aware(timestamp, field_name="order_timestamps")
         for timestamp in self.recent_rejection_timestamps:
             _ensure_aware(timestamp, field_name="recent_rejection_timestamps")
+        for timestamp in self.recent_loss_timestamps:
+            _ensure_aware(timestamp, field_name="recent_loss_timestamps")
         if self.latest_market_data_at is not None:
             _ensure_aware(self.latest_market_data_at, field_name="latest_market_data_at")
+        if self.current_spread_pips is not None and self.current_spread_pips < 0:
+            raise ValueError("current_spread_pips must be non-negative when provided.")
         if self.starting_equity is not None and self.starting_equity <= 0:
             raise ValueError("starting_equity must be greater than zero when provided.")
 
@@ -189,8 +225,20 @@ class RiskEngine:
             return self._reject(intent, context, RiskRejectCode.REJECT_BURST)
         if self._market_data_is_stale(context):
             return self._reject(intent, context, RiskRejectCode.STALE_MARKET_DATA)
+        if not context.features_healthy:
+            return self._reject(intent, context, RiskRejectCode.STALE_FEATURES)
+        if not context.model_healthy:
+            return self._reject(intent, context, RiskRejectCode.MODEL_UNHEALTHY)
+        if self._spread_exceeded(context):
+            return self._reject(intent, context, RiskRejectCode.MAX_SPREAD)
         if self._order_rate_exceeded(context):
             return self._reject(intent, context, RiskRejectCode.MAX_ORDER_RATE)
+        if self._loss_cooldown_active(context):
+            return self._reject(intent, context, RiskRejectCode.LOSS_COOLDOWN)
+        if self._volatility_guard_active(context):
+            return self._reject(intent, context, RiskRejectCode.VOLATILITY_GUARD)
+        if self._news_guard_active(context):
+            return self._reject(intent, context, RiskRejectCode.NEWS_GUARD)
         loss_code = self._loss_limit_code(context)
         if loss_code is not None:
             return self._reject(intent, context, loss_code)
@@ -257,6 +305,28 @@ class RiskEngine:
         window_start = context.checked_at - timedelta(seconds=60)
         recent_count = sum(1 for timestamp in context.order_timestamps if timestamp >= window_start)
         return recent_count >= self._limits.max_order_rate_per_minute
+
+    def _spread_exceeded(self, context: RiskContext) -> bool:
+        if self._limits.max_spread_pips is None or context.current_spread_pips is None:
+            return False
+        return context.current_spread_pips > self._limits.max_spread_pips
+
+    def _loss_cooldown_active(self, context: RiskContext) -> bool:
+        if self._limits.post_loss_cooldown_seconds <= 0:
+            return False
+        window_start = context.checked_at - timedelta(
+            seconds=self._limits.post_loss_cooldown_seconds
+        )
+        recent_loss_count = sum(
+            1 for timestamp in context.recent_loss_timestamps if timestamp >= window_start
+        )
+        return recent_loss_count >= self._limits.loss_burst_threshold
+
+    def _volatility_guard_active(self, context: RiskContext) -> bool:
+        return self._limits.volatility_filter_enabled and context.volatility_guard_active
+
+    def _news_guard_active(self, context: RiskContext) -> bool:
+        return self._limits.news_filter_enabled and context.news_guard_active
 
     def _loss_limit_code(self, context: RiskContext) -> RiskRejectCode | None:
         if (

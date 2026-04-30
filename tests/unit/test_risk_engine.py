@@ -106,6 +106,49 @@ def test_risk_engine_blocks_position_limit_and_reduce_only_exposure_increase() -
     assert reduce_only_growth.projected_position == 11_000.0
 
 
+@pytest.mark.parametrize(
+    ("limits", "context_kwargs", "expected_code"),
+    [
+        (
+            {"max_spread_pips": 1.5},
+            {"current_spread_pips": 2.0},
+            RiskRejectCode.MAX_SPREAD,
+        ),
+        (
+            {
+                "post_loss_cooldown_seconds": 300.0,
+                "loss_burst_threshold": 2,
+            },
+            {
+                "recent_loss_timestamps": (
+                    BASE_TS - timedelta(seconds=10),
+                    BASE_TS - timedelta(seconds=20),
+                )
+            },
+            RiskRejectCode.LOSS_COOLDOWN,
+        ),
+        ({}, {"volatility_guard_active": True}, RiskRejectCode.VOLATILITY_GUARD),
+        ({}, {"news_guard_active": True}, RiskRejectCode.NEWS_GUARD),
+        ({}, {"features_healthy": False}, RiskRejectCode.STALE_FEATURES),
+        ({}, {"model_healthy": False}, RiskRejectCode.MODEL_UNHEALTHY),
+    ],
+)
+def test_risk_engine_blocks_market_and_dependency_guards(
+    limits: dict[str, object],
+    context_kwargs: dict[str, object],
+    expected_code: RiskRejectCode,
+) -> None:
+    engine = RiskEngine(_limits(**limits))
+
+    decision = engine.evaluate_order(
+        _intent(quantity=5_000.0),
+        _context(**context_kwargs),
+    )
+
+    assert decision.status is RiskDecisionStatus.REJECTED
+    assert decision.code is expected_code
+
+
 def test_risk_engine_uses_target_position_for_projection() -> None:
     engine = RiskEngine(_limits(max_position_size=50_000.0))
 
@@ -118,15 +161,24 @@ def test_risk_engine_uses_target_position_for_projection() -> None:
     assert decision.projected_position == -25_000.0
 
 
-def _limits(*, max_position_size: float = 100_000.0) -> RiskLimits:
+def _limits(
+    *,
+    max_position_size: float = 100_000.0,
+    max_spread_pips: float | None = None,
+    post_loss_cooldown_seconds: float = 0.0,
+    loss_burst_threshold: int = 2,
+) -> RiskLimits:
     return RiskLimits(
         max_position_size=max_position_size,
         max_daily_loss=500.0,
         max_daily_drawdown=0.02,
+        max_spread_pips=max_spread_pips,
         max_order_rate_per_minute=2,
         stale_market_data_seconds=2.0,
         reject_burst_threshold=2,
         reject_burst_window_seconds=60.0,
+        post_loss_cooldown_seconds=post_loss_cooldown_seconds,
+        loss_burst_threshold=loss_burst_threshold,
     )
 
 

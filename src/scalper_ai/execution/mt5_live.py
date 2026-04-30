@@ -6,6 +6,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+from decimal import ROUND_DOWN, Decimal
 from typing import Protocol
 
 from scalper_ai.backtesting.accounting import (
@@ -80,6 +81,46 @@ class Mt5ExecutionConfig:
         for internal_symbol, broker_symbol in self.symbol_map.items():
             if not internal_symbol.strip() or not broker_symbol.strip():
                 raise ValueError("symbol_map keys and values must be non-empty.")
+
+
+@dataclass(frozen=True)
+class Mt5SymbolSpec:
+    """Broker symbol trading constraints used for conservative MT5 normalization."""
+
+    broker_symbol: str
+    base_units_per_lot: float = 100_000.0
+    volume_min_lots: float = 0.01
+    volume_step_lots: float = 0.01
+    volume_max_lots: float | None = None
+    digits: int | None = None
+    point: float | None = None
+    stops_level_points: int | None = None
+    freeze_level_points: int | None = None
+
+    def __post_init__(self) -> None:
+        if not self.broker_symbol.strip():
+            raise ValueError("broker_symbol must be non-empty.")
+        if self.base_units_per_lot <= 0:
+            raise ValueError("base_units_per_lot must be greater than zero.")
+        if self.volume_min_lots <= 0:
+            raise ValueError("volume_min_lots must be greater than zero.")
+        if self.volume_step_lots <= 0:
+            raise ValueError("volume_step_lots must be greater than zero.")
+        if self.volume_max_lots is not None and self.volume_max_lots <= 0:
+            raise ValueError("volume_max_lots must be greater than zero when provided.")
+        if (
+            self.volume_max_lots is not None
+            and self.volume_max_lots < self.volume_min_lots
+        ):
+            raise ValueError("volume_max_lots must not be smaller than volume_min_lots.")
+        if self.digits is not None and self.digits < 0:
+            raise ValueError("digits must be non-negative when provided.")
+        if self.point is not None and self.point <= 0:
+            raise ValueError("point must be greater than zero when provided.")
+        if self.stops_level_points is not None and self.stops_level_points < 0:
+            raise ValueError("stops_level_points must be non-negative when provided.")
+        if self.freeze_level_points is not None and self.freeze_level_points < 0:
+            raise ValueError("freeze_level_points must be non-negative when provided.")
 
 
 @dataclass(frozen=True)
@@ -334,6 +375,7 @@ class Mt5ExecutionAdapter:
         self._positions: dict[str, PositionState] = {}
         self._last_quotes: dict[str, ExecutionQuote] = {}
         self._seen_deal_ids: set[str] = set()
+        self._symbol_specs: dict[str, Mt5SymbolSpec] = {}
         self._next_fill_id = 1
 
     @property
@@ -402,13 +444,27 @@ class Mt5ExecutionAdapter:
                 ),
             )
 
+        broker_symbol = self._broker_symbol_for(intent.symbol)
+        try:
+            volume_lots = self._base_units_to_lots(
+                sizing.requested_quantity,
+                broker_symbol=broker_symbol,
+            )
+        except ValueError as exc:
+            return self._build_rejected_update(
+                intent,
+                quote=quote,
+                requested_quantity=sizing.requested_quantity,
+                reason=str(exc),
+            )
+
         request = Mt5OrderRequest(
             client_order_id=intent.intent_id,
-            broker_symbol=self._broker_symbol_for(intent.symbol),
+            broker_symbol=broker_symbol,
             side=intent.side,
             order_type=intent.order_type,
             submitted_at=quote.received_timestamp,
-            volume_lots=self._base_units_to_lots(sizing.requested_quantity),
+            volume_lots=volume_lots,
             time_in_force=intent.time_in_force,
             limit_price=None if intent.limit_price is None else float(intent.limit_price),
             stop_price=None if intent.stop_price is None else float(intent.stop_price),
@@ -506,9 +562,18 @@ class Mt5ExecutionAdapter:
                 symbol=self._internal_symbol_for(state.broker_symbol),
                 status=state.status,
                 updated_at=state.updated_at,
-                requested_quantity=self._lots_to_base_units(state.requested_volume_lots),
-                filled_quantity=self._lots_to_base_units(state.filled_volume_lots),
-                remaining_quantity=self._lots_to_base_units(state.remaining_volume_lots),
+                requested_quantity=self._lots_to_base_units(
+                    state.requested_volume_lots,
+                    broker_symbol=state.broker_symbol,
+                ),
+                filled_quantity=self._lots_to_base_units(
+                    state.filled_volume_lots,
+                    broker_symbol=state.broker_symbol,
+                ),
+                remaining_quantity=self._lots_to_base_units(
+                    state.remaining_volume_lots,
+                    broker_symbol=state.broker_symbol,
+                ),
                 stop_loss_price=state.stop_loss_price,
                 take_profit_price=state.take_profit_price,
             )
@@ -536,11 +601,17 @@ class Mt5ExecutionAdapter:
                 BrokerPositionSnapshot(
                     symbol=self._internal_symbol_for(position.broker_symbol),
                     timestamp=position.timestamp,
-                    net_quantity=self._lots_to_base_units(position.net_volume_lots),
+                    net_quantity=self._lots_to_base_units(
+                        position.net_volume_lots,
+                        broker_symbol=position.broker_symbol,
+                    ),
                     average_entry_price=position.average_entry_price,
                     position_mode=position.position_mode,
                     position_id=position.position_ticket,
-                    gross_quantity=self._lots_to_base_units(position.gross_lots),
+                    gross_quantity=self._lots_to_base_units(
+                        position.gross_lots,
+                        broker_symbol=position.broker_symbol,
+                    ),
                     source_position_ids=position.source_position_tickets,
                 )
             )
@@ -580,9 +651,18 @@ class Mt5ExecutionAdapter:
 
         previous_order = self._orders.get(state.broker_order_id)
         previous_filled_quantity = 0.0 if previous_order is None else previous_order.filled_quantity
-        filled_quantity = self._lots_to_base_units(state.filled_volume_lots)
-        remaining_quantity = self._lots_to_base_units(state.remaining_volume_lots)
-        requested_quantity = self._lots_to_base_units(state.requested_volume_lots)
+        filled_quantity = self._lots_to_base_units(
+            state.filled_volume_lots,
+            broker_symbol=state.broker_symbol,
+        )
+        remaining_quantity = self._lots_to_base_units(
+            state.remaining_volume_lots,
+            broker_symbol=state.broker_symbol,
+        )
+        requested_quantity = self._lots_to_base_units(
+            state.requested_volume_lots,
+            broker_symbol=state.broker_symbol,
+        )
         delta_filled_quantity = filled_quantity - previous_filled_quantity
         if delta_filled_quantity < -_ZERO_TOLERANCE:
             raise ValueError("Broker filled quantity moved backwards.")
@@ -676,7 +756,9 @@ class Mt5ExecutionAdapter:
         if not state.deals:
             return ()
 
-        previous_filled_lots = previous_filled_quantity / self._config.base_units_per_lot
+        previous_filled_lots = previous_filled_quantity / self._symbol_spec_for(
+            state.broker_symbol
+        ).base_units_per_lot
         cumulative_lots = 0.0
         fills: list[FillEvent] = []
         for deal in sorted(state.deals, key=lambda item: (item.timestamp, item.broker_deal_id)):
@@ -697,7 +779,10 @@ class Mt5ExecutionAdapter:
         deal: Mt5DealState,
         quote: ExecutionQuote,
     ) -> FillEvent:
-        fill_quantity = self._lots_to_base_units(deal.volume_lots)
+        fill_quantity = self._lots_to_base_units(
+            deal.volume_lots,
+            broker_symbol=deal.broker_symbol,
+        )
         return FillEvent(
             fill_id=f"mt5-deal-{deal.broker_deal_id}",
             intent_id=intent.intent_id,
@@ -798,7 +883,10 @@ class Mt5ExecutionAdapter:
         *,
         quote: ExecutionQuote,
     ) -> PositionState:
-        net_quantity = self._lots_to_base_units(broker_position.net_volume_lots)
+        net_quantity = self._lots_to_base_units(
+            broker_position.net_volume_lots,
+            broker_symbol=broker_position.broker_symbol,
+        )
         average_entry_price = (
             0.0
             if math.isclose(net_quantity, 0.0, abs_tol=_ZERO_TOLERANCE)
@@ -845,7 +933,10 @@ class Mt5ExecutionAdapter:
         current_quantity = (
             0.0
             if broker_position is None
-            else self._lots_to_base_units(broker_position.net_volume_lots)
+            else self._lots_to_base_units(
+                broker_position.net_volume_lots,
+                broker_symbol=broker_position.broker_symbol,
+            )
         )
         if intent.target_position is not None:
             delta_quantity = float(intent.target_position) - current_quantity
@@ -938,7 +1029,10 @@ class Mt5ExecutionAdapter:
                 requested_quantity=requested_quantity,
                 rejection_reason="reduce_only hedging order requires a broker position ticket.",
             )
-        reducible_quantity = self._lots_to_base_units(abs(position.net_volume_lots))
+        reducible_quantity = self._lots_to_base_units(
+            abs(position.net_volume_lots),
+            broker_symbol=position.broker_symbol,
+        )
         if requested_quantity - reducible_quantity > _ZERO_TOLERANCE:
             return _ResolvedMt5Sizing(
                 requested_quantity=requested_quantity,
@@ -987,7 +1081,10 @@ class Mt5ExecutionAdapter:
         current_quantity = (
             0.0
             if broker_position is None
-            else self._lots_to_base_units(broker_position.net_volume_lots)
+            else self._lots_to_base_units(
+                broker_position.net_volume_lots,
+                broker_symbol=broker_position.broker_symbol,
+            )
         )
         signed_quantity = (
             requested_quantity if intent.side is OrderSide.BUY else -requested_quantity
@@ -1003,18 +1100,47 @@ class Mt5ExecutionAdapter:
             return abs(current_quantity)
         return 0.0
 
-    def _base_units_to_lots(self, quantity: float) -> float:
-        raw_lots = float(quantity) / self._config.base_units_per_lot
-        step_count = math.floor((raw_lots + _ZERO_TOLERANCE) / self._config.volume_step_lots)
-        normalized_lots = round(step_count * self._config.volume_step_lots, 8)
-        if normalized_lots < self._config.min_volume_lots - _ZERO_TOLERANCE:
+    def _base_units_to_lots(self, quantity: float, *, broker_symbol: str) -> float:
+        spec = self._symbol_spec_for(broker_symbol)
+        raw_lots = Decimal(str(float(quantity))) / Decimal(str(spec.base_units_per_lot))
+        normalized_lots = _quantize_lots_down(raw_lots, step=spec.volume_step_lots)
+        if normalized_lots < Decimal(str(spec.volume_min_lots)):
             raise ValueError(
                 "Requested base-unit quantity is smaller than the broker minimum lot size."
             )
-        return normalized_lots
+        if (
+            spec.volume_max_lots is not None
+            and normalized_lots > Decimal(str(spec.volume_max_lots))
+        ):
+            raise ValueError("Requested base-unit quantity exceeds the broker maximum lot size.")
+        return float(normalized_lots)
 
-    def _lots_to_base_units(self, volume_lots: float) -> float:
-        return float(volume_lots) * self._config.base_units_per_lot
+    def _lots_to_base_units(self, volume_lots: float, *, broker_symbol: str | None = None) -> float:
+        base_units_per_lot = (
+            self._config.base_units_per_lot
+            if broker_symbol is None
+            else self._symbol_spec_for(broker_symbol).base_units_per_lot
+        )
+        return float(volume_lots) * base_units_per_lot
+
+    def _symbol_spec_for(self, broker_symbol: str) -> Mt5SymbolSpec:
+        cached = self._symbol_specs.get(broker_symbol)
+        if cached is not None:
+            return cached
+        spec_provider = getattr(self._client, "get_symbol_spec", None)
+        if callable(spec_provider):
+            spec = spec_provider(broker_symbol)
+            if spec is not None:
+                self._symbol_specs[broker_symbol] = spec
+                return spec
+        spec = Mt5SymbolSpec(
+            broker_symbol=broker_symbol,
+            base_units_per_lot=self._config.base_units_per_lot,
+            volume_min_lots=self._config.min_volume_lots,
+            volume_step_lots=self._config.volume_step_lots,
+        )
+        self._symbol_specs[broker_symbol] = spec
+        return spec
 
     def _broker_symbol_for(self, internal_symbol: str) -> str:
         return self._config.symbol_map.get(internal_symbol, internal_symbol)
@@ -1089,3 +1215,10 @@ def _position_is_reduced_by(position: Mt5PositionState, side: OrderSide) -> bool
     if side is OrderSide.SELL and position.net_volume_lots > 0:
         return True
     return False
+
+
+def _quantize_lots_down(raw_lots: Decimal, *, step: float) -> Decimal:
+    if raw_lots <= 0:
+        raise ValueError("Requested base-unit quantity must be greater than zero.")
+    step_decimal = Decimal(str(step))
+    return (raw_lots / step_decimal).to_integral_value(rounding=ROUND_DOWN) * step_decimal

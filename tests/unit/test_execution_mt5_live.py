@@ -16,6 +16,7 @@ from scalper_ai.execution import (
     Mt5OrderRequest,
     Mt5OrderState,
     Mt5PositionState,
+    Mt5SymbolSpec,
 )
 from scalper_ai.execution.mt5_live import aggregate_mt5_positions
 
@@ -277,6 +278,92 @@ def test_mt5_execution_adapter_hedging_reduce_only_uses_single_position_ticket()
     assert update.order.status is ExecutionOrderStatus.FILLED
 
 
+def test_mt5_execution_adapter_uses_symbol_spec_for_conservative_lot_quantization() -> None:
+    client = _SymbolSpecMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            base_units_per_lot=10_000.0,
+            volume_min_lots=0.1,
+            volume_step_lots=0.1,
+            volume_max_lots=2.0,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(
+        client,
+        config=Mt5ExecutionConfig(base_units_per_lot=100_000.0),
+    )
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-quantized",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=12_345.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0998,
+            ask=1.1000,
+            venue="broker-feed",
+        ),
+    )
+
+    assert client.requests[0].volume_lots == pytest.approx(1.2)
+    assert update.order.requested_quantity == pytest.approx(12_000.0)
+    assert update.order.status is ExecutionOrderStatus.FILLED
+
+
+def test_mt5_execution_adapter_rejects_symbol_spec_volume_above_maximum() -> None:
+    client = _SymbolSpecMt5Client(
+        Mt5SymbolSpec(
+            broker_symbol="EURUSD",
+            base_units_per_lot=100_000.0,
+            volume_min_lots=0.01,
+            volume_step_lots=0.01,
+            volume_max_lots=0.5,
+        )
+    )
+    adapter = Mt5ExecutionAdapter(
+        client,
+        config=Mt5ExecutionConfig(base_units_per_lot=100_000.0),
+    )
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+
+    update = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-too-large",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=100_000.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0998,
+            ask=1.1000,
+            venue="broker-feed",
+        ),
+    )
+
+    assert client.requests == []
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == (
+        "Requested base-unit quantity exceeds the broker maximum lot size."
+    )
+
+
 def test_mt5_execution_adapter_rejects_ambiguous_hedging_reduce_only() -> None:
     client = _BrokerPositionMt5Client(
         Mt5PositionState(
@@ -461,6 +548,16 @@ class _ImmediateFillMt5Client:
 
     def ping_latency_ms(self) -> float | None:
         return 4.0
+
+
+class _SymbolSpecMt5Client(_ImmediateFillMt5Client):
+    def __init__(self, spec: Mt5SymbolSpec) -> None:
+        super().__init__()
+        self._spec = spec
+
+    def get_symbol_spec(self, broker_symbol: str) -> Mt5SymbolSpec:
+        assert broker_symbol == self._spec.broker_symbol
+        return self._spec
 
 
 class _DealFillMt5Client(_ImmediateFillMt5Client):

@@ -95,7 +95,7 @@ def test_bootstrap_runtime_can_auto_build_mt5_live_adapter(monkeypatch: pytest.M
                 event_timestamp=timestamp,
                 received_timestamp=timestamp,
                 bid=1.1000,
-                ask=1.1002,
+                ask=1.10005,
                 venue="broker-feed",
             ),
         )
@@ -167,6 +167,19 @@ class _BootstrapFakeMetaTrader5Module:
 
     def symbol_info_tick(self, symbol: str) -> SimpleNamespace:
         return SimpleNamespace(bid=1.1000, ask=1.1002)
+
+    def symbol_info(self, symbol: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            name=symbol,
+            trade_contract_size=100_000.0,
+            volume_min=0.01,
+            volume_step=0.01,
+            volume_max=100.0,
+            digits=5,
+            point=0.00001,
+            trade_stops_level=10,
+            trade_freeze_level=5,
+        )
 
     def order_check(self, request: dict[str, object]) -> SimpleNamespace:
         return SimpleNamespace(
