@@ -29,6 +29,7 @@ from scalper_ai.execution import (
     ExecutionOrderStatus,
     ExecutionQuote,
     ExecutionRouter,
+    ExecutionStateStore,
     ExecutionStateTracker,
     ExecutionUpdate,
     PaperExecutionAdapter,
@@ -102,6 +103,7 @@ class DeploymentRuntime:
         risk_engine: RiskEngine | None = None,
         risk_context_provider: RiskContextProvider | None = None,
         journal_writer: JournalWriterProtocol | None = None,
+        state_store: ExecutionStateStore | None = None,
         live_confirmation_token: str | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -115,6 +117,7 @@ class DeploymentRuntime:
         self._risk_engine = risk_engine or RiskEngine(RiskLimits.from_risk_config(config.risk))
         self._risk_context_provider = risk_context_provider
         self._journal_writer = journal_writer
+        self._state_store = state_store
         self._live_confirmation_token = live_confirmation_token
         self._logger = logger or get_logger(f"{config.logging.logger_name}.deployment")
         self._metrics = MetricsRegistry(service_name=self._service_name)
@@ -127,6 +130,8 @@ class DeploymentRuntime:
         self._journal_events: list[JournalEvent] = []
         self._last_cash_balance_by_route: dict[bool, float] = {}
         self._last_equity_by_route: dict[bool, float] = {}
+        self._recovered_execution_update_count = 0
+        self._recovered_oms_record_count = 0
         self._router: ExecutionRouter | None = None
         self._live_adapter: ExecutionAdapter | None = None
         self._state = RuntimeLifecycleState.CREATED
@@ -193,11 +198,12 @@ class DeploymentRuntime:
         if self._state in {RuntimeLifecycleState.RUNNING, RuntimeLifecycleState.DEGRADED}:
             raise RuntimeError("Runtime is already started.")
 
-        self._state_tracker.clear()
         if self.config.deployment.create_directories_on_startup:
             for path in self.resolved_directories().values():
                 path.mkdir(parents=True, exist_ok=True)
 
+        self._reset_recoverable_state()
+        self._recover_state_from_store()
         self._started_at = datetime.now(UTC)
         self._last_broker_connectivity_snapshot = None
         self._last_broker_connectivity_provider_error = None
@@ -207,7 +213,15 @@ class DeploymentRuntime:
             "scalper_ai_runtime_start_total",
             requested_mode=self.requested_mode,
         )
-        self._activate_mode()
+        try:
+            self._activate_mode()
+            self._block_unsafe_recovered_startup()
+        except Exception:
+            self._close_live_adapter()
+            self._router = None
+            self._live_adapter = None
+            self._state = RuntimeLifecycleState.CREATED
+            raise
         self._metrics.set_gauge(
             "scalper_ai_runtime_up",
             1.0,
@@ -217,6 +231,18 @@ class DeploymentRuntime:
         self._metrics.set_gauge(
             "scalper_ai_runtime_execution_enabled",
             1.0 if self.execution_enabled else 0.0,
+            requested_mode=self.requested_mode,
+            effective_mode=self.effective_mode,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_runtime_recovered_execution_updates",
+            float(self._recovered_execution_update_count),
+            requested_mode=self.requested_mode,
+            effective_mode=self.effective_mode,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_runtime_recovered_oms_records",
+            float(self._recovered_oms_record_count),
             requested_mode=self.requested_mode,
             effective_mode=self.effective_mode,
         )
@@ -413,6 +439,62 @@ class DeploymentRuntime:
             )
         return updates
 
+    def _reset_recoverable_state(self) -> None:
+        self._state_tracker.clear()
+        self._oms_records.clear()
+        self._last_cash_balance_by_route.clear()
+        self._last_equity_by_route.clear()
+        self._recovered_execution_update_count = 0
+        self._recovered_oms_record_count = 0
+
+    def _recover_state_from_store(self) -> None:
+        if self._state_store is None:
+            return
+
+        execution_updates = self._state_store.list_execution_updates()
+        self._state_tracker.apply_updates(execution_updates)
+        for update in execution_updates:
+            self._remember_account_state(update)
+        for record in self._state_store.list_oms_records():
+            self._remember_oms_record(record, persist=False)
+
+        self._recovered_execution_update_count = len(execution_updates)
+        self._recovered_oms_record_count = len(self._oms_records)
+
+    def _block_unsafe_recovered_startup(self) -> None:
+        live_open_orders = tuple(
+            order for order in self._state_tracker.list_orders(paper=False) if order.is_open
+        )
+        if not live_open_orders:
+            return
+        if self.requested_mode == "live" and self.effective_mode != "live":
+            raise RuntimeError(
+                "Cannot fall back to paper while durable state contains open live orders."
+            )
+        if self.effective_mode != "live":
+            return
+
+        report_provider = self._resolved_reconciliation_report_provider()
+        if report_provider is None:
+            raise RuntimeError(
+                "Cannot start live runtime with open recovered live orders without reconciliation."
+            )
+        try:
+            report = report_provider()
+        except Exception as exc:
+            raise RuntimeError(
+                "Cannot start live runtime because startup reconciliation failed."
+            ) from exc
+        if report is None:
+            raise RuntimeError(
+                "Cannot start live runtime because startup reconciliation returned no report."
+            )
+        self._last_reconciliation_report = report
+        if report.has_errors:
+            raise RuntimeError(
+                "Cannot start live runtime because startup reconciliation found error drift."
+            )
+
     def _build_risk_context(self, intent: OrderIntent, quote: ExecutionQuote) -> RiskContext:
         if self._risk_context_provider is not None:
             return self._risk_context_provider(intent, quote, self._state_tracker)
@@ -574,8 +656,10 @@ class DeploymentRuntime:
             )
         return record
 
-    def _remember_oms_record(self, record: OmsOrderRecord) -> None:
+    def _remember_oms_record(self, record: OmsOrderRecord, *, persist: bool = True) -> None:
         self._oms_records[record.intent.intent_id] = record
+        if persist and self._state_store is not None:
+            self._state_store.save_oms_record(record)
 
     def _remember_account_state(self, update: ExecutionUpdate) -> None:
         route = update.order.intent.paper
@@ -583,6 +667,8 @@ class DeploymentRuntime:
         self._last_equity_by_route[route] = update.equity
 
     def _record_risk_decision(self, decision: RiskDecision) -> None:
+        if self._state_store is not None:
+            self._state_store.save_risk_decision(decision)
         self._record_journal_event(
             decision.to_journal_event(
                 event_id=f"risk-{decision.intent_id}-{len(self._journal_events) + 1}",
@@ -627,6 +713,8 @@ class DeploymentRuntime:
 
     def _record_order_response(self, update: ExecutionUpdate, *, causation_id: str) -> None:
         order = update.order
+        if self._state_store is not None:
+            self._state_store.save_execution_update(update)
         self._record_journal_event(
             JournalEvent.from_payload(
                 event_id=f"order-response-{order.intent.intent_id}-{len(self._journal_events) + 1}",

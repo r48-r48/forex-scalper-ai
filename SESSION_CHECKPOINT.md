@@ -211,6 +211,16 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `.venv/bin/ruff check src/scalper_ai/deployment/runtime.py tests/unit/test_deployment_runtime.py` passed
   - `.venv/bin/pytest tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py` passed
   - full `.venv/bin/pytest` passed with `173 passed`
+- 2026-04-30 completed the first P0.B durable state/startup recovery slice:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/state_store.py`
+  - `SqliteExecutionStateStore` persists order intents, risk decisions, OMS transitions, execution updates, fills, latest position snapshots, and kill-switch state
+  - `DeploymentRuntime.start()` now reloads durable execution/OMS/account state before accepting new orders
+  - duplicate intents after runtime restart are rejected from recovered execution state before adapter submission
+  - recovered open live orders block unsafe paper fallback and unreconciled live startup
+  - added unit coverage for SQLite round-trip, paper runtime restart duplicate blocking, and live open-order fallback blocking
+  - targeted Ruff passed for the new state store, runtime, execution exports, and touched tests
+  - `.venv/bin/pytest tests/unit/test_execution_state_store.py tests/unit/test_deployment_runtime.py` passed with `18 passed`
+  - full `.venv/bin/pytest` passed with `176 passed`
 - 2026-04-27 project scan refreshed the current state from the active Desktop workspace.
 - Updated stale project-memory paths from the old missing Documents workspace location to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`.
 - Removed current Pydantic warning sources:

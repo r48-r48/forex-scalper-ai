@@ -83,6 +83,8 @@ Current contracts:
 - `ExecutionAdapter`
 - `BrokerSnapshotProvider`
 - `BrokerConnectivityProvider`
+- `ExecutionStateStore`
+- `SqliteExecutionStateStore`
 - paper execution adapter
 - live stub adapter
 - MT5 live adapter and terminal client wrapper
@@ -91,6 +93,7 @@ Target direction:
 
 - MT5 live submission now runs `order_check` before `order_send`; full journal correlation and reconciliation flow continue through the journal/OMS work
 - broker adapters should remain separated from domain logic and OMS/risk decisions
+- runtime recovery should reload durable execution state before new orders and block unsafe live startup when recovered open orders cannot be reconciled
 
 ### Journal
 

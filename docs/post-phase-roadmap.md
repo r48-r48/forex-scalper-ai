@@ -58,8 +58,8 @@ Already implemented:
 - local JSONL alert transport for warning/failing health snapshots
 
 Known gaps:
-- RiskEngine and OMS are now mandatory in `DeploymentRuntime.submit_order()` for the first runtime gate slice, but durable persistence and startup recovery for those decisions are still pending
-- durable state storage and startup recovery are still absent; live state is currently process-local
+- RiskEngine and OMS are now mandatory in `DeploymentRuntime.submit_order()` for the first runtime gate slice
+- first durable state storage and startup recovery wiring exists through `SqliteExecutionStateStore`, but deeper live recovery fault injection still needs broker-side scenarios for open orders, broker-only positions, and missing/partial history
 - MT5 live sizing still needs broker-source-of-truth refresh before target-position/reduce-only decisions
 - live accounting still needs deal-level commission/fee/swap attribution
 - protective TP/SL/bracket management is not yet implemented as a production order-management mechanism
@@ -100,7 +100,8 @@ Known gaps:
 - Risk Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `392` to `374`.
 - Parallels MT5 read-only validation and runtime availability check: completed on 2026-04-28 without order_send; IOC is required for Dukascopy EURUSD, one-year history is empty, terminal-side trading permission is disabled, Docker is unavailable locally, and local paper runtime describe/health/metrics passed.
 - Controlled Parallels MT5 demo-order validation: completed on 2026-04-29 with explicit operator approval, minimum EURUSD IOC demo fill, ticket-specific flattening, and zero remaining open positions.
-- Current next task: build durable state/startup recovery on top of the new runtime Risk/OMS submit gate, then continue with broker-source-of-truth MT5 sizing, hedging-aware MT5 execution/reconciliation, and history API investigation.
+- P0.B Durable State Store And Startup Recovery first slice: completed on 2026-04-30 with SQLite state persistence, runtime reload, duplicate-intent recovery, and open-live-order startup blocking.
+- Current next task: continue with broker-source-of-truth MT5 sizing, hedging-aware MT5 execution/reconciliation, and history API investigation.
 
 ## P0 Workstream
 
@@ -463,7 +464,7 @@ Completed implementation notes:
 
 ## Immediate Next Task
 
-The first external-audit P0 runtime gate slice is completed.
+The first external-audit P0 runtime gate and durable recovery slices are completed.
 
 Completed runtime-gating slice:
 1. `DeploymentRuntime.submit_order()` builds a `RiskContext` for every order.
@@ -472,10 +473,16 @@ Completed runtime-gating slice:
 4. Runtime records risk, OMS, order response, fill, and position journal events in memory and through an optional writer.
 5. Runtime returns a normalized rejected execution update when risk blocks an order, without broker submission.
 
+Completed durable recovery slice:
+1. `SqliteExecutionStateStore` persists order intents, OMS transitions, risk decisions, execution updates, fills, latest positions, and kill-switch state.
+2. `DeploymentRuntime.start()` reloads durable execution/OMS/account state before accepting new orders.
+3. Duplicate intent checks now use recovered execution state after restart.
+4. Open recovered live orders block unsafe paper fallback and unreconciled live startup.
+
 Next immediate slice:
-1. Add durable state storage for order intents, OMS transitions, risk decisions, execution updates, fills, positions, and kill-switch state.
-2. Add startup recovery that reloads the durable state, fetches broker snapshots, reconciles, and blocks unsafe running states.
-3. Add fault-injection tests for restart with open order, local state empty but broker position present, and duplicate intent after recovery.
+1. Refresh broker positions before MT5 target-position and reduce-only sizing.
+2. Add hedging-aware MT5 execution/reconciliation using position tickets for `margin_mode=2`.
+3. Add live fault-injection tests for broker-only positions, partial local state, and missing/empty broker history.
 
 Then continue MT5 demo validation when the Windows terminal is available.
 

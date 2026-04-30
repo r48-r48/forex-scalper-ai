@@ -432,9 +432,11 @@ Current repository status:
 
 ## Last Session Snapshot
 
-- Session updated on: 2026-04-28
+- Session updated on: 2026-04-30
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - P0.B Durable State Store And Startup Recovery first slice is complete: `scalper_ai.execution.state_store` provides `SqliteExecutionStateStore`, runtime recovery reloads execution/OMS/account state before accepting new orders, duplicate intents after restart are blocked from recovered state, recovered open live orders block unsafe fallback or unreconciled startup, and full `.venv/bin/pytest` passed with `176 passed`
+  - P0.A Runtime Risk/OMS Gate first slice is complete: `DeploymentRuntime.submit_order()` evaluates `RiskEngine` before router/broker submission, drives OMS transitions, journals risk/OMS/execution/fill/position events, and returns normalized risk-rejected execution updates without broker submission
   - P2.3 Release Runbooks is complete: `docs/runbooks/`, `docs/production-checklist.md`, `docs/incident-template.md`, and `docs/postmortem-template.md` now provide normal and incident procedures
   - P2.2 Observability Expansion is complete as docs: `docs/alert-rules.md` and `docs/platform-roadmap.md` define alert meanings, operator actions, and Compose-first platform sequencing
   - P2.1 Supervised Baseline Filter is complete: `scalper_ai.models.baseline_filter` provides the transparent filter, while `scalper_ai.validation.supervised_filter` provides train-only fit and test-only walk-forward evaluation
@@ -477,7 +479,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue deeper MT5 demo validation when the Windows terminal is available, especially non-empty history/deal normalization and controlled demo-order behavior only after explicit operator approval
+  - continue broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, non-empty history/deal normalization, and protective order management
   - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## Constraints To Preserve
@@ -494,7 +496,7 @@ Current repository status:
 
 ## Post-Phase Focus
 
-- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, especially non-empty history/deal normalization and demo-order behavior only after explicit approval
+- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, especially broker-source-of-truth sizing, hedging-aware reconciliation, non-empty history/deal normalization, and demo-order behavior only after explicit approval
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
 - validate Docker/Compose runtime packaging, retire lint/typecheck baseline in small batches, then add network alert transport wiring, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface

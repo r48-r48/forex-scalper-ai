@@ -7,6 +7,12 @@ from scalper_ai.execution.interfaces import (
     ExecutionAdapter,
 )
 from scalper_ai.execution.live_stub import LiveExecutionStubAdapter, LiveExecutionStubConfig
+from scalper_ai.execution.models import (
+    ExecutionOrder,
+    ExecutionOrderStatus,
+    ExecutionQuote,
+    ExecutionUpdate,
+)
 from scalper_ai.execution.mt5_client import (
     Mt5AccountSnapshot,
     Mt5OrderCheckResult,
@@ -21,12 +27,6 @@ from scalper_ai.execution.mt5_live import (
     Mt5OrderState,
     Mt5PositionState,
 )
-from scalper_ai.execution.models import (
-    ExecutionOrder,
-    ExecutionOrderStatus,
-    ExecutionQuote,
-    ExecutionUpdate,
-)
 from scalper_ai.execution.paper import PaperExecutionAdapter, PaperExecutionConfig
 from scalper_ai.execution.reconciliation import (
     BrokerOrderSnapshot,
@@ -39,8 +39,17 @@ from scalper_ai.execution.reconciliation import (
     reconcile_order,
     reconcile_position,
 )
-from scalper_ai.execution.snapshots import ExecutionStateTracker, build_snapshot_reconciliation_report
 from scalper_ai.execution.router import ExecutionRouter
+from scalper_ai.execution.snapshots import (
+    ExecutionStateTracker,
+    build_snapshot_reconciliation_report,
+)
+from scalper_ai.execution.state_store import (
+    ExecutionStateStore,
+    KillSwitchScope,
+    KillSwitchState,
+    SqliteExecutionStateStore,
+)
 
 __all__ = [
     "BrokerOrderSnapshot",
@@ -53,8 +62,11 @@ __all__ = [
     "ExecutionOrderStatus",
     "ExecutionQuote",
     "ExecutionRouter",
+    "ExecutionStateStore",
     "ExecutionStateTracker",
     "ExecutionUpdate",
+    "KillSwitchScope",
+    "KillSwitchState",
     "LiveExecutionStubAdapter",
     "LiveExecutionStubConfig",
     "Mt5ExecutionAdapter",
@@ -72,6 +84,7 @@ __all__ = [
     "ReconciliationIssue",
     "ReconciliationReport",
     "ReconciliationSeverity",
+    "SqliteExecutionStateStore",
     "build_reconciliation_report",
     "build_reconciliation_report_for_positions",
     "build_snapshot_reconciliation_report",

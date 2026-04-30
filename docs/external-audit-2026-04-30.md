@@ -25,9 +25,9 @@ The highest priority is to make RiskEngine, OMS, durable state, broker-source-of
    - `src/scalper_ai/execution/mt5_live.py:251` returns the latest marked internal position, not a refreshed broker position.
    - Broker snapshot methods exist, but they are not used as the source of truth before target-position or reduce-only sizing.
 
-3. Durable restart recovery is absent.
-   - Current state tracking is process-local through `ExecutionStateTracker` and adapter dictionaries.
-   - There is no `state_store.py`, `recovery.py`, persisted OMS ledger, or startup recovery gate that reconstructs open orders, fills, positions, and kill-switch state before running.
+3. Durable restart recovery was absent at audit time.
+   - First slice completed on `2026-04-30`: `state_store.py` now provides SQLite persistence for runtime order/risk/OMS/execution/fill/position/kill-switch state, and `DeploymentRuntime.start()` reloads state before new orders.
+   - Remaining work: expand broker-side recovery/fault injection for broker-only positions, partial local state, and missing/empty broker history.
 
 4. Live PnL, fees, and fill attribution are incomplete.
    - `src/scalper_ai/execution/mt5_live.py:413` builds fills with `commission=0.0` and `slippage_cost=0.0`.
@@ -81,16 +81,20 @@ Required behavior:
 - Completed: create and transition `OmsOrderRecord` through `NEW -> CHECKED -> SENT -> ACK/PARTIAL/FILLED/REJECTED/CANCELLED` or risk-rejected states.
 - Completed: journal risk decisions, OMS transitions, broker responses, fills, and position updates in memory and through an optional writer.
 - Completed: return a normalized rejected `ExecutionUpdate` when risk blocks an order, without touching the broker.
-- Pending: durable persistence of these records and startup recovery, covered by P0.B.
+- Completed in the first P0.B slice: durable persistence and startup recovery for these runtime records.
 
 ### P0.B - Durable State Store And Startup Recovery
+
+Status: first durable recovery slice completed on `2026-04-30`.
 
 Goal: make live state recoverable after process crash or restart.
 
 Required behavior:
-- Persist order intents, OMS transitions, broker order ids, fills/deals, position snapshots, risk decisions, and kill-switch state.
-- On startup, reload state, fetch broker orders/positions/deals, reconcile, and only enter running state if safe.
-- Enter safe/kill-switch mode when broker state and internal state cannot be reconciled.
+- Completed: persist order intents, OMS transitions, broker order ids, execution updates, fills, position snapshots, risk decisions, and kill-switch state in SQLite.
+- Completed: reload execution/OMS/account state during `DeploymentRuntime.start()` before accepting new orders.
+- Completed: block duplicate intents after restart through recovered execution state.
+- Completed: block unsafe paper fallback or unreconciled live startup when recovered live orders are still open.
+- Pending: expand broker-side startup reconciliation and fault-injection tests for broker-only positions, partial local state, and missing/empty broker history.
 
 ### P0.C - Broker-Source-Of-Truth MT5 Position Handling
 
@@ -140,4 +144,4 @@ Required behavior:
 
 ## Next Recommended Implementation Step
 
-Continue with P0.B: add durable state storage and startup recovery on top of the new mandatory runtime Risk/OMS gate.
+Continue with P0.C/P0.D: broker-source-of-truth MT5 sizing, hedging-aware execution/reconciliation, and deal/history normalization on top of the mandatory runtime Risk/OMS and durable recovery gates.

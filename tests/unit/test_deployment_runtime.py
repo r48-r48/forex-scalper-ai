@@ -13,13 +13,15 @@ from scalper_ai.deployment import (
     MetricsRegistry,
     RuntimeLifecycleState,
 )
-from scalper_ai.domain import OrderIntent, OrderSide, OrderType
+from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionState
 from scalper_ai.execution import (
     BrokerConnectivitySnapshot,
     BrokerOrderSnapshot,
     BrokerPositionSnapshot,
+    ExecutionOrder,
     ExecutionOrderStatus,
     ExecutionQuote,
+    ExecutionUpdate,
     LiveExecutionStubAdapter,
     Mt5ExecutionAdapter,
     Mt5ExecutionConfig,
@@ -29,6 +31,7 @@ from scalper_ai.execution import (
     ReconciliationIssue,
     ReconciliationReport,
     ReconciliationSeverity,
+    SqliteExecutionStateStore,
 )
 from scalper_ai.journal import JournalEvent, JournalEventType
 from scalper_ai.services import OmsOrderStatus
@@ -500,6 +503,139 @@ def test_runtime_oms_tracks_process_quote_fill_for_open_order() -> None:
         and event.payload["status"] == "filled"
         for event in runtime.journal_events
     )
+
+
+def test_runtime_recovers_durable_state_and_blocks_duplicate_intent(tmp_path) -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+    timestamp = datetime(2026, 4, 30, 10, 20, tzinfo=UTC)
+    intent = OrderIntent(
+        intent_id="recovered-intent",
+        strategy_id="runtime-recovery-test",
+        symbol="EURUSD",
+        created_at=timestamp,
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        quantity=2.0,
+        paper=True,
+    )
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.0999,
+        ask=1.1001,
+        venue="paper",
+    )
+
+    first_runtime = DeploymentRuntime(config, state_store=store)
+    first_runtime.start()
+    first_update = first_runtime.submit_order(intent, quote)
+    first_runtime.stop()
+
+    assert first_update.order.status is ExecutionOrderStatus.FILLED
+    assert store.count_rows("execution_updates") == 1
+
+    adapter = _RejectIfSubmittedAdapter()
+    recovered_runtime = DeploymentRuntime(
+        config,
+        paper_adapter_factory=lambda: adapter,
+        state_store=store,
+    )
+    recovered_runtime.start()
+
+    assert recovered_runtime.oms_records[0].status is OmsOrderStatus.FILLED
+    assert "scalper_ai_runtime_recovered_execution_updates" in recovered_runtime.metrics_text()
+
+    retry_timestamp = datetime(2026, 4, 30, 10, 20, 1, tzinfo=UTC)
+    retry_update = recovered_runtime.submit_order(
+        intent,
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=retry_timestamp,
+            received_timestamp=retry_timestamp,
+            bid=1.0998,
+            ask=1.1002,
+            venue="paper",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert retry_update.order.status is ExecutionOrderStatus.REJECTED
+    assert retry_update.order.rejection_reason == "duplicate_intent"
+
+
+def test_live_startup_blocks_paper_fallback_when_recovered_live_order_is_open(tmp_path) -> None:
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+    timestamp = datetime(2026, 4, 30, 10, 25, tzinfo=UTC)
+    intent = OrderIntent(
+        intent_id="open-live-intent",
+        strategy_id="runtime-recovery-test",
+        symbol="EURUSD",
+        created_at=timestamp,
+        side=OrderSide.BUY,
+        order_type=OrderType.LIMIT,
+        quantity=1.0,
+        limit_price=1.0995,
+        paper=False,
+    )
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.0999,
+        ask=1.1001,
+        venue="broker-feed",
+    )
+    store.save_execution_update(
+        ExecutionUpdate(
+            order=ExecutionOrder(
+                intent=intent,
+                broker_order_id="live-open-1",
+                status=ExecutionOrderStatus.ACCEPTED,
+                submitted_at=timestamp,
+                updated_at=timestamp,
+                requested_quantity=1.0,
+                filled_quantity=0.0,
+                remaining_quantity=1.0,
+            ),
+            fills=(),
+            position=PositionState(
+                symbol="EURUSD",
+                timestamp=timestamp,
+                net_quantity=0.0,
+                average_entry_price=0.0,
+                mark_price=quote.mid_price,
+                realized_pnl=0.0,
+                unrealized_pnl=0.0,
+                exposure_quote=0.0,
+            ),
+            cash_balance=100_000.0,
+            equity=100_000.0,
+            quote=quote,
+        )
+    )
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": True,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    runtime = DeploymentRuntime(config, state_store=store)
+
+    with pytest.raises(RuntimeError, match="Cannot fall back to paper"):
+        runtime.start()
 
 
 def test_live_runtime_can_use_live_stub_adapter_with_snapshot_reconciliation() -> None:
