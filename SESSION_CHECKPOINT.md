@@ -14,7 +14,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Current Snapshot
 
-- Date: `2026-04-30`
+- Date: `2026-05-01`
 - Repo phase status: `PHASE 1-12 complete`
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
@@ -584,6 +584,16 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - `.venv/bin/ruff check src/scalper_ai/execution/mt5_client.py tests/unit/test_execution_mt5_client.py scripts/mt5_history_probe.py tests/unit/test_scripts_mt5_history_probe.py` passed
   - `PYTHONPYCACHEPREFIX=/private/tmp/forex-scalper-ai-pycache python3 -m compileall src tests scripts` passed
   - full `.venv/bin/pytest` passed with `236 passed`
+- 2026-05-01 completed supervisor alert routing and controlled Parallels pending-order modify validation:
+  - `RuntimeSupervisor` now converts warning/failing health snapshots into alert events and sends them through an injected transport; alert transport failures are captured in the iteration without failing health/metrics polling
+  - `scripts/run_runtime.py supervise` now runs the supervisor as a CLI surface with optional local JSONL alerts and config-driven webhook alerts
+  - `scripts/mt5_pending_modify_demo.py` was added for explicit-token demo placement, modification, and cancellation of a far-away pending limit order
+  - first real Parallels run blocked safely before `order_send` because Windows `cmd` quoting mangled `BROKER_MT5_TERMINAL_PATH`; the second run used the established plain `set BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe` syntax and proceeded
+  - the script placed EURUSD demo pending order `156778443` on Dukascopy account `610769553`, modified the buy-limit price from `1.12273` to `1.11773`, and canceled it
+  - final `scripts\mt5_smoke.py --config-name mt5 --include-orders --include-positions` returned `order_count=0` and `position_count=0`
+  - the live cancel path exposed that MT5 history APIs can return unrelated old rows despite a ticket parameter; `Mt5TerminalClient._history_orders_get()` and `_history_deals_get()` now filter by ticket/order locally and fall back to full-window filtering when the broker rejects a shaped query
+  - targeted Ruff passed for supervisor/run-runtime/MT5 client/pending script/touched tests, targeted pytest passed with `29 passed`, and `scripts/run_runtime.py supervise --config-name paper --max-iterations 1` passed
+  - `git diff --check` passed, compileall passed, and full `.venv/bin/pytest` passed with `243 passed`
 - `python3 -m compileall src tests scripts`
 - `python3 scripts/run_runtime.py describe --config-name paper`
 - `python3 scripts/run_runtime.py health --config-name paper`
@@ -602,9 +612,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 ## Recommended Next Move
 
 Continue remaining live hardening:
-- add controlled broker-side pending-order modify validation only when a safe demo pending-order scenario is explicitly prepared
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
-- continue alert routing/operator automation, concrete volatility/news/model/feature health providers, Docker validation on a Docker-enabled host, and small-batch Ruff/mypy cleanup
+- continue concrete volatility/news/model/feature health providers, Docker validation on a Docker-enabled host, deeper MT5 fault-injection/partial-fill validation, and small-batch Ruff/mypy cleanup
 
 If further MT5 validation is paused:
 - validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup

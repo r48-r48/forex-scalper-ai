@@ -63,6 +63,61 @@ def test_runtime_supervisor_reports_runtime_errors_without_raising() -> None:
     assert iteration.snapshot is None
 
 
+def test_runtime_supervisor_routes_alerts_when_health_warns() -> None:
+    checked_at = datetime(2026, 4, 30, 13, 0, tzinfo=UTC)
+    transport = _RecordingAlertTransport()
+    supervisor = RuntimeSupervisor(
+        _WarningRuntime(checked_at),
+        alert_transport=transport,
+        clock=lambda: checked_at,
+        sleeper=lambda seconds: None,
+    )
+
+    iteration = supervisor.run_once()
+
+    assert len(iteration.alerts) == 1
+    assert iteration.alert_count == 1
+    assert iteration.alert_error is None
+    assert iteration.alerts[0].rule_id == "reconciliation_drift"
+    assert transport.alert_batches == [iteration.alerts]
+
+
+def test_runtime_supervisor_can_skip_warning_alerts() -> None:
+    checked_at = datetime(2026, 4, 30, 13, 0, tzinfo=UTC)
+    transport = _RecordingAlertTransport()
+    supervisor = RuntimeSupervisor(
+        _WarningRuntime(checked_at),
+        config=RuntimeSupervisorConfig(alert_include_warnings=False),
+        alert_transport=transport,
+        clock=lambda: checked_at,
+        sleeper=lambda seconds: None,
+    )
+
+    iteration = supervisor.run_once()
+
+    assert iteration.alerts == ()
+    assert iteration.alert_count == 0
+    assert transport.alert_batches == []
+
+
+def test_runtime_supervisor_preserves_health_result_when_alert_transport_fails() -> None:
+    checked_at = datetime(2026, 4, 30, 13, 0, tzinfo=UTC)
+    supervisor = RuntimeSupervisor(
+        _WarningRuntime(checked_at),
+        alert_transport=_BrokenAlertTransport(),
+        clock=lambda: checked_at,
+        sleeper=lambda seconds: None,
+    )
+
+    iteration = supervisor.run_once()
+
+    assert iteration.overall_status is HealthStatus.WARN
+    assert len(iteration.alerts) == 1
+    assert iteration.alert_count == 0
+    assert iteration.alert_error == "alert transport failed"
+    assert iteration.error is None
+
+
 def test_runtime_supervisor_run_forever_honors_max_iterations() -> None:
     checked_at = datetime(2026, 4, 30, 13, 0, tzinfo=UTC)
     clock_values = [checked_at + timedelta(seconds=index) for index in range(3)]
@@ -119,9 +174,49 @@ class _RecordingRuntime:
         return "scalper_ai_runtime_up 1\n"
 
 
+class _WarningRuntime:
+    def __init__(self, checked_at: datetime) -> None:
+        self._checked_at = checked_at
+
+    def health_snapshot(self) -> HealthSnapshot:
+        return HealthSnapshot(
+            service_name="scalper_ai_runtime",
+            requested_mode="live",
+            effective_mode="live",
+            lifecycle_state="running",
+            checked_at=self._checked_at,
+            overall_status=HealthStatus.WARN,
+            checks=(
+                HealthCheckResult(
+                    name="execution_reconciliation",
+                    status=HealthStatus.WARN,
+                    summary="Reconciliation detected warning-level drift.",
+                    details={"warning_count": 1},
+                ),
+            ),
+        )
+
+    def metrics_text(self) -> str:
+        return "scalper_ai_runtime_up 1\n"
+
+
 class _BrokenRuntime:
     def health_snapshot(self) -> HealthSnapshot:
         raise RuntimeError("health failed")
 
     def metrics_text(self) -> str:
         raise AssertionError("metrics must not be called when health fails")
+
+
+class _RecordingAlertTransport:
+    def __init__(self) -> None:
+        self.alert_batches: list[tuple[object, ...]] = []
+
+    def write_alerts(self, alerts: tuple[object, ...]) -> int:
+        self.alert_batches.append(alerts)
+        return len(alerts)
+
+
+class _BrokenAlertTransport:
+    def write_alerts(self, alerts: tuple[object, ...]) -> int:
+        raise RuntimeError("alert transport failed")

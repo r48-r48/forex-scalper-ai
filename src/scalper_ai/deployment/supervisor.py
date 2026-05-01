@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from time import sleep
 from typing import Protocol
 
+from scalper_ai.deployment.alerts import AlertEvent, alerts_from_health_snapshot
 from scalper_ai.deployment.health import HealthSnapshot, HealthStatus
 
 
@@ -21,6 +22,13 @@ class SupervisedRuntime(Protocol):
         """Render runtime metrics."""
 
 
+class AlertTransport(Protocol):
+    """Alert transport surface used by the supervisor."""
+
+    def write_alerts(self, alerts: tuple[AlertEvent, ...]) -> int:
+        """Write alert events and return the number submitted."""
+
+
 @dataclass(frozen=True)
 class RuntimeSupervisorConfig:
     """Scheduling knobs for the runtime supervisor loop."""
@@ -28,6 +36,7 @@ class RuntimeSupervisorConfig:
     health_interval_seconds: float = 30.0
     reconciliation_interval_seconds: float = 60.0
     idle_sleep_seconds: float = 1.0
+    alert_include_warnings: bool = True
 
     def __post_init__(self) -> None:
         if self.health_interval_seconds <= 0:
@@ -47,6 +56,9 @@ class RuntimeSupervisorIteration:
     reconciliation_due: bool
     snapshot: HealthSnapshot | None = None
     metrics_text: str = ""
+    alerts: tuple[AlertEvent, ...] = ()
+    alert_count: int = 0
+    alert_error: str | None = None
     error: str | None = None
 
     @property
@@ -64,11 +76,13 @@ class RuntimeSupervisor:
         runtime: SupervisedRuntime,
         *,
         config: RuntimeSupervisorConfig | None = None,
+        alert_transport: AlertTransport | None = None,
         clock: Callable[[], datetime] | None = None,
         sleeper: Callable[[float], object] | None = None,
     ) -> None:
         self._runtime = runtime
         self._config = config or RuntimeSupervisorConfig()
+        self._alert_transport = alert_transport
         self._clock = clock or (lambda: datetime.now(UTC))
         self._sleeper = sleeper or sleep
         self._last_health_at: datetime | None = None
@@ -109,6 +123,18 @@ class RuntimeSupervisor:
                 error=str(exc),
             )
 
+        alerts = alerts_from_health_snapshot(
+            snapshot,
+            include_warnings=self._config.alert_include_warnings,
+        )
+        alert_count = 0
+        alert_error = None
+        if self._alert_transport is not None and alerts:
+            try:
+                alert_count = self._alert_transport.write_alerts(alerts)
+            except Exception as exc:
+                alert_error = str(exc)
+
         self._last_health_at = checked_at
         if any(check.name == "execution_reconciliation" for check in snapshot.checks):
             self._last_reconciliation_at = checked_at
@@ -118,6 +144,9 @@ class RuntimeSupervisor:
             reconciliation_due=reconciliation_due,
             snapshot=snapshot,
             metrics_text=metrics_text,
+            alerts=alerts,
+            alert_count=alert_count,
+            alert_error=alert_error,
         )
 
     def run_forever(

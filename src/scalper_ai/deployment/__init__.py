@@ -18,6 +18,7 @@ from scalper_ai.deployment.metrics import MetricSample, MetricsRegistry
 from scalper_ai.deployment.mt5_preflight import Mt5PreflightReport, build_mt5_preflight_report
 from scalper_ai.deployment.runtime import DeploymentRuntime, RuntimeLifecycleState, RuntimeSummary
 from scalper_ai.deployment.supervisor import (
+    AlertTransport,
     RuntimeSupervisor,
     RuntimeSupervisorConfig,
     RuntimeSupervisorIteration,
@@ -39,6 +40,7 @@ __all__ = [
     "Mt5PreflightReport",
     "WebhookAlertTransport",
     "alerts_from_health_snapshot",
+    "AlertTransport",
     "resolve_live_adapter_factory",
     "RuntimeLifecycleState",
     "RuntimeSummary",

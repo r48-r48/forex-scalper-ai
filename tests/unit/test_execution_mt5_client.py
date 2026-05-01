@@ -497,6 +497,44 @@ def test_mt5_terminal_client_does_not_modify_pending_order_when_precheck_rejects
     assert module.order_send_call_count == 0
 
 
+def test_mt5_terminal_client_filters_history_order_ticket_after_pending_cancel() -> None:
+    module = _FakeMetaTrader5Module()
+    module.ignore_history_order_ticket_filter = True
+    module._open_orders[6601] = SimpleNamespace(
+        ticket=6601,
+        symbol="EURUSD",
+        type=module.ORDER_TYPE_BUY_LIMIT,
+        state=module.ORDER_STATE_PLACED,
+        volume_initial=0.01,
+        volume_current=0.01,
+        price_open=1.0990,
+        time_setup=1_774_670_400,
+    )
+    module._history_orders[9001] = SimpleNamespace(
+        ticket=9001,
+        symbol="EURUSD",
+        state=module.ORDER_STATE_FILLED,
+        volume_initial=0.01,
+        volume_current=0.0,
+        time_setup=1_774_670_300,
+        time_done=1_774_670_300,
+        comment="old fill",
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.cancel_order(
+        "6601",
+        timestamp=datetime(2026, 3, 28, 14, 1, tzinfo=UTC),
+    )
+
+    assert state.broker_order_id == "6601"
+    assert state.status is ExecutionOrderStatus.CANCELED
+    assert state.cancel_reason == "user_requested"
+
+
 def test_mt5_terminal_client_normalizes_symbol_spec() -> None:
     module = _FakeMetaTrader5Module()
     client = Mt5TerminalClient(
@@ -593,6 +631,7 @@ class _FakeMetaTrader5Module:
         )
         self.use_default_order_send = True
         self.order_send_result: SimpleNamespace | None = None
+        self.ignore_history_order_ticket_filter = False
         self._open_orders: dict[int, SimpleNamespace] = {}
         self._history_orders: dict[int, SimpleNamespace] = {}
         self._deals: dict[int, list[SimpleNamespace]] = {}
@@ -686,6 +725,15 @@ class _FakeMetaTrader5Module:
                 comment="done",
                 time=1_774_670_400,
             )
+        if request["action"] == self.TRADE_ACTION_REMOVE:
+            order_id = int(request["order"])
+            self._open_orders.pop(order_id, None)
+            return SimpleNamespace(
+                retcode=self.TRADE_RETCODE_DONE,
+                order=order_id,
+                comment="removed",
+                time=1_774_670_400,
+            )
         if request["action"] == self.TRADE_ACTION_SLTP:
             position_ticket = int(request["position"])
             for position in self._positions.values():
@@ -766,7 +814,7 @@ class _FakeMetaTrader5Module:
 
     def history_orders_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
         ticket = kwargs.get("ticket")
-        if ticket is None:
+        if ticket is None or self.ignore_history_order_ticket_filter:
             return tuple(self._history_orders.values())
         order = self._history_orders.get(int(ticket))
         return () if order is None else (order,)

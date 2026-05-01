@@ -53,6 +53,7 @@ They are written as operator guidance first and now have local JSONL and HTTP we
 - `JsonlAlertTransport` appends alert events to JSONL files for local operations and incident evidence.
 - `WebhookAlertTransport` posts batched alert JSON to an HTTP(S) endpoint with an explicit timeout and optional headers.
 - `monitoring.alert_webhook_url`, `monitoring.alert_webhook_timeout_seconds`, and `monitoring.alert_include_warnings` are available in config/env for operator wiring.
+- `RuntimeSupervisor` sends generated alerts through an injected transport, and `scripts/run_runtime.py supervise` wires config webhook routing plus optional `--alert-jsonl-path` evidence capture.
 - Broker connectivity maps to `broker_disconnect`.
 - Execution reconciliation maps to `reconciliation_drift`.
 - Execution-mode downgrade maps to `execution_mode_degraded`.

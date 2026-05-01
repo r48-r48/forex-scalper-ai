@@ -432,9 +432,10 @@ Current repository status:
 
 ## Last Session Snapshot
 
-- Session updated on: 2026-04-30
+- Session updated on: 2026-05-01
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - Supervisor alert routing and controlled Parallels pending-order modify validation are complete: `RuntimeSupervisor` now renders warning/failing health snapshots into alert events and sends them through an injected transport without failing the health loop on transport errors; `scripts/run_runtime.py supervise` wires supervisor polling to optional JSONL/webhook alert routing; `scripts/mt5_pending_modify_demo.py` placed a far-away EURUSD demo pending limit order on Dukascopy account `610769553`, modified it through `TRADE_ACTION_MODIFY`, canceled it, and final smoke confirmed `order_count=0` and `position_count=0`; the live run exposed and fixed MT5 history ticket filtering after cancel so old filled history rows are not mistaken for the canceled pending order
   - Real read-only Parallels MT5 history/deal validation is complete: with explicit `BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe` and 8760-hour lookback, `mt5_history_probe.py` found 4 EURUSD historical orders and 4 EURUSD trade deals without `order_send`; the normalized client was hardened to skip zero-volume deposit deals; `mt5_broker_probe.py --skip-order-check` then returned `normalized_order_count=4` with per-order deal attribution; full `.venv/bin/pytest` passed with `236 passed`
   - Post-repair reset / pending-order modify / MT5 history-probe / runtime supervisor slice is complete: runtime can clear a session kill-switch only after explicit-token clean reconciliation, MT5 pending orders support `TRADE_ACTION_MODIFY` through `order_check -> order_send` with adapter-side stops/freeze/trade-mode guardrails, `scripts/mt5_history_probe.py` provides read-only multi-shape history/deal diagnostics, `RuntimeSupervisor` schedules health/metrics polling through the existing reconciliation surface, targeted Ruff passed, targeted pytest passed with `71 passed`, compileall passed, and full `.venv/bin/pytest` passed with `236 passed`
   - MT5 Protective Repair / Modify first slice is complete: added `Mt5ProtectionUpdateRequest`, `Mt5TerminalClient.modify_position_protection()` using `TRADE_ACTION_SLTP` with `order_check` before `order_send`, adapter-side symbol trade-mode/stops/freeze validation before repair, ticket-scoped position refresh, runtime `repair_unprotected_positions()` with explicit live confirmation token, targeted MT5/client/runtime validation with `60 passed`, broader validation with `85 passed`, compileall, and full `.venv/bin/pytest` with `225 passed`
@@ -456,7 +457,7 @@ Current repository status:
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
   - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `374` Ruff issues after scripts/config/logging/journal/OMS/validation/models/risk cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
-  - Local JSONL alert transport and HTTP webhook alert transport are implemented; concrete endpoint routing remains pending after Docker/runtime topology validation
+  - Local JSONL alert transport and HTTP webhook alert transport are implemented and now wired into the supervisor/`run_runtime.py supervise` path; concrete production endpoint values still depend on deployment topology
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
   - P0.5 Python 3.11+ Target Validation is complete: local `.venv` uses Python 3.12.13, full dev/ml extras are installed, compile passes, and the current full suite passes with `165 passed`
@@ -485,7 +486,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue alert routing/operator automation, concrete health providers, Docker/runtime validation where available, small-batch Ruff/mypy cleanup, and controlled broker-side pending-order modify validation only when a safe demo pending-order scenario is prepared
+  - continue concrete health providers, Docker/runtime validation where available, small-batch Ruff/mypy cleanup, and deeper MT5 fault-injection/partial-fill validation
   - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## Constraints To Preserve
@@ -502,7 +503,7 @@ Current repository status:
 
 ## Post-Phase Focus
 
-- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, using explicit terminal path plus sufficient history lookback for history/deal checks, and controlled pending-order modify behavior only when a safe demo pending-order scenario is prepared
+- continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, using explicit terminal path plus sufficient history lookback for history/deal checks, and keep any further order-sending scenarios strictly demo-only and operator-approved
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
 - validate Docker/Compose runtime packaging, retire lint/typecheck baseline in small batches, then add network alert transport wiring, dependency supervision, and long-running runtime hardening
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface

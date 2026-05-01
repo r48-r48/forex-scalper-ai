@@ -107,6 +107,15 @@ Controlled demo-order test after terminal trading was enabled:
 - Follow-up validation on `2026-04-30` with `scripts\mt5_history_probe.py`, explicit `BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe`, and an `8760` hour lookback found `4` EURUSD historical orders and `4` EURUSD trade deals, plus the account deposit deal.
 - The normalized broker probe then returned `4` normalized historical EURUSD orders with per-order deals after the client was hardened to ignore non-trade/deposit deals with zero volume.
 
+Controlled pending-order modify test:
+
+- `scripts\mt5_pending_modify_demo.py` was added for strictly gated demo validation of pending-order placement, `TRADE_ACTION_MODIFY`, and cancel.
+- First real run on `2026-05-01` intentionally blocked before `order_send` when Windows `cmd` quote handling mangled `BROKER_MT5_TERMINAL_PATH`; preflight returned `mt5_preflight_not_ready`.
+- Re-run with the established plain `set BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe` syntax succeeded on Dukascopy demo account `610769553`.
+- The script placed far-away EURUSD buy limit pending order `156778443`, modified its limit price from `1.12273` to `1.11773`, then canceled it.
+- The live cancel path exposed that MT5 history calls can return unrelated old rows even when a ticket parameter is supplied; `Mt5TerminalClient` now filters historical orders/deals by ticket/order on our side before normalizing refreshed state.
+- Final smoke returned `0` open orders and `0` open positions.
+
 ## Follow-Up
 
 - Treat MT5 filling mode as broker and symbol specific. The Windows notebook MetaQuotes demo accepted FOK for EURUSD, while the Parallels Dukascopy demo accepted IOC and rejected FOK.
@@ -117,4 +126,5 @@ Controlled demo-order test after terminal trading was enabled:
 - Configure explicit terminal path and broker env vars only when moving beyond saved terminal-session smoke checks.
 - Enable and document live confirmation only for an intentionally approved live-safe run.
 - Use an explicit terminal path and a sufficient MT5 history lookback when investigating historical orders/deals; the normalized client now handles zero-volume deposit deals safely.
+- Keep local ticket/order filtering on top of MT5 history API results; do not assume the terminal always honors ticket parameters exactly.
 - Keep `order_send()` disabled by default; use it only for an explicitly approved demo-order test after a fresh terminal permission check shows terminal-side trading is enabled.

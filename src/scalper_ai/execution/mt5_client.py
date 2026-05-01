@@ -1093,36 +1093,67 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
 
     def _history_orders_get(self, **kwargs: Any) -> tuple[Any, ...]:
         start_time, end_time = self._history_window()
+        ticket = kwargs.get("ticket")
         try:
-            return self._safe_sequence(
+            orders = self._safe_sequence(
                 self._module.history_orders_get(start_time, end_time, **kwargs)
             )
         except TypeError:
             orders = self._safe_sequence(self._module.history_orders_get(start_time, end_time))
-            ticket = kwargs.get("ticket")
-            if ticket is None:
-                return orders
-            return tuple(
-                order for order in orders if self._coerce_mapping(order).get("ticket") == ticket
-            )
+        if ticket is None:
+            return orders
+        filtered = self._filter_history_orders_by_ticket(orders, ticket=ticket)
+        if filtered or not orders:
+            return filtered
+        full_window_orders = self._safe_sequence(
+            self._module.history_orders_get(start_time, end_time)
+        )
+        return self._filter_history_orders_by_ticket(full_window_orders, ticket=ticket)
 
     def _history_deals_get(self, **kwargs: Any) -> tuple[Any, ...]:
         start_time, end_time = self._history_window()
+        ticket = kwargs.get("ticket")
         try:
-            return self._safe_sequence(
+            deals = self._safe_sequence(
                 self._module.history_deals_get(start_time, end_time, **kwargs)
             )
         except TypeError:
             deals = self._safe_sequence(self._module.history_deals_get(start_time, end_time))
-            ticket = kwargs.get("ticket")
-            if ticket is None:
-                return deals
-            return tuple(
-                deal
-                for deal in deals
-                if self._coerce_mapping(deal).get("order") == ticket
-                or self._coerce_mapping(deal).get("ticket") == ticket
-            )
+        if ticket is None:
+            return deals
+        filtered = self._filter_history_deals_by_ticket_or_order(deals, ticket=ticket)
+        if filtered or not deals:
+            return filtered
+        full_window_deals = self._safe_sequence(
+            self._module.history_deals_get(start_time, end_time)
+        )
+        return self._filter_history_deals_by_ticket_or_order(
+            full_window_deals,
+            ticket=ticket,
+        )
+
+    def _filter_history_orders_by_ticket(
+        self,
+        orders: tuple[Any, ...],
+        *,
+        ticket: Any,
+    ) -> tuple[Any, ...]:
+        return tuple(
+            order for order in orders if self._coerce_mapping(order).get("ticket") == ticket
+        )
+
+    def _filter_history_deals_by_ticket_or_order(
+        self,
+        deals: tuple[Any, ...],
+        *,
+        ticket: Any,
+    ) -> tuple[Any, ...]:
+        return tuple(
+            deal
+            for deal in deals
+            if self._coerce_mapping(deal).get("order") == ticket
+            or self._coerce_mapping(deal).get("ticket") == ticket
+        )
 
     def _history_window(self) -> tuple[datetime, datetime]:
         end_time = datetime.now(UTC)
