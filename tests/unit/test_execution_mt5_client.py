@@ -182,6 +182,120 @@ def test_mt5_terminal_client_keeps_send_failure_after_successful_check_as_reject
     assert module.order_send_call_count == 1
 
 
+def test_mt5_terminal_client_returns_rejected_state_when_order_send_retcode_rejects() -> None:
+    module = _FakeMetaTrader5Module()
+    module.use_default_order_send = False
+    module.order_send_result = SimpleNamespace(
+        retcode=10030,
+        order=9103,
+        comment="unsupported filling mode",
+        time=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-send-rejected",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.REJECTED
+    assert state.broker_order_id == "9103"
+    assert state.rejection_reason == "unsupported filling mode"
+    assert module.order_send_call_count == 1
+
+
+def test_mt5_terminal_client_uses_success_fallback_when_post_send_refresh_fails() -> None:
+    module = _FakeMetaTrader5Module()
+    module.raise_history_orders_error = True
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-refresh-fails",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.FILLED
+    assert state.broker_order_id == "9001"
+    assert state.filled_volume_lots == pytest.approx(1.0)
+    assert state.remaining_volume_lots == pytest.approx(0.0)
+    assert state.average_fill_price == pytest.approx(1.1002)
+
+
+def test_mt5_terminal_client_uses_success_fallback_when_deal_refresh_fails() -> None:
+    module = _FakeMetaTrader5Module()
+    module.raise_history_deals_error = True
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-deals-fail",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.FILLED
+    assert state.broker_order_id == "9001"
+    assert state.filled_volume_lots == pytest.approx(1.0)
+    assert state.average_fill_price == pytest.approx(1.1002)
+    assert state.deals == ()
+
+
+def test_mt5_terminal_client_uses_success_fallback_when_result_has_no_ticket() -> None:
+    module = _FakeMetaTrader5Module()
+    module.use_default_order_send = False
+    module.order_send_result = SimpleNamespace(
+        retcode=module.TRADE_RETCODE_DONE,
+        price=1.1002,
+        comment="done",
+        time=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-no-ticket",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.FILLED
+    assert state.broker_order_id == "mt5-intent-no-ticket"
+    assert state.filled_volume_lots == pytest.approx(1.0)
+    assert state.average_fill_price == pytest.approx(1.1002)
+
+
 def test_mt5_terminal_client_preserves_partial_done_fallback_volume() -> None:
     module = _FakeMetaTrader5Module()
     module.use_default_order_send = False
@@ -698,6 +812,8 @@ class _FakeMetaTrader5Module:
         self.use_default_order_send = True
         self.order_send_result: SimpleNamespace | None = None
         self.ignore_history_order_ticket_filter = False
+        self.raise_history_orders_error = False
+        self.raise_history_deals_error = False
         self._open_orders: dict[int, SimpleNamespace] = {}
         self._history_orders: dict[int, SimpleNamespace] = {}
         self._deals: dict[int, list[SimpleNamespace]] = {}
@@ -879,6 +995,8 @@ class _FakeMetaTrader5Module:
         return tuple(position for position in self._positions.values() if position.symbol == symbol)
 
     def history_orders_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
+        if self.raise_history_orders_error:
+            raise RuntimeError("history orders unavailable")
         ticket = kwargs.get("ticket")
         if ticket is None or self.ignore_history_order_ticket_filter:
             return tuple(self._history_orders.values())
@@ -886,6 +1004,8 @@ class _FakeMetaTrader5Module:
         return () if order is None else (order,)
 
     def history_deals_get(self, *args: object, **kwargs: object) -> tuple[SimpleNamespace, ...]:
+        if self.raise_history_deals_error:
+            raise RuntimeError("history deals unavailable")
         deposit_deal = SimpleNamespace(
             ticket=9900,
             order=0,

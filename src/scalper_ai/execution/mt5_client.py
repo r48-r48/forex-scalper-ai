@@ -363,7 +363,7 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
                 reason=self._result_comment(result) or self._last_error_message(),
             )
 
-        live_state = self.get_order(broker_order_id)
+        live_state = self._get_order_after_successful_send(broker_order_id)
         if live_state is not None:
             return live_state
 
@@ -373,6 +373,12 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             result=result,
             updated_at=self._result_timestamp(result, fallback=sent_at),
         )
+
+    def _get_order_after_successful_send(self, broker_order_id: str) -> Mt5OrderState | None:
+        try:
+            return self.get_order(broker_order_id)
+        except (RuntimeError, TypeError, ValueError):
+            return None
 
     def check_order(
         self,

@@ -22,6 +22,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed the MT5 post-send fallback fault-injection validation slice:
+  - after a successful MT5 `order_send`, `Mt5TerminalClient` now attempts immediate broker refresh through a safe helper and falls back to the broker send result when order/history/deal refresh raises
+  - success responses without a numeric broker ticket now return normalized fallback state instead of crashing while converting the fallback id to `int`
+  - explicit non-success `order_send` retcodes remain structured rejected order states with broker comment/reason preserved
+  - targeted Ruff passed for touched MT5 client code/tests
+  - `.venv/bin/python -m pytest tests/unit/test_execution_mt5_client.py` passed with `25 passed`
+  - `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `265 passed`
 - 2026-05-03 completed the MT5 partial-fill fault-injection validation slice:
   - `Mt5TerminalClient` fallback normalization now preserves `TRADE_RETCODE_DONE_PARTIAL` result volume when broker history/order refresh is not yet available
   - partial fallback fill volume is clamped to the requested lot size and converted to `FILLED` when the broker result covers the full request
