@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from scalper_ai.domain import OrderIntent, PositionMode
 from scalper_ai.execution.connectivity import BrokerConnectivitySnapshot
+from scalper_ai.execution.models import ExecutionOrder, ExecutionQuote, ExecutionUpdate
 from scalper_ai.execution.paper import PaperExecutionAdapter, PaperExecutionConfig
 from scalper_ai.execution.reconciliation import BrokerOrderSnapshot, BrokerPositionSnapshot
-from scalper_ai.execution.models import ExecutionOrder, ExecutionQuote, ExecutionUpdate
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,9 @@ class LiveExecutionStubAdapter(PaperExecutionAdapter):
         """Submit one live-facing order through the deterministic stub."""
 
         if intent.paper:
-            raise ValueError("LiveExecutionStubAdapter only accepts order intents with paper=False.")
+            raise ValueError(
+                "LiveExecutionStubAdapter only accepts order intents with paper=False."
+            )
         shadow_intent = intent.model_copy(update={"paper": True})
         update = super().submit_order(shadow_intent, self._normalize_quote(quote))
         self._original_intents[update.order.broker_order_id] = intent
@@ -105,7 +107,7 @@ class LiveExecutionStubAdapter(PaperExecutionAdapter):
     def describe_broker_connectivity(self) -> BrokerConnectivitySnapshot:
         """Return one healthy broker connectivity snapshot for the live stub."""
 
-        checked_at = datetime.now(timezone.utc)
+        checked_at = datetime.now(UTC)
         latest_state_timestamp = max(
             (
                 *[order.updated_at for order in self._orders.values()],

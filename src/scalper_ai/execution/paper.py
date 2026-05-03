@@ -12,7 +12,15 @@ from scalper_ai.backtesting.accounting import (
     calculate_equity,
     mark_position,
 )
-from scalper_ai.domain import FillEvent, LiquidityFlag, OrderIntent, OrderSide, OrderType, PositionState, TimeInForce
+from scalper_ai.domain import (
+    FillEvent,
+    LiquidityFlag,
+    OrderIntent,
+    OrderSide,
+    OrderType,
+    PositionState,
+    TimeInForce,
+)
 from scalper_ai.execution.models import (
     ExecutionOrder,
     ExecutionOrderStatus,
@@ -143,7 +151,10 @@ class PaperExecutionAdapter:
 
         current_quote = self._last_quotes.get(order.intent.symbol)
         if current_quote is None:
-            raise RuntimeError("Cannot cancel an order before at least one quote has been observed for its symbol.")
+            raise RuntimeError(
+                "Cannot cancel an order before at least one quote has been observed "
+                "for its symbol."
+            )
 
         quote = replace(
             current_quote,
@@ -162,7 +173,12 @@ class PaperExecutionAdapter:
 
         return self._orders.get(broker_order_id)
 
-    def get_position(self, symbol: str, *, quote: ExecutionQuote | None = None) -> PositionState | None:
+    def get_position(
+        self,
+        symbol: str,
+        *,
+        quote: ExecutionQuote | None = None,
+    ) -> PositionState | None:
         """Return the current marked position for one symbol."""
 
         if quote is not None:
@@ -202,14 +218,20 @@ class PaperExecutionAdapter:
 
         if order.intent.order_type is OrderType.STOP_LIMIT:
             candidate = order
-            if candidate.status is not ExecutionOrderStatus.TRIGGERED and self._stop_is_triggered(candidate, quote=quote):
+            if (
+                candidate.status is not ExecutionOrderStatus.TRIGGERED
+                and self._stop_is_triggered(candidate, quote=quote)
+            ):
                 candidate = replace(
                     candidate,
                     status=ExecutionOrderStatus.TRIGGERED,
                     updated_at=quote.received_timestamp,
                     triggered_at=quote.received_timestamp,
                 )
-            if candidate.status is ExecutionOrderStatus.TRIGGERED and self._limit_is_fillable(candidate, quote=quote):
+            if (
+                candidate.status is ExecutionOrderStatus.TRIGGERED
+                and self._limit_is_fillable(candidate, quote=quote)
+            ):
                 liquidity = (
                     LiquidityFlag.TAKER
                     if candidate.triggered_at == quote.received_timestamp
@@ -253,7 +275,11 @@ class PaperExecutionAdapter:
         fill_price = base_price * (1.0 + (direction * slippage_multiplier))
         spread_cost = abs(base_price - quote.mid_price) * order.requested_quantity
         slippage_cost = base_price * order.requested_quantity * slippage_multiplier
-        commission = fill_price * order.requested_quantity * (self._config.commission_bps / 10_000.0)
+        commission = (
+            fill_price
+            * order.requested_quantity
+            * (self._config.commission_bps / 10_000.0)
+        )
         return FillEvent(
             fill_id=self._next_fill_id_value(),
             intent_id=order.intent.intent_id,
@@ -287,7 +313,11 @@ class PaperExecutionAdapter:
             base_price = max(float(order.intent.limit_price), quote.bid)
 
         spread_cost = abs(base_price - quote.mid_price) * order.requested_quantity
-        commission = base_price * order.requested_quantity * (self._config.commission_bps / 10_000.0)
+        commission = (
+            base_price
+            * order.requested_quantity
+            * (self._config.commission_bps / 10_000.0)
+        )
         return FillEvent(
             fill_id=self._next_fill_id_value(),
             intent_id=order.intent.intent_id,

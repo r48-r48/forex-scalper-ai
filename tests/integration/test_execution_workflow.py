@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -88,4 +88,4 @@ def _quote(*, minutes: int, bid: float, ask: float) -> ExecutionQuote:
 
 
 def _timestamp(minutes: int) -> datetime:
-    return datetime(2026, 3, 27, 13, 0, tzinfo=timezone.utc) + timedelta(minutes=minutes)
+    return datetime(2026, 3, 27, 13, 0, tzinfo=UTC) + timedelta(minutes=minutes)

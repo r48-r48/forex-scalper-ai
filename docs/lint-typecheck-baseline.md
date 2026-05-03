@@ -17,22 +17,21 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result after scripts, config, logging, journal, OMS, validation, models, risk, data-layer, backtesting, features, RL, and deployment cleanup batches:
+Current result after scripts, config, logging, journal, OMS, validation, models, risk, data-layer, backtesting, features, RL, deployment, and execution cleanup batches:
 
 ```text
-Found 72 errors.
-51 fixable with --fix.
+Found 50 errors.
+42 fixable with --fix.
 ```
 
 Statistics:
 
 ```text
- 27 UP017 datetime-timezone-utc
+ 22 UP017 datetime-timezone-utc
  14 UP045 non-pep604-annotation-optional
- 13 E501  line-too-long
   8 UP042 replace-str-enum
-  5 I001  unsorted-imports
   4 UP037 quoted-annotation
+  1 I001  unsorted-imports
   1 UP035 deprecated-import
 ```
 
@@ -51,6 +50,7 @@ Completed cleanup batches:
 - 2026-05-03: features cleanup modernized optional and union annotations, moved imports to `collections.abc`, switched tests to `datetime.UTC`, added explicit `zip(..., strict=True)`, sorted imports, and wrapped long feature expressions without changing feature calculations. Targeted Ruff is green for `src/scalper_ai/features` and selected feature tests.
 - 2026-05-03: RL cleanup modernized optional annotations, moved `Sequence` to `collections.abc`, removed an unused import, switched tests to `datetime.UTC`, sorted imports, and wrapped long environment/training expressions without changing reward or policy-training logic. Targeted Ruff is green for `src/scalper_ai/rl` and selected RL tests.
 - 2026-05-03: deployment cleanup converted `HealthStatus` to `StrEnum`, modernized health annotations/imports, and wrapped Prometheus metric rendering/key expressions without changing output semantics. Targeted Ruff is green for `src/scalper_ai/deployment` and selected deployment tests.
+- 2026-05-03: execution cleanup switched selected tests/live stub UTC usage to `datetime.UTC`, sorted imports, wrapped protocol/router signatures, and wrapped paper execution cost/order-trigger expressions without changing order lifecycle or fill math. Targeted Ruff is green for `src/scalper_ai/execution` and selected execution tests.
 
 Recommended cleanup order:
 

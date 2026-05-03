@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionMode, PositionState, TimeInForce
+from scalper_ai.domain import (
+    OrderIntent,
+    OrderSide,
+    OrderType,
+    PositionMode,
+    PositionState,
+    TimeInForce,
+)
 from scalper_ai.execution import (
     ExecutionOrder,
     ExecutionOrderStatus,
@@ -173,7 +180,7 @@ def _quote(*, minutes: int = 0, bid: float, ask: float) -> ExecutionQuote:
 
 
 def _timestamp(minutes: int) -> datetime:
-    return datetime(2026, 3, 27, 12, 0, tzinfo=timezone.utc) + timedelta(minutes=minutes)
+    return datetime(2026, 3, 27, 12, 0, tzinfo=UTC) + timedelta(minutes=minutes)
 
 
 class _RecordingAdapter:
@@ -256,7 +263,12 @@ class _RecordingAdapter:
     def get_order(self, broker_order_id: str) -> ExecutionOrder | None:
         return self._orders.get(broker_order_id)
 
-    def get_position(self, symbol: str, *, quote: ExecutionQuote | None = None) -> PositionState | None:
+    def get_position(
+        self,
+        symbol: str,
+        *,
+        quote: ExecutionQuote | None = None,
+    ) -> PositionState | None:
         mark_price = 100.5 if quote is None else quote.mid_price
         timestamp = _timestamp(0) if quote is None else quote.received_timestamp
         return PositionState(

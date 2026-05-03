@@ -55,7 +55,13 @@ class ExecutionRouter:
             return None
         return adapter.get_order(broker_order_id)
 
-    def get_position(self, symbol: str, *, quote: ExecutionQuote | None = None, paper: bool = True) -> PositionState | None:
+    def get_position(
+        self,
+        symbol: str,
+        *,
+        quote: ExecutionQuote | None = None,
+        paper: bool = True,
+    ) -> PositionState | None:
         """Return the current marked position from the selected adapter."""
 
         adapter = self._paper_adapter if paper else self._require_live_adapter()

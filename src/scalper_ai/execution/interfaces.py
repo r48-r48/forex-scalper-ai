@@ -26,7 +26,12 @@ class ExecutionAdapter(Protocol):
     def get_order(self, broker_order_id: str) -> ExecutionOrder | None:
         """Return the latest lifecycle state for one order if known."""
 
-    def get_position(self, symbol: str, *, quote: ExecutionQuote | None = None) -> PositionState | None:
+    def get_position(
+        self,
+        symbol: str,
+        *,
+        quote: ExecutionQuote | None = None,
+    ) -> PositionState | None:
         """Return the current marked position for one symbol."""
 
 

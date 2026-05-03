@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType
-from scalper_ai.execution import ExecutionOrderStatus, ExecutionQuote, LiveExecutionStubAdapter, LiveExecutionStubConfig
+from scalper_ai.execution import (
+    ExecutionOrderStatus,
+    ExecutionQuote,
+    LiveExecutionStubAdapter,
+    LiveExecutionStubConfig,
+)
 
 
 def test_live_stub_accepts_live_orders_and_exports_broker_snapshots() -> None:
@@ -19,7 +24,7 @@ def test_live_stub_accepts_live_orders_and_exports_broker_snapshots() -> None:
             default_venue="live_stub",
         )
     )
-    timestamp = datetime(2026, 3, 28, 12, 0, tzinfo=timezone.utc)
+    timestamp = datetime(2026, 3, 28, 12, 0, tzinfo=UTC)
     quote = ExecutionQuote(
         symbol="EURUSD",
         event_timestamp=timestamp,
@@ -63,7 +68,7 @@ def test_live_stub_accepts_live_orders_and_exports_broker_snapshots() -> None:
 
 def test_live_stub_rejects_paper_orders() -> None:
     adapter = LiveExecutionStubAdapter()
-    timestamp = datetime(2026, 3, 28, 12, 0, tzinfo=timezone.utc)
+    timestamp = datetime(2026, 3, 28, 12, 0, tzinfo=UTC)
 
     with pytest.raises(ValueError, match="paper=False"):
         adapter.submit_order(

@@ -22,6 +22,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed execution Ruff cleanup:
+  - `src/scalper_ai/execution` and selected execution tests now pass targeted Ruff
+  - cleanup switched selected tests/live stub UTC usage to `datetime.UTC`, sorted imports, wrapped protocol/router signatures, and wrapped paper execution cost/order-trigger expressions without changing order lifecycle or fill math
+  - selected execution pytest passed with `67 passed`
+  - compileall, `git diff --check`, and full pytest passed with `265 passed`
+  - full-repository Ruff baseline dropped from `72` to `50` historical issues
 - 2026-05-03 completed deployment Ruff cleanup:
   - `src/scalper_ai/deployment` and selected deployment tests now pass targeted Ruff
   - cleanup converted `HealthStatus` to `StrEnum`, modernized health annotations/imports, and wrapped Prometheus metric rendering/key expressions without changing output semantics
@@ -282,6 +288,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/metrics.py`
   - targeted Ruff is now green for `src/scalper_ai/deployment` and selected deployment tests
   - full Ruff baseline dropped from `77` to `72` issues
+- 2026-05-03 completed execution Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution`
+  - updated selected execution unit/integration tests to use modern imports and `datetime.UTC`
+  - targeted Ruff is now green for `src/scalper_ai/execution` and selected execution tests
+  - full Ruff baseline dropped from `72` to `50` issues
 - 2026-04-28 completed same-Mac Parallels Windows 11 MT5 setup and safe demo validation:
   - VM: `Windows 11`, accessed directly with `prlctl exec --current-user`; SSH is not required for this VM
   - Windows project copy: `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai`
