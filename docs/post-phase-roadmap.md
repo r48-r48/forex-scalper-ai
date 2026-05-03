@@ -107,7 +107,8 @@ Known gaps:
 - Richer runtime health provider contracts: completed on 2026-05-01 with data freshness, model readiness, dependency guard, and risk-guardrail health checks; provider metrics; RiskContext wiring; broker reconnect/circuit-breaker observability; and `250 passed` full pytest validation.
 - Concrete runtime dependency provider trackers: completed on 2026-05-03 with updatable data freshness, model readiness/prediction freshness, and volatility/news guard providers; targeted Ruff, compileall, `git diff --check`, targeted provider/runtime pytest, and full `.venv/bin/python -m pytest` passed with `254 passed`.
 - Concrete runtime dependency provider event-loop wiring: completed on 2026-05-03 with runtime quote-to-provider updates, optional `OnlineFeatureCalculator` updates into data/guard providers, direct market/feature/model runtime hooks, bootstrap provider passthrough, targeted Ruff, `45 passed` targeted provider/runtime/bootstrap validation, paper runtime describe/health validation, and `258 passed` full pytest validation.
-- Current next task: continue with Docker host validation, deeper MT5 fault-injection/partial-fill validation, small-batch Ruff/mypy cleanup, and any further demo order-sending checks only as explicit controlled scenarios.
+- MT5 partial-fill fault-injection validation: completed on 2026-05-03 with partial `order_send` fallback volume preservation, impossible partial-volume clamping, incremental adapter deal-fill polling coverage without duplicate deal fills, `42 passed` targeted MT5 client/live validation, and `261 passed` full pytest validation.
+- Current next task: continue with Docker host validation, remaining MT5 fault-injection validation, small-batch Ruff/mypy cleanup, and any further demo order-sending checks only as explicit controlled scenarios.
 
 ## P0 Workstream
 

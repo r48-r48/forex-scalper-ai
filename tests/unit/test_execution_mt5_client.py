@@ -182,6 +182,72 @@ def test_mt5_terminal_client_keeps_send_failure_after_successful_check_as_reject
     assert module.order_send_call_count == 1
 
 
+def test_mt5_terminal_client_preserves_partial_done_fallback_volume() -> None:
+    module = _FakeMetaTrader5Module()
+    module.use_default_order_send = False
+    module.order_send_result = SimpleNamespace(
+        retcode=module.TRADE_RETCODE_DONE_PARTIAL,
+        order=9101,
+        price=1.1002,
+        volume=0.4,
+        comment="partial",
+        time=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-partial-fallback",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.PARTIALLY_FILLED
+    assert state.broker_order_id == "9101"
+    assert state.filled_volume_lots == pytest.approx(0.4)
+    assert state.remaining_volume_lots == pytest.approx(0.6)
+    assert state.average_fill_price == pytest.approx(1.1002)
+
+
+def test_mt5_terminal_client_clamps_oversized_partial_fallback_volume() -> None:
+    module = _FakeMetaTrader5Module()
+    module.use_default_order_send = False
+    module.order_send_result = SimpleNamespace(
+        retcode=module.TRADE_RETCODE_DONE_PARTIAL,
+        order=9102,
+        price=1.1002,
+        volume=2.0,
+        comment="partial",
+        time=1_774_670_400,
+    )
+    client = Mt5TerminalClient(
+        config=Mt5TerminalClientConfig(),
+        module=module,
+    )
+
+    state = client.submit_order(
+        Mt5OrderRequest(
+            client_order_id="intent-partial-oversized-fallback",
+            broker_symbol="EURUSD.a",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            submitted_at=datetime(2026, 3, 28, 14, 0, tzinfo=UTC),
+            volume_lots=1.0,
+        )
+    )
+
+    assert state.status is ExecutionOrderStatus.FILLED
+    assert state.filled_volume_lots == pytest.approx(1.0)
+    assert state.remaining_volume_lots == pytest.approx(0.0)
+
+
 def test_mt5_terminal_client_describes_account_positions_and_closes_cleanly() -> None:
     module = _FakeMetaTrader5Module()
     client = Mt5TerminalClient(

@@ -1200,8 +1200,18 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
         updated_at: datetime,
     ) -> Mt5OrderState:
         status = self._retcode_to_status(getattr(result, "retcode", None))
-        filled_volume_lots = request.volume_lots if status is ExecutionOrderStatus.FILLED else 0.0
+        filled_volume_lots = self._fallback_filled_volume_lots(
+            request,
+            result=result,
+            status=status,
+        )
         remaining_volume_lots = max(0.0, request.volume_lots - filled_volume_lots)
+        if (
+            status is ExecutionOrderStatus.PARTIALLY_FILLED
+            and remaining_volume_lots <= 0
+            and filled_volume_lots > 0
+        ):
+            status = ExecutionOrderStatus.FILLED
         average_fill_price = self._coerce_float(getattr(result, "price", None))
         return Mt5OrderState(
             broker_order_id=broker_order_id,
@@ -1218,6 +1228,22 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             take_profit_price=request.take_profit_price,
             average_fill_price=average_fill_price,
         )
+
+    def _fallback_filled_volume_lots(
+        self,
+        request: Mt5OrderRequest,
+        *,
+        result: Any,
+        status: ExecutionOrderStatus,
+    ) -> float:
+        if status is ExecutionOrderStatus.FILLED:
+            return request.volume_lots
+        if status is not ExecutionOrderStatus.PARTIALLY_FILLED:
+            return 0.0
+        result_volume = self._coerce_float(getattr(result, "volume", None))
+        if result_volume is None or result_volume <= 0:
+            return 0.0
+        return min(request.volume_lots, result_volume)
 
     def _resolve_result_order_id(self, result: Any, request: Mt5OrderRequest) -> str:
         order_id = self._coerce_int(getattr(result, "order", None))

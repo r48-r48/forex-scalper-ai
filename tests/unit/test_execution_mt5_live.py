@@ -197,6 +197,90 @@ def test_mt5_execution_adapter_process_quote_polls_open_orders_until_fill() -> N
     )
 
 
+def test_mt5_execution_adapter_processes_incremental_partial_deal_fills_once() -> None:
+    client = _PartialDealPollingMt5Client()
+    adapter = Mt5ExecutionAdapter(
+        client,
+        config=Mt5ExecutionConfig(base_units_per_lot=100_000.0),
+    )
+    submitted_at = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+    accepted = adapter.submit_order(
+        OrderIntent(
+            intent_id="mt5-partial-deal-intent",
+            strategy_id="mt5-test",
+            symbol="EURUSD",
+            created_at=submitted_at,
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            quantity=100_000.0,
+            limit_price=1.0999,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=submitted_at,
+            received_timestamp=submitted_at,
+            bid=1.0998,
+            ask=1.1000,
+            venue="broker-feed",
+        ),
+    )
+
+    assert accepted.order.status is ExecutionOrderStatus.ACCEPTED
+    assert accepted.fills == ()
+
+    first_updates = adapter.process_quote(
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=submitted_at + timedelta(seconds=1),
+            received_timestamp=submitted_at + timedelta(seconds=1),
+            bid=1.0998,
+            ask=1.0999,
+            venue="broker-feed",
+        )
+    )
+
+    assert len(first_updates) == 1
+    first_update = first_updates[0]
+    assert first_update.order.status is ExecutionOrderStatus.PARTIALLY_FILLED
+    assert first_update.order.filled_quantity == pytest.approx(40_000.0)
+    assert first_update.order.remaining_quantity == pytest.approx(60_000.0)
+    assert [fill.broker_deal_id for fill in first_update.fills] == ["5001"]
+    assert first_update.fills[0].fill_quantity == pytest.approx(40_000.0)
+    assert first_update.position.net_quantity == pytest.approx(40_000.0)
+
+    second_updates = adapter.process_quote(
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=submitted_at + timedelta(seconds=2),
+            received_timestamp=submitted_at + timedelta(seconds=2),
+            bid=1.1001,
+            ask=1.1002,
+            venue="broker-feed",
+        )
+    )
+
+    assert len(second_updates) == 1
+    second_update = second_updates[0]
+    assert second_update.order.status is ExecutionOrderStatus.FILLED
+    assert second_update.order.filled_quantity == pytest.approx(100_000.0)
+    assert second_update.order.remaining_quantity == pytest.approx(0.0)
+    assert [fill.broker_deal_id for fill in second_update.fills] == ["5002"]
+    assert second_update.fills[0].fill_quantity == pytest.approx(60_000.0)
+    assert [fill.broker_deal_id for fill in second_update.order.fills] == ["5001", "5002"]
+    assert second_update.position.net_quantity == pytest.approx(100_000.0)
+    assert adapter.process_quote(
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=submitted_at + timedelta(seconds=3),
+            received_timestamp=submitted_at + timedelta(seconds=3),
+            bid=1.1001,
+            ask=1.1002,
+            venue="broker-feed",
+        )
+    ) == ()
+
+
 def test_mt5_execution_adapter_sizes_target_from_broker_position() -> None:
     client = _BrokerPositionMt5Client(
         Mt5PositionState(
@@ -1225,3 +1309,115 @@ class _PollingFillMt5Client:
 
     def ping_latency_ms(self) -> float | None:
         return 6.0
+
+
+class _PartialDealPollingMt5Client:
+    def __init__(self) -> None:
+        self._orders: dict[str, Mt5OrderState] = {}
+        self._positions: dict[str, Mt5PositionState] = {}
+        self._poll_count = 0
+
+    def submit_order(self, request: Mt5OrderRequest) -> Mt5OrderState:
+        state = Mt5OrderState(
+            broker_order_id="mt5-order-partial-1",
+            broker_symbol=request.broker_symbol,
+            status=ExecutionOrderStatus.ACCEPTED,
+            submitted_at=request.submitted_at,
+            updated_at=request.submitted_at,
+            requested_volume_lots=request.volume_lots,
+            filled_volume_lots=0.0,
+            remaining_volume_lots=request.volume_lots,
+        )
+        self._orders[state.broker_order_id] = state
+        return state
+
+    def cancel_order(self, broker_order_id: str, *, timestamp: datetime) -> Mt5OrderState:
+        raise NotImplementedError
+
+    def get_order(self, broker_order_id: str) -> Mt5OrderState | None:
+        state = self._orders.get(broker_order_id)
+        if state is None:
+            return None
+        self._poll_count += 1
+        if self._poll_count == 1:
+            state = self._partial_state(state)
+        elif self._poll_count == 2:
+            state = self._filled_state(state)
+        self._orders[broker_order_id] = state
+        self._positions[state.broker_symbol] = Mt5PositionState(
+            broker_symbol=state.broker_symbol,
+            timestamp=state.updated_at,
+            net_volume_lots=state.filled_volume_lots,
+            average_entry_price=state.average_fill_price or 1.1000,
+        )
+        return state
+
+    def list_orders(self) -> tuple[Mt5OrderState, ...]:
+        return tuple(self._orders.values())
+
+    def get_position(self, broker_symbol: str) -> Mt5PositionState | None:
+        return self._positions.get(broker_symbol)
+
+    def list_positions(self) -> tuple[Mt5PositionState, ...]:
+        return tuple(self._positions.values())
+
+    def is_connected(self) -> bool:
+        return True
+
+    def ping_latency_ms(self) -> float | None:
+        return 6.0
+
+    @staticmethod
+    def _partial_state(state: Mt5OrderState) -> Mt5OrderState:
+        first_deal = Mt5DealState(
+            broker_deal_id="5001",
+            broker_order_id=state.broker_order_id,
+            broker_symbol=state.broker_symbol,
+            timestamp=state.updated_at + timedelta(seconds=1),
+            side=OrderSide.BUY,
+            volume_lots=0.4,
+            price=1.0999,
+            commission=-0.8,
+            fee=-0.1,
+            position_ticket="7001",
+        )
+        return Mt5OrderState(
+            broker_order_id=state.broker_order_id,
+            broker_symbol=state.broker_symbol,
+            status=ExecutionOrderStatus.PARTIALLY_FILLED,
+            submitted_at=state.submitted_at,
+            updated_at=first_deal.timestamp,
+            requested_volume_lots=state.requested_volume_lots,
+            filled_volume_lots=0.4,
+            remaining_volume_lots=0.6,
+            average_fill_price=1.0999,
+            deals=(first_deal,),
+        )
+
+    @staticmethod
+    def _filled_state(state: Mt5OrderState) -> Mt5OrderState:
+        first_deal = state.deals[0]
+        second_deal = Mt5DealState(
+            broker_deal_id="5002",
+            broker_order_id=state.broker_order_id,
+            broker_symbol=state.broker_symbol,
+            timestamp=state.updated_at + timedelta(seconds=1),
+            side=OrderSide.BUY,
+            volume_lots=0.6,
+            price=1.1002,
+            commission=-1.2,
+            fee=-0.1,
+            position_ticket="7001",
+        )
+        return Mt5OrderState(
+            broker_order_id=state.broker_order_id,
+            broker_symbol=state.broker_symbol,
+            status=ExecutionOrderStatus.FILLED,
+            submitted_at=state.submitted_at,
+            updated_at=second_deal.timestamp,
+            requested_volume_lots=state.requested_volume_lots,
+            filled_volume_lots=1.0,
+            remaining_volume_lots=0.0,
+            average_fill_price=1.10008,
+            deals=(first_deal, second_deal),
+        )

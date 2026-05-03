@@ -22,6 +22,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed the MT5 partial-fill fault-injection validation slice:
+  - `Mt5TerminalClient` fallback normalization now preserves `TRADE_RETCODE_DONE_PARTIAL` result volume when broker history/order refresh is not yet available
+  - partial fallback fill volume is clamped to the requested lot size and converted to `FILLED` when the broker result covers the full request
+  - `Mt5ExecutionAdapter` now has unit coverage for incremental partial deal fills across successive `process_quote()` polls, ensuring old broker deals are not duplicated and new deals become separate fills
+  - targeted Ruff passed for touched MT5 client/live tests and client code
+  - `.venv/bin/python -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py` passed with `42 passed`
+  - `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `261 passed`
 - 2026-05-03 completed the concrete runtime dependency provider event-loop wiring slice:
   - `DeploymentRuntime.submit_order()` and `DeploymentRuntime.process_quote()` now record execution quotes into concrete data freshness providers when they expose `record_execution_quote`
   - when an `OnlineFeatureCalculator` is configured, runtime quote and canonical market-event updates produce leakage-safe `FeatureSnapshot` objects and feed both data freshness and guard-state providers

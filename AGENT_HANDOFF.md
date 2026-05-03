@@ -435,6 +435,7 @@ Current repository status:
 - Session updated on: 2026-05-03
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - MT5 partial-fill fault-injection validation is complete: `Mt5TerminalClient` fallback normalization now preserves `TRADE_RETCODE_DONE_PARTIAL` result volume when broker history/order refresh is temporarily unavailable, clamps impossible oversized partial result volume, and `Mt5ExecutionAdapter` tests cover incremental broker deal fills across successive `process_quote()` polls without duplicate fill creation; targeted Ruff, `42 passed` targeted MT5 client/live pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `261 passed`
   - Concrete runtime dependency provider event-loop wiring is complete: `DeploymentRuntime.submit_order()` and `process_quote()` now record execution quotes into concrete data freshness providers, optional `OnlineFeatureCalculator` output feeds data freshness and guard-state providers, runtime exposes `record_market_data_event()`, `record_feature_snapshot()`, `record_model_loaded()`, `record_model_prediction()`, and `mark_model_unavailable()` hooks for live/paper loops, `bootstrap_runtime()` passes dependency providers/calculators through, targeted Ruff and provider/runtime/bootstrap pytest passed with `45 passed`, paper runtime describe/health passed, and full `.venv/bin/python -m pytest` passed with `258 passed`
   - Concrete runtime dependency provider trackers are complete: `RuntimeDataFreshnessProvider`, `RuntimeModelHealthProvider`, and `RuntimeGuardStateProvider` now provide mutable runtime-updated data/feature freshness, model readiness/prediction freshness, and volatility/news guard state; providers are exported from `scalper_ai.deployment`; targeted Ruff, compileall, `git diff --check`, targeted provider/runtime pytest, and full `.venv/bin/python -m pytest` passed with `254 passed`
   - Richer runtime health provider contracts are complete: added `scalper_ai.deployment.health_providers` with typed data freshness, model readiness, and dependency guard provider contracts; `DeploymentRuntime` now registers `data_freshness`, `model_readiness`, `dependency_guards`, and `risk_guardrails`; provider state feeds metrics, alert routing, and pre-trade `RiskContext`; live mode warns when providers are missing and fails health on stale live data or an unready model; broker connectivity now surfaces reconnect attempt/circuit-breaker state; targeted Ruff, compileall, `git diff --check`, targeted runtime/bootstrap pytest, and full `.venv/bin/python -m pytest` passed with `250 passed`
@@ -489,7 +490,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue Docker/runtime validation where available, small-batch Ruff/mypy cleanup, and deeper MT5 fault-injection/partial-fill validation
+  - continue Docker/runtime validation where available, small-batch Ruff/mypy cleanup, and remaining MT5 fault-injection validation
   - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue small-batch Ruff/mypy cleanup
 
 ## Constraints To Preserve
