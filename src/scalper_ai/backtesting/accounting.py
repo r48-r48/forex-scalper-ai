@@ -91,7 +91,11 @@ def mark_position(
         realized_pnl = float(position.realized_pnl)
         last_fill_id = position.last_fill_id
 
-    unrealized_pnl = 0.0 if _is_flat(net_quantity) else (mark_price - average_entry_price) * net_quantity
+    unrealized_pnl = (
+        0.0
+        if _is_flat(net_quantity)
+        else (mark_price - average_entry_price) * net_quantity
+    )
     exposure_quote = net_quantity * mark_price
     return PositionState(
         symbol=symbol,
@@ -107,7 +111,12 @@ def mark_position(
     )
 
 
-def apply_fill_to_position(position: PositionState | None, fill: FillEvent, *, mark_price: float) -> PositionState:
+def apply_fill_to_position(
+    position: PositionState | None,
+    fill: FillEvent,
+    *,
+    mark_price: float,
+) -> PositionState:
     """Apply a fill to a netting position and immediately mark the result to market."""
 
     if mark_price <= 0:
@@ -131,14 +140,19 @@ def apply_fill_to_position(position: PositionState | None, fill: FillEvent, *, m
             fill.fill_price
             if _is_flat(current_quantity)
             else (
-                ((abs(current_quantity) * current_average_entry) + (abs(signed_quantity) * fill.fill_price))
+                (
+                    (abs(current_quantity) * current_average_entry)
+                    + (abs(signed_quantity) * fill.fill_price)
+                )
                 / abs(next_quantity)
             )
         )
     else:
         closed_quantity = min(abs(current_quantity), abs(signed_quantity))
-        realized_pnl += (fill.fill_price - current_average_entry) * closed_quantity * _position_sign(
-            current_quantity
+        realized_pnl += (
+            (fill.fill_price - current_average_entry)
+            * closed_quantity
+            * _position_sign(current_quantity)
         )
 
         if _is_flat(next_quantity):
@@ -153,7 +167,11 @@ def apply_fill_to_position(position: PositionState | None, fill: FillEvent, *, m
         next_quantity = 0.0
         next_average_entry = 0.0
 
-    unrealized_pnl = 0.0 if _is_flat(next_quantity) else (mark_price - next_average_entry) * next_quantity
+    unrealized_pnl = (
+        0.0
+        if _is_flat(next_quantity)
+        else (mark_price - next_average_entry) * next_quantity
+    )
     exposure_quote = next_quantity * mark_price
 
     return PositionState(
@@ -189,7 +207,11 @@ def _signed_fill_quantity(fill: FillEvent) -> float:
 
 
 def _same_direction(left: float, right: float) -> bool:
-    return _position_sign(left) == _position_sign(right) and not _is_flat(left) and not _is_flat(right)
+    return (
+        _position_sign(left) == _position_sign(right)
+        and not _is_flat(left)
+        and not _is_flat(right)
+    )
 
 
 def _position_sign(quantity: float) -> int:

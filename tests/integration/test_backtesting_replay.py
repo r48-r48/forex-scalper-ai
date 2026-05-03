@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -43,15 +43,17 @@ def test_run_backtest_with_flat_strategy_keeps_zero_fills_and_flat_equity() -> N
     assert len(result.fills) == 0
     assert result.metrics.trade_count == 0
     assert result.metrics.turnover_quote == pytest.approx(0.0)
-    assert result.equity_curve["equity"].tolist() == pytest.approx([100_000.0, 100_000.0, 100_000.0])
+    assert result.equity_curve["equity"].tolist() == pytest.approx(
+        [100_000.0, 100_000.0, 100_000.0]
+    )
     assert all(position.net_quantity == 0.0 for position in result.position_history)
 
 
 def _market_frame(*, prices: list[float], signals: list[float]) -> pd.DataFrame:
-    base_time = datetime(2026, 3, 27, 9, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 3, 27, 9, 0, 0, tzinfo=UTC)
     assert len(prices) == len(signals)
     records: list[dict[str, object]] = []
-    for index, (price, signal) in enumerate(zip(prices, signals)):
+    for index, (price, signal) in enumerate(zip(prices, signals, strict=True)):
         records.append(
             {
                 "symbol": "EURUSD",

@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
 
 from scalper_ai.backtesting import BacktestConfig, run_backtest
-from scalper_ai.backtesting.accounting import apply_fill_to_cash, apply_fill_to_position, simulate_market_fill
+from scalper_ai.backtesting.accounting import (
+    apply_fill_to_cash,
+    apply_fill_to_position,
+    simulate_market_fill,
+)
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType
 
 
 def _timestamp(minutes: int) -> datetime:
-    return datetime(2026, 3, 27, 9, 0, tzinfo=timezone.utc) + timedelta(minutes=minutes)
+    return datetime(2026, 3, 27, 9, 0, tzinfo=UTC) + timedelta(minutes=minutes)
 
 
 def test_simulate_market_fill_decomposes_buy_and_sell_costs() -> None:
@@ -50,26 +54,46 @@ def test_simulate_market_fill_decomposes_buy_and_sell_costs() -> None:
 
 
 def test_apply_fill_to_position_handles_add_reduce_flip_and_close() -> None:
-    position = apply_fill_to_position(None, _fill(OrderSide.BUY, 2.0, 100.0, "fill-1"), mark_price=100.0)
+    position = apply_fill_to_position(
+        None,
+        _fill(OrderSide.BUY, 2.0, 100.0, "fill-1"),
+        mark_price=100.0,
+    )
     assert position.net_quantity == pytest.approx(2.0)
     assert position.average_entry_price == pytest.approx(100.0)
     assert position.realized_pnl == pytest.approx(0.0)
 
-    position = apply_fill_to_position(position, _fill(OrderSide.BUY, 1.0, 110.0, "fill-2"), mark_price=110.0)
+    position = apply_fill_to_position(
+        position,
+        _fill(OrderSide.BUY, 1.0, 110.0, "fill-2"),
+        mark_price=110.0,
+    )
     assert position.net_quantity == pytest.approx(3.0)
     assert position.average_entry_price == pytest.approx(103.3333333333)
 
-    position = apply_fill_to_position(position, _fill(OrderSide.SELL, 1.0, 120.0, "fill-3"), mark_price=120.0)
+    position = apply_fill_to_position(
+        position,
+        _fill(OrderSide.SELL, 1.0, 120.0, "fill-3"),
+        mark_price=120.0,
+    )
     assert position.net_quantity == pytest.approx(2.0)
     assert position.average_entry_price == pytest.approx(103.3333333333)
     assert position.realized_pnl == pytest.approx(16.6666666667)
 
-    position = apply_fill_to_position(position, _fill(OrderSide.SELL, 4.0, 90.0, "fill-4"), mark_price=90.0)
+    position = apply_fill_to_position(
+        position,
+        _fill(OrderSide.SELL, 4.0, 90.0, "fill-4"),
+        mark_price=90.0,
+    )
     assert position.net_quantity == pytest.approx(-2.0)
     assert position.average_entry_price == pytest.approx(90.0)
     assert position.realized_pnl == pytest.approx(-10.0)
 
-    position = apply_fill_to_position(position, _fill(OrderSide.BUY, 2.0, 80.0, "fill-5"), mark_price=80.0)
+    position = apply_fill_to_position(
+        position,
+        _fill(OrderSide.BUY, 2.0, 80.0, "fill-5"),
+        mark_price=80.0,
+    )
     assert position.net_quantity == pytest.approx(0.0)
     assert position.average_entry_price == pytest.approx(0.0)
     assert position.realized_pnl == pytest.approx(10.0)
@@ -155,8 +179,13 @@ def _fill(side: OrderSide, quantity: float, fill_price: float, fill_id: str):
         mark_price=fill_price,
     )
     cash_balance = apply_fill_to_cash(100_000.0, fill)
+    expected_cash_delta = (
+        fill.fill_quantity * fill.fill_price
+        if side is OrderSide.BUY
+        else -fill.fill_quantity * fill.fill_price
+    )
     assert cash_balance == pytest.approx(
-        100_000.0 - (fill.fill_quantity * fill.fill_price if side is OrderSide.BUY else -fill.fill_quantity * fill.fill_price)
+        100_000.0 - expected_cash_delta
     )
     return fill
 
@@ -164,7 +193,7 @@ def _fill(side: OrderSide, quantity: float, fill_price: float, fill_id: str):
 def _market_frame(*, prices: list[float], signals: list[float]) -> pd.DataFrame:
     assert len(prices) == len(signals)
     records: list[dict[str, object]] = []
-    for index, (price, signal) in enumerate(zip(prices, signals)):
+    for index, (price, signal) in enumerate(zip(prices, signals, strict=True)):
         records.append(
             {
                 "symbol": "EURUSD",

@@ -99,7 +99,7 @@ def run_backtest(
     position_history: list[PositionState] = []
     equity_rows: list[dict[str, object]] = []
 
-    for row_index, row in market_frame.iterrows():
+    for _, row in market_frame.iterrows():
         event = _build_backtest_event(row, config=resolved_config)
 
         pretrade_position = mark_position(
@@ -125,7 +125,9 @@ def run_backtest(
 
         posttrade_position = pretrade_position
         if target_position is not None:
-            delta_quantity = _coerce_target_position(target_position) - float(pretrade_position.net_quantity)
+            delta_quantity = _coerce_target_position(target_position) - float(
+                pretrade_position.net_quantity
+            )
             if not math.isclose(delta_quantity, 0.0, abs_tol=_ZERO_TOLERANCE):
                 order = _build_market_order(
                     event=event,
@@ -211,7 +213,10 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
     }
     missing_columns = required_columns.difference(frame.columns)
     if missing_columns:
-        raise ValueError(f"Backtest frame is missing required columns: {', '.join(sorted(missing_columns))}")
+        raise ValueError(
+            "Backtest frame is missing required columns: "
+            f"{', '.join(sorted(missing_columns))}"
+        )
 
     prepared = frame.copy()
     prepared[config.event_timestamp_column] = _normalize_timestamp_column(
@@ -222,7 +227,10 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
         prepared[config.available_timestamp_column],
         column_name=config.available_timestamp_column,
     )
-    if (prepared[config.available_timestamp_column] < prepared[config.event_timestamp_column]).any():
+    if (
+        prepared[config.available_timestamp_column]
+        < prepared[config.event_timestamp_column]
+    ).any():
         raise ValueError("available_timestamp_column must not precede event_timestamp_column.")
 
     prepared[config.price_column] = pd.to_numeric(prepared[config.price_column], errors="coerce")
@@ -235,7 +243,9 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
 
     if prepared[config.symbol_column].isna().any():
         raise ValueError(f"{config.symbol_column} must not contain null symbols.")
-    prepared[config.symbol_column] = prepared[config.symbol_column].map(lambda value: str(value).strip())
+    prepared[config.symbol_column] = prepared[config.symbol_column].map(
+        lambda value: str(value).strip()
+    )
     if (prepared[config.symbol_column] == "").any():
         raise ValueError(f"{config.symbol_column} must not contain empty symbols.")
     if prepared[config.symbol_column].nunique(dropna=False) != 1:
@@ -264,7 +274,12 @@ def _normalize_timestamp_column(series: pd.Series, *, column_name: str) -> pd.Se
             raise ValueError(f"{column_name} must contain UTC-aware timestamps.")
         normalized_values.append(timestamp.tz_convert("UTC"))
 
-    return pd.Series(normalized_values, index=series.index, name=series.name, dtype="datetime64[ns, UTC]")
+    return pd.Series(
+        normalized_values,
+        index=series.index,
+        name=series.name,
+        dtype="datetime64[ns, UTC]",
+    )
 
 
 def _build_backtest_event(row: pd.Series, *, config: BacktestConfig) -> BacktestEvent:
