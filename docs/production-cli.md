@@ -53,9 +53,16 @@ The report includes explicit cost assumptions, strategy names, risk limits, and 
 baseline metrics frame. Supported strategies are `spread_mean_reversion`,
 `ofi_imbalance`, `volatility_breakout`, or `all`.
 
-For bid/ask-aware replay, call the library `BacktestConfig` with
-`bid_price_column` and `ask_price_column`. BUY fills then use ask and SELL fills use
-bid, while `price_column` remains the mark-to-market column.
+For bid/ask-aware replay, pass `--bid-price-column` and `--ask-price-column`. BUY
+fills then use ask and SELL fills use bid, while `--price-column` remains the
+mark-to-market column.
+
+For session or regime-specific costs, pass `--spread-bps-column`,
+`--slippage-bps-column`, or `--commission-bps-column`; each row must be non-negative
+and overrides the constant cost for that event. FX symbol realism metrics can be
+enabled with `--fx-pip-size`, plus optional contract size, margin rate, rollover hour,
+and long/short swap-per-lot assumptions. These fields add pip value, margin
+utilization, and rollover swap cost metrics without changing defaults.
 
 ## Run Walk-Forward Validation
 

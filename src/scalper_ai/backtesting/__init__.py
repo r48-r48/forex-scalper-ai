@@ -19,7 +19,7 @@ from scalper_ai.backtesting.baselines import (
     VolatilityBreakoutStrategy,
     build_default_baseline_specs,
 )
-from scalper_ai.backtesting.config import BacktestConfig
+from scalper_ai.backtesting.config import BacktestConfig, FxSymbolSpec
 from scalper_ai.backtesting.engine import (
     BacktestEvent,
     BacktestMetrics,
@@ -48,6 +48,7 @@ __all__ = [
     "ExecutionBacktestResult",
     "ExecutionQualityMetrics",
     "ExecutionSimulatorConfig",
+    "FxSymbolSpec",
     "OfiImbalanceConfig",
     "OfiImbalanceStrategy",
     "SimulatedExecutionOrder",

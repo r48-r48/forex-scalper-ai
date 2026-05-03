@@ -540,7 +540,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
   - supervised baseline training/export and runtime inference packaging are complete; extend export coverage toward transformer models when that becomes the next model slice
-  - deepen FX backtest realism beyond the first bid/ask slice: pip value, margin/leverage, swap/rollover, broker symbol specs, session spread regimes, and stop/TP path realism
+  - first FX backtest realism metrics are complete for row-level costs, pip value, margin-rate utilization, and swap/rollover; continue with broker symbol-spec ingestion, margin-call/leverage behavior, and stop/TP path realism
   - extend longer paper/shadow supervision evidence with a real alert sink topology, and continue production-startup hardening
   - keep remaining MT5 fault-injection, broker metadata, and operator recovery items in scope, especially IOC/Dukascopy hedging behavior and explicit terminal-path history checks
 

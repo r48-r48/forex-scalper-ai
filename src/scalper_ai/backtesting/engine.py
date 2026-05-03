@@ -63,6 +63,11 @@ class BacktestMetrics:
     max_drawdown: float
     trade_count: int
     turnover_quote: float
+    pip_value_per_unit: float = 0.0
+    pip_value_per_lot: float = 0.0
+    max_margin_required: float = 0.0
+    max_margin_utilization: float = 0.0
+    swap_cost: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -74,6 +79,13 @@ class BacktestResult:
     position_history: tuple[PositionState, ...]
     equity_curve: pd.DataFrame
     metrics: BacktestMetrics
+
+
+@dataclass(frozen=True)
+class _ExecutionCostBps:
+    spread_bps: float
+    slippage_bps: float
+    commission_bps: float
 
 
 def run_backtest(
@@ -92,7 +104,9 @@ def run_backtest(
     peak_equity = float(resolved_config.initial_cash)
     trade_count = 0
     turnover_quote = 0.0
+    swap_cost = 0.0
     position: PositionState | None = None
+    previous_timestamp: pd.Timestamp | None = None
 
     orders: list[OrderIntent] = []
     fills: list[FillEvent] = []
@@ -101,6 +115,15 @@ def run_backtest(
 
     for _, row in market_frame.iterrows():
         event = _build_backtest_event(row, config=resolved_config)
+        event_swap_cost = _calculate_swap_cost(
+            position,
+            previous_timestamp=previous_timestamp,
+            current_timestamp=event.available_timestamp,
+            config=resolved_config,
+        )
+        if not math.isclose(event_swap_cost, 0.0, abs_tol=_ZERO_TOLERANCE):
+            cash_balance -= event_swap_cost
+            swap_cost += event_swap_cost
 
         pretrade_position = mark_position(
             position,
@@ -135,6 +158,7 @@ def run_backtest(
                     side=order_side,
                     config=resolved_config,
                 )
+                execution_costs = _resolve_execution_costs(event, config=resolved_config)
                 order = _build_market_order(
                     event=event,
                     strategy_id=strategy_id,
@@ -151,9 +175,9 @@ def run_backtest(
                     event_timestamp=event.available_timestamp.to_pydatetime(),
                     received_timestamp=event.available_timestamp.to_pydatetime(),
                     mark_price=execution_reference_price,
-                    spread_bps=resolved_config.spread_bps,
-                    slippage_bps=resolved_config.slippage_bps,
-                    commission_bps=resolved_config.commission_bps,
+                    spread_bps=execution_costs.spread_bps,
+                    slippage_bps=execution_costs.slippage_bps,
+                    commission_bps=execution_costs.commission_bps,
                 )
                 cash_balance = apply_fill_to_cash(cash_balance, fill)
                 posttrade_position = apply_fill_to_position(
@@ -169,6 +193,8 @@ def run_backtest(
         posttrade_equity = calculate_equity(cash_balance, posttrade_position)
         peak_equity = max(pretrade_peak_equity, posttrade_equity)
         drawdown = calculate_drawdown(posttrade_equity, peak_equity)
+        margin_required = _calculate_margin_required(posttrade_position, config=resolved_config)
+        margin_utilization = _safe_ratio(margin_required, posttrade_equity)
 
         position = posttrade_position
         position_history.append(posttrade_position)
@@ -185,19 +211,29 @@ def run_backtest(
                 "realized_pnl": float(posttrade_position.realized_pnl),
                 "unrealized_pnl": float(posttrade_position.unrealized_pnl),
                 "drawdown": drawdown,
+                "margin_required": margin_required,
+                "margin_utilization": margin_utilization,
+                "swap_cost": swap_cost,
                 "trade_count": trade_count,
                 "turnover_quote": turnover_quote,
             }
         )
+        previous_timestamp = event.available_timestamp
 
     equity_curve = pd.DataFrame.from_records(equity_rows)
     final_equity = float(equity_curve.iloc[-1]["equity"])
+    pip_value_per_unit, pip_value_per_lot = _pip_values(resolved_config)
     metrics = BacktestMetrics(
         total_pnl=final_equity - resolved_config.initial_cash,
         final_equity=final_equity,
         max_drawdown=float(equity_curve["drawdown"].max()),
         trade_count=trade_count,
         turnover_quote=turnover_quote,
+        pip_value_per_unit=pip_value_per_unit,
+        pip_value_per_lot=pip_value_per_lot,
+        max_margin_required=float(equity_curve["margin_required"].max()),
+        max_margin_utilization=float(equity_curve["margin_utilization"].max()),
+        swap_cost=swap_cost,
     )
     return BacktestResult(
         orders=tuple(orders),
@@ -225,6 +261,13 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
                 str(config.ask_price_column),
             }
         )
+    for column_name in (
+        config.spread_bps_column,
+        config.slippage_bps_column,
+        config.commission_bps_column,
+    ):
+        if column_name is not None:
+            required_columns.add(column_name)
     missing_columns = required_columns.difference(frame.columns)
     if missing_columns:
         raise ValueError(
@@ -255,6 +298,13 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
         _validate_positive_price_column(prepared, column_name=ask_column)
         if (prepared[bid_column] > prepared[ask_column]).any():
             raise ValueError("bid_price_column must not exceed ask_price_column.")
+    for column_name in (
+        config.spread_bps_column,
+        config.slippage_bps_column,
+        config.commission_bps_column,
+    ):
+        if column_name is not None:
+            _validate_non_negative_numeric_column(prepared, column_name=column_name)
 
     if prepared[config.symbol_column].isna().any():
         raise ValueError(f"{config.symbol_column} must not contain null symbols.")
@@ -358,6 +408,114 @@ def _execution_reference_price(
     return float(event.row_payload[column_name])
 
 
+def _resolve_execution_costs(
+    event: BacktestEvent,
+    *,
+    config: BacktestConfig,
+) -> _ExecutionCostBps:
+    return _ExecutionCostBps(
+        spread_bps=_resolve_event_bps(
+            event,
+            column_name=config.spread_bps_column,
+            default=config.spread_bps,
+        ),
+        slippage_bps=_resolve_event_bps(
+            event,
+            column_name=config.slippage_bps_column,
+            default=config.slippage_bps,
+        ),
+        commission_bps=_resolve_event_bps(
+            event,
+            column_name=config.commission_bps_column,
+            default=config.commission_bps,
+        ),
+    )
+
+
+def _resolve_event_bps(
+    event: BacktestEvent,
+    *,
+    column_name: str | None,
+    default: float,
+) -> float:
+    if column_name is None:
+        return default
+    value = float(event.row_payload[column_name])
+    if value < 0:
+        raise ValueError(f"{column_name} must be non-negative.")
+    return value
+
+
+def _calculate_swap_cost(
+    position: PositionState | None,
+    *,
+    previous_timestamp: pd.Timestamp | None,
+    current_timestamp: pd.Timestamp,
+    config: BacktestConfig,
+) -> float:
+    symbol_spec = config.fx_symbol
+    if symbol_spec is None or previous_timestamp is None or position is None:
+        return 0.0
+    net_quantity = float(position.net_quantity)
+    if math.isclose(net_quantity, 0.0, abs_tol=_ZERO_TOLERANCE):
+        return 0.0
+    rollover_count = _rollover_count(
+        previous_timestamp,
+        current_timestamp,
+        rollover_hour_utc=symbol_spec.rollover_hour_utc,
+    )
+    if rollover_count <= 0:
+        return 0.0
+    rate = (
+        symbol_spec.swap_long_per_lot
+        if net_quantity > 0
+        else symbol_spec.swap_short_per_lot
+    )
+    lots = abs(net_quantity) / symbol_spec.contract_size
+    return lots * rate * rollover_count
+
+
+def _rollover_count(
+    previous_timestamp: pd.Timestamp,
+    current_timestamp: pd.Timestamp,
+    *,
+    rollover_hour_utc: int,
+) -> int:
+    previous_utc = pd.Timestamp(previous_timestamp).tz_convert("UTC")
+    current_utc = pd.Timestamp(current_timestamp).tz_convert("UTC")
+    if current_utc <= previous_utc:
+        return 0
+
+    current_day = previous_utc.normalize()
+    final_day = current_utc.normalize()
+    count = 0
+    while current_day <= final_day:
+        rollover = current_day + pd.Timedelta(hours=rollover_hour_utc)
+        if previous_utc < rollover <= current_utc:
+            count += 1
+        current_day += pd.Timedelta(days=1)
+    return count
+
+
+def _calculate_margin_required(
+    position: PositionState,
+    *,
+    config: BacktestConfig,
+) -> float:
+    symbol_spec = config.fx_symbol
+    if symbol_spec is None or symbol_spec.margin_rate <= 0:
+        return 0.0
+    return abs(float(position.exposure_quote)) * symbol_spec.margin_rate * (
+        symbol_spec.quote_to_account_rate
+    )
+
+
+def _pip_values(config: BacktestConfig) -> tuple[float, float]:
+    if config.fx_symbol is None:
+        return 0.0, 0.0
+    return config.fx_symbol.pip_value_per_unit, config.fx_symbol.pip_value_per_lot
+
+
 def _validate_positive_price_column(frame: pd.DataFrame, *, column_name: str) -> None:
     frame[column_name] = pd.to_numeric(frame[column_name], errors="coerce")
     if frame[column_name].isna().any():
@@ -366,6 +524,26 @@ def _validate_positive_price_column(frame: pd.DataFrame, *, column_name: str) ->
         raise ValueError(f"{column_name} contains non-finite values.")
     if (frame[column_name] <= 0).any():
         raise ValueError(f"{column_name} must contain strictly positive prices.")
+
+
+def _validate_non_negative_numeric_column(
+    frame: pd.DataFrame,
+    *,
+    column_name: str,
+) -> None:
+    frame[column_name] = pd.to_numeric(frame[column_name], errors="coerce")
+    if frame[column_name].isna().any():
+        raise ValueError(f"{column_name} contains non-numeric values.")
+    if not np.isfinite(frame[column_name].to_numpy(dtype=float, copy=False)).all():
+        raise ValueError(f"{column_name} contains non-finite values.")
+    if (frame[column_name] < 0).any():
+        raise ValueError(f"{column_name} must contain non-negative values.")
+
+
+def _safe_ratio(numerator: float, denominator: float) -> float:
+    if denominator <= _ZERO_TOLERANCE:
+        return 0.0
+    return numerator / denominator
 
 
 def _resolve_strategy_id(strategy: TargetPositionStrategy) -> str:

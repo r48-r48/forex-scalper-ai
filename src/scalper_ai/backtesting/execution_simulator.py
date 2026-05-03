@@ -25,6 +25,7 @@ from scalper_ai.backtesting.engine import (
     _build_market_order,
     _coerce_target_position,
     _prepare_backtest_frame,
+    _resolve_execution_costs,
     _resolve_strategy_id,
 )
 from scalper_ai.domain import FillEvent, OrderIntent, PositionState
@@ -551,15 +552,16 @@ def _simulate_partial_fill(
     config: ExecutionSimulatorConfig,
 ) -> FillEvent:
     partial_intent = intent.model_copy(update={"quantity": quantity})
+    execution_costs = _resolve_execution_costs(event, config=config.base)
     return simulate_market_fill(
         partial_intent,
         fill_id=fill_id,
         event_timestamp=event.available_timestamp.to_pydatetime(),
         received_timestamp=event.available_timestamp.to_pydatetime(),
         mark_price=event.mark_price,
-        spread_bps=config.base.spread_bps,
-        slippage_bps=config.base.slippage_bps,
-        commission_bps=config.base.commission_bps,
+        spread_bps=execution_costs.spread_bps,
+        slippage_bps=execution_costs.slippage_bps,
+        commission_bps=execution_costs.commission_bps,
     )
 
 

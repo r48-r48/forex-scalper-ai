@@ -22,6 +22,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed the first FX backtest realism slice:
+  - added `FxSymbolSpec` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/config.py` for base/quote/account currency, pip size, contract size, quote-account conversion, margin rate, swap cost per lot, and UTC rollover hour assumptions
+  - `BacktestConfig` now accepts optional row-level `spread_bps_column`, `slippage_bps_column`, and `commission_bps_column`
+  - `run_backtest()` now reports pip value per unit/lot, max margin required, max margin utilization, and cumulative swap cost while preserving default behavior when `fx_symbol` and row-level cost columns are absent
+  - `run_execution_aware_backtest()` now reuses row-level cost columns for partial fills through the shared cost resolver
+  - `scripts/run_backtest.py` exposes bid/ask columns, row-level cost columns, and FX symbol assumptions as CLI flags
+  - targeted validation passed: Ruff, strict mypy, compileall, and focused backtesting/script pytest with `24 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `91` source files, compileall green, full pytest `321 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed supervised baseline training/export and runtime inference packaging:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/train_supervised_filter.py` for explicit-cutoff supervised filter training and bundle export
   - `SupervisedBaselineFilterModel` now has JSON-safe payload helpers plus atomic save/load helpers
@@ -841,7 +849,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
 - use `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` for future latest-code Parallels MT5 checks
-- supervised baseline training/export and runtime inference packaging are complete; next deepen FX backtest realism beyond bid/ask, continue concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
+- first FX backtest realism metrics are complete for row-level costs, pip value, margin-rate utilization, and swap/rollover; next continue broker symbol-spec ingestion, margin-call/leverage behavior, stop/TP path realism, concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
 
 If further MT5 validation is paused:
 - continue with FX backtest realism and network alert transport topology now that Docker/Compose validation is complete

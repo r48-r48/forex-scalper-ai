@@ -18,7 +18,7 @@ for import_path in (SCRIPT_ROOT, SRC_ROOT):
 
 from cli_utils import dataframe_records, load_frame, write_json
 
-from scalper_ai.backtesting import BacktestConfig, BaselineStrategySpec
+from scalper_ai.backtesting import BacktestConfig, BaselineStrategySpec, FxSymbolSpec
 from scalper_ai.backtesting.baselines import build_default_baseline_specs
 from scalper_ai.validation import run_baseline_suite
 
@@ -36,10 +36,25 @@ def run_backtest_cli(
     output_path: Path | None = None,
     strategy: str = "all",
     price_column: str = "mid_price",
+    bid_price_column: str | None = None,
+    ask_price_column: str | None = None,
     initial_cash: float = 100_000.0,
     spread_bps: float = 0.0,
     slippage_bps: float = 0.0,
     commission_bps: float = 0.0,
+    spread_bps_column: str | None = None,
+    slippage_bps_column: str | None = None,
+    commission_bps_column: str | None = None,
+    fx_pip_size: float | None = None,
+    fx_base_currency: str = "EUR",
+    fx_quote_currency: str = "USD",
+    fx_account_currency: str = "USD",
+    fx_contract_size: float = 100_000.0,
+    fx_quote_to_account_rate: float = 1.0,
+    fx_margin_rate: float = 0.0,
+    fx_swap_long_per_lot: float = 0.0,
+    fx_swap_short_per_lot: float = 0.0,
+    fx_rollover_hour_utc: int = 21,
     max_abs_position: float = 1.0,
     max_spread_bps: float = 2.0,
     disable_spread_filter: bool = False,
@@ -49,10 +64,27 @@ def run_backtest_cli(
     frame = load_frame(input_path)
     backtest_config = BacktestConfig(
         price_column=price_column,
+        bid_price_column=bid_price_column,
+        ask_price_column=ask_price_column,
         initial_cash=initial_cash,
         spread_bps=spread_bps,
         slippage_bps=slippage_bps,
         commission_bps=commission_bps,
+        spread_bps_column=spread_bps_column,
+        slippage_bps_column=slippage_bps_column,
+        commission_bps_column=commission_bps_column,
+        fx_symbol=_build_fx_symbol_spec(
+            pip_size=fx_pip_size,
+            base_currency=fx_base_currency,
+            quote_currency=fx_quote_currency,
+            account_currency=fx_account_currency,
+            contract_size=fx_contract_size,
+            quote_to_account_rate=fx_quote_to_account_rate,
+            margin_rate=fx_margin_rate,
+            swap_long_per_lot=fx_swap_long_per_lot,
+            swap_short_per_lot=fx_swap_short_per_lot,
+            rollover_hour_utc=fx_rollover_hour_utc,
+        ),
     )
     specs = _select_baseline_specs(
         strategy=strategy,
@@ -113,10 +145,25 @@ def main() -> None:
         output_path=args.output_path,
         strategy=args.strategy,
         price_column=args.price_column,
+        bid_price_column=args.bid_price_column,
+        ask_price_column=args.ask_price_column,
         initial_cash=args.initial_cash,
         spread_bps=args.spread_bps,
         slippage_bps=args.slippage_bps,
         commission_bps=args.commission_bps,
+        spread_bps_column=args.spread_bps_column,
+        slippage_bps_column=args.slippage_bps_column,
+        commission_bps_column=args.commission_bps_column,
+        fx_pip_size=args.fx_pip_size,
+        fx_base_currency=args.fx_base_currency,
+        fx_quote_currency=args.fx_quote_currency,
+        fx_account_currency=args.fx_account_currency,
+        fx_contract_size=args.fx_contract_size,
+        fx_quote_to_account_rate=args.fx_quote_to_account_rate,
+        fx_margin_rate=args.fx_margin_rate,
+        fx_swap_long_per_lot=args.fx_swap_long_per_lot,
+        fx_swap_short_per_lot=args.fx_swap_short_per_lot,
+        fx_rollover_hour_utc=args.fx_rollover_hour_utc,
         max_abs_position=args.max_abs_position,
         max_spread_bps=args.max_spread_bps,
         disable_spread_filter=args.disable_spread_filter,
@@ -144,6 +191,8 @@ def _select_baseline_specs(
 
 def _add_backtest_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--price-column", default="mid_price")
+    parser.add_argument("--bid-price-column", default=None)
+    parser.add_argument("--ask-price-column", default=None)
     parser.add_argument("--initial-cash", type=float, default=100_000.0)
     parser.add_argument(
         "--spread-bps",
@@ -163,6 +212,24 @@ def _add_backtest_arguments(parser: argparse.ArgumentParser) -> None:
         default=0.0,
         help="Commission cost in basis points.",
     )
+    parser.add_argument("--spread-bps-column", default=None)
+    parser.add_argument("--slippage-bps-column", default=None)
+    parser.add_argument("--commission-bps-column", default=None)
+    parser.add_argument(
+        "--fx-pip-size",
+        type=float,
+        default=None,
+        help="Enable FX symbol metrics with this pip size, for example 0.0001.",
+    )
+    parser.add_argument("--fx-base-currency", default="EUR")
+    parser.add_argument("--fx-quote-currency", default="USD")
+    parser.add_argument("--fx-account-currency", default="USD")
+    parser.add_argument("--fx-contract-size", type=float, default=100_000.0)
+    parser.add_argument("--fx-quote-to-account-rate", type=float, default=1.0)
+    parser.add_argument("--fx-margin-rate", type=float, default=0.0)
+    parser.add_argument("--fx-swap-long-per-lot", type=float, default=0.0)
+    parser.add_argument("--fx-swap-short-per-lot", type=float, default=0.0)
+    parser.add_argument("--fx-rollover-hour-utc", type=int, default=21)
 
 
 def _add_baseline_risk_arguments(parser: argparse.ArgumentParser) -> None:
@@ -172,6 +239,35 @@ def _add_baseline_risk_arguments(parser: argparse.ArgumentParser) -> None:
         "--disable-spread-filter",
         action="store_true",
         help="Disable the baseline entry spread filter.",
+    )
+
+
+def _build_fx_symbol_spec(
+    *,
+    pip_size: float | None,
+    base_currency: str,
+    quote_currency: str,
+    account_currency: str,
+    contract_size: float,
+    quote_to_account_rate: float,
+    margin_rate: float,
+    swap_long_per_lot: float,
+    swap_short_per_lot: float,
+    rollover_hour_utc: int,
+) -> FxSymbolSpec | None:
+    if pip_size is None:
+        return None
+    return FxSymbolSpec(
+        base_currency=base_currency,
+        quote_currency=quote_currency,
+        account_currency=account_currency,
+        pip_size=pip_size,
+        contract_size=contract_size,
+        quote_to_account_rate=quote_to_account_rate,
+        margin_rate=margin_rate,
+        swap_long_per_lot=swap_long_per_lot,
+        swap_short_per_lot=swap_short_per_lot,
+        rollover_hour_utc=rollover_hour_utc,
     )
 
 

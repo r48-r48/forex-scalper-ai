@@ -51,7 +51,7 @@ The report was based on a static archive review and did not see all subsequent l
    the first supervised baseline training/export CLI and runtime inference package now exist, but a model registry, drift monitoring, transformer training/export, and end-to-end live signal loop are still pending.
 
 3. Backtesting remains insufficient for serious FX scalping:
-   the current research backtest still needs bid/ask execution, pip value, margin/leverage, swap/rollover, session spread regimes, symbol specs, and realistic stop/TP path simulation.
+   the current research backtest now has bid/ask execution plus first-row-level cost, pip-value, margin, and swap/rollover metrics, but it still needs broker symbol-spec ingestion, leverage/margin-call behavior, and realistic stop/TP path simulation.
 
 4. Data bootstrap is incomplete:
    the repo can ingest replay files and now has an offline data-quality validation foundation, but it does not yet download, quarantine, and version broker-quality Forex history from scratch.
@@ -79,6 +79,7 @@ The report was based on a static archive review and did not see all subsequent l
 - Completed on `2026-05-03`: parallel hardening batch added `scripts/build_features.py` for offline feature frames, `scripts/run_supervised_filter.py` for leakage-safe supervised filter validation, opt-in RiskEngine budget guards for risk-per-trade/open-position/weekly-loss/margin/leverage checks, and a backwards-compatible bid/ask-aware backtest execution slice; `make PYTHON=.venv/bin/python ci` passed with full pytest `306 passed`.
 - Completed on `2026-05-03`: risk-budget config/runtime wiring added config/env fields for weekly-loss, risk-per-trade, max-open-position, margin-level, and leverage budgets; runtime `RiskContext` now receives broker account state, broker-source live positions, quote-based market entry estimates, and UTC day/week realized-PnL baselines; MT5 account snapshots expose margin fields and MT5 live adapter account snapshots include gross-position effective leverage; `make PYTHON=.venv/bin/python ci` passed with full pytest `309 passed`.
 - Completed on `2026-05-03`: supervised baseline filter training/export and runtime inference packaging were added with `scripts/train_supervised_filter.py`, JSON model/scaler artifacts, SHA-verified bundle metadata, `load_baseline_filter_inference_package()`, and tests for leakage-safe training cutoff behavior plus runtime scoring; `make PYTHON=.venv/bin/python ci` passed with full pytest `317 passed`.
+- Completed on `2026-05-03`: first FX backtest realism slice added row-level execution cost regimes, `FxSymbolSpec`, pip-value metrics, margin-required/utilization metrics, and rollover swap-cost accounting without changing default mid-price behavior; `make PYTHON=.venv/bin/python ci` passed with full pytest `321 passed`.
 
 ## Non-Goals
 
