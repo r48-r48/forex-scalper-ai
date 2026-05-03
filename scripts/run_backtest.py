@@ -18,7 +18,12 @@ for import_path in (SCRIPT_ROOT, SRC_ROOT):
 
 from cli_utils import dataframe_records, load_frame, write_json
 
-from scalper_ai.backtesting import BacktestConfig, BaselineStrategySpec, FxSymbolSpec
+from scalper_ai.backtesting import (
+    BacktestConfig,
+    BaselineStrategySpec,
+    FxSymbolSpec,
+    load_fx_symbol_spec,
+)
 from scalper_ai.backtesting.baselines import build_default_baseline_specs
 from scalper_ai.validation import run_baseline_suite
 
@@ -47,16 +52,17 @@ def run_backtest_cli(
     spread_bps_column: str | None = None,
     slippage_bps_column: str | None = None,
     commission_bps_column: str | None = None,
+    fx_symbol_spec_path: Path | None = None,
     fx_pip_size: float | None = None,
-    fx_base_currency: str = "EUR",
-    fx_quote_currency: str = "USD",
-    fx_account_currency: str = "USD",
-    fx_contract_size: float = 100_000.0,
-    fx_quote_to_account_rate: float = 1.0,
-    fx_margin_rate: float = 0.0,
-    fx_swap_long_per_lot: float = 0.0,
-    fx_swap_short_per_lot: float = 0.0,
-    fx_rollover_hour_utc: int = 21,
+    fx_base_currency: str | None = None,
+    fx_quote_currency: str | None = None,
+    fx_account_currency: str | None = None,
+    fx_contract_size: float | None = None,
+    fx_quote_to_account_rate: float | None = None,
+    fx_margin_rate: float | None = None,
+    fx_swap_long_per_lot: float | None = None,
+    fx_swap_short_per_lot: float | None = None,
+    fx_rollover_hour_utc: int | None = None,
     margin_call_level: float | None = None,
     stop_loss_price_column: str | None = None,
     take_profit_price_column: str | None = None,
@@ -82,6 +88,7 @@ def run_backtest_cli(
         slippage_bps_column=slippage_bps_column,
         commission_bps_column=commission_bps_column,
         fx_symbol=_build_fx_symbol_spec(
+            spec_path=fx_symbol_spec_path,
             pip_size=fx_pip_size,
             base_currency=fx_base_currency,
             quote_currency=fx_quote_currency,
@@ -168,6 +175,7 @@ def main() -> None:
         spread_bps_column=args.spread_bps_column,
         slippage_bps_column=args.slippage_bps_column,
         commission_bps_column=args.commission_bps_column,
+        fx_symbol_spec_path=args.fx_symbol_spec_path,
         fx_pip_size=args.fx_pip_size,
         fx_base_currency=args.fx_base_currency,
         fx_quote_currency=args.fx_quote_currency,
@@ -236,20 +244,26 @@ def _add_backtest_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--slippage-bps-column", default=None)
     parser.add_argument("--commission-bps-column", default=None)
     parser.add_argument(
+        "--fx-symbol-spec-path",
+        type=Path,
+        default=None,
+        help="Optional JSON file with broker-style FX symbol assumptions.",
+    )
+    parser.add_argument(
         "--fx-pip-size",
         type=float,
         default=None,
         help="Enable FX symbol metrics with this pip size, for example 0.0001.",
     )
-    parser.add_argument("--fx-base-currency", default="EUR")
-    parser.add_argument("--fx-quote-currency", default="USD")
-    parser.add_argument("--fx-account-currency", default="USD")
-    parser.add_argument("--fx-contract-size", type=float, default=100_000.0)
-    parser.add_argument("--fx-quote-to-account-rate", type=float, default=1.0)
-    parser.add_argument("--fx-margin-rate", type=float, default=0.0)
-    parser.add_argument("--fx-swap-long-per-lot", type=float, default=0.0)
-    parser.add_argument("--fx-swap-short-per-lot", type=float, default=0.0)
-    parser.add_argument("--fx-rollover-hour-utc", type=int, default=21)
+    parser.add_argument("--fx-base-currency", default=None)
+    parser.add_argument("--fx-quote-currency", default=None)
+    parser.add_argument("--fx-account-currency", default=None)
+    parser.add_argument("--fx-contract-size", type=float, default=None)
+    parser.add_argument("--fx-quote-to-account-rate", type=float, default=None)
+    parser.add_argument("--fx-margin-rate", type=float, default=None)
+    parser.add_argument("--fx-swap-long-per-lot", type=float, default=None)
+    parser.add_argument("--fx-swap-short-per-lot", type=float, default=None)
+    parser.add_argument("--fx-rollover-hour-utc", type=int, default=None)
     parser.add_argument(
         "--margin-call-level",
         type=float,
@@ -281,30 +295,66 @@ def _add_baseline_risk_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _build_fx_symbol_spec(
     *,
+    spec_path: Path | None,
     pip_size: float | None,
-    base_currency: str,
-    quote_currency: str,
-    account_currency: str,
-    contract_size: float,
-    quote_to_account_rate: float,
-    margin_rate: float,
-    swap_long_per_lot: float,
-    swap_short_per_lot: float,
-    rollover_hour_utc: int,
+    base_currency: str | None,
+    quote_currency: str | None,
+    account_currency: str | None,
+    contract_size: float | None,
+    quote_to_account_rate: float | None,
+    margin_rate: float | None,
+    swap_long_per_lot: float | None,
+    swap_short_per_lot: float | None,
+    rollover_hour_utc: int | None,
 ) -> FxSymbolSpec | None:
+    manual_fields = {
+        "fx_pip_size": pip_size,
+        "fx_base_currency": base_currency,
+        "fx_quote_currency": quote_currency,
+        "fx_account_currency": account_currency,
+        "fx_contract_size": contract_size,
+        "fx_quote_to_account_rate": quote_to_account_rate,
+        "fx_margin_rate": margin_rate,
+        "fx_swap_long_per_lot": swap_long_per_lot,
+        "fx_swap_short_per_lot": swap_short_per_lot,
+        "fx_rollover_hour_utc": rollover_hour_utc,
+    }
+    provided_manual_fields = [
+        field_name for field_name, value in manual_fields.items() if value is not None
+    ]
+    if spec_path is not None:
+        if provided_manual_fields:
+            raise ValueError(
+                "--fx-symbol-spec-path cannot be combined with manual FX fields: "
+                + ", ".join(provided_manual_fields)
+                + "."
+            )
+        return load_fx_symbol_spec(spec_path)
     if pip_size is None:
+        if provided_manual_fields:
+            raise ValueError(
+                "--fx-pip-size is required when using manual FX symbol fields: "
+                + ", ".join(provided_manual_fields)
+                + "."
+            )
         return None
     return FxSymbolSpec(
-        base_currency=base_currency,
-        quote_currency=quote_currency,
-        account_currency=account_currency,
+        base_currency=base_currency if base_currency is not None else "EUR",
+        quote_currency=quote_currency if quote_currency is not None else "USD",
+        account_currency=account_currency if account_currency is not None else "USD",
         pip_size=pip_size,
-        contract_size=contract_size,
-        quote_to_account_rate=quote_to_account_rate,
-        margin_rate=margin_rate,
-        swap_long_per_lot=swap_long_per_lot,
-        swap_short_per_lot=swap_short_per_lot,
-        rollover_hour_utc=rollover_hour_utc,
+        contract_size=contract_size if contract_size is not None else 100_000.0,
+        quote_to_account_rate=(
+            quote_to_account_rate if quote_to_account_rate is not None else 1.0
+        ),
+        margin_rate=margin_rate if margin_rate is not None else 0.0,
+        swap_long_per_lot=(
+            swap_long_per_lot if swap_long_per_lot is not None else 0.0
+        ),
+        swap_short_per_lot=(
+            swap_short_per_lot if swap_short_per_lot is not None else 0.0
+        ),
+        rollover_hour_utc=rollover_hour_utc if rollover_hour_utc is not None else 21,
     )
 
 

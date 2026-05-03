@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from scalper_ai.backtesting import BacktestConfig, FxSymbolSpec, run_backtest
+from scalper_ai.backtesting import (
+    BacktestConfig,
+    FxSymbolSpec,
+    fx_symbol_spec_from_mapping,
+    load_fx_symbol_spec,
+    run_backtest,
+)
 
 
 def test_run_backtest_uses_row_level_execution_cost_regimes() -> None:
@@ -271,6 +279,85 @@ def test_backtest_config_rejects_invalid_fx_symbol_spec() -> None:
             stop_loss_price_column="stop_loss_price",
             protective_exit_priority="unknown",
         )
+
+
+def test_fx_symbol_spec_from_mapping_accepts_wrapped_payload() -> None:
+    spec = fx_symbol_spec_from_mapping(
+        {
+            "fx_symbol": {
+                "base_currency": "eur",
+                "quote_currency": "usd",
+                "account_currency": "usd",
+                "pip_size": 0.0001,
+                "contract_size": 100_000,
+                "quote_to_account_rate": 1,
+                "margin_rate": 0.02,
+                "swap_long_per_lot": -4.1,
+                "swap_short_per_lot": 1.2,
+                "rollover_hour_utc": 22,
+            }
+        }
+    )
+
+    assert spec.base_currency == "EUR"
+    assert spec.quote_currency == "USD"
+    assert spec.account_currency == "USD"
+    assert spec.pip_size == pytest.approx(0.0001)
+    assert spec.contract_size == pytest.approx(100_000.0)
+    assert spec.margin_rate == pytest.approx(0.02)
+    assert spec.swap_long_per_lot == pytest.approx(-4.1)
+    assert spec.swap_short_per_lot == pytest.approx(1.2)
+    assert spec.rollover_hour_utc == 22
+
+
+def test_load_fx_symbol_spec_reads_flat_json_file(tmp_path: Path) -> None:
+    spec_path = tmp_path / "eurusd-symbol.json"
+    spec_path.write_text(
+        json.dumps(
+            {
+                "base_currency": "EUR",
+                "quote_currency": "USD",
+                "account_currency": "USD",
+                "pip_size": 0.0001,
+                "margin_rate": 0.02,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    spec = load_fx_symbol_spec(spec_path)
+
+    assert spec.pip_value_per_lot == pytest.approx(10.0)
+    assert spec.margin_rate == pytest.approx(0.02)
+
+
+def test_fx_symbol_spec_loader_rejects_unknown_and_missing_fields(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="Unknown FX symbol spec fields: digits"):
+        fx_symbol_spec_from_mapping(
+            {
+                "base_currency": "EUR",
+                "quote_currency": "USD",
+                "account_currency": "USD",
+                "pip_size": 0.0001,
+                "digits": 5,
+            }
+        )
+
+    with pytest.raises(ValueError, match="Missing required FX symbol spec fields"):
+        fx_symbol_spec_from_mapping(
+            {
+                "base_currency": "EUR",
+                "quote_currency": "USD",
+                "account_currency": "USD",
+            }
+        )
+
+    spec_path = tmp_path / "invalid-symbol.json"
+    spec_path.write_text(json.dumps(["not", "a", "mapping"]), encoding="utf-8")
+    with pytest.raises(ValueError, match="FX symbol spec file must be a JSON object"):
+        load_fx_symbol_spec(spec_path)
 
 
 def test_run_backtest_rejects_negative_row_level_costs() -> None:

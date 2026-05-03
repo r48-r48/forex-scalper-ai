@@ -67,6 +67,29 @@ changing defaults. To model broker-style forced liquidation, pass
 `--margin-call-level` as an `equity / margin_required` threshold, for example `1.0`
 for a 100% margin level stop-out.
 
+For broker-exported or curated symbol assumptions, prefer a strict JSON file and pass
+`--fx-symbol-spec-path data/config/eurusd-symbol.json` instead of manual FX flags:
+
+```json
+{
+  "fx_symbol": {
+    "base_currency": "EUR",
+    "quote_currency": "USD",
+    "account_currency": "USD",
+    "pip_size": 0.0001,
+    "contract_size": 100000,
+    "quote_to_account_rate": 1.0,
+    "margin_rate": 0.02,
+    "swap_long_per_lot": -4.1,
+    "swap_short_per_lot": 1.2,
+    "rollover_hour_utc": 21
+  }
+}
+```
+
+The loader rejects unknown fields and missing required values so broker assumptions
+stay explicit in the report.
+
 For completed-bar stop-loss / take-profit path simulation, pass
 `--high-price-column`, `--low-price-column`, and one or both of
 `--stop-loss-price-column` / `--take-profit-price-column`. Protective prices become

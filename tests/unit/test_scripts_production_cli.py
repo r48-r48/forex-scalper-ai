@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
@@ -40,9 +41,24 @@ def test_run_backtest_cli_writes_explicit_cost_baseline_report(tmp_path: Path) -
     script = _load_script_module("run_backtest")
     input_path = tmp_path / "replay.csv"
     output_path = tmp_path / "backtest.json"
+    fx_spec_path = tmp_path / "eurusd-symbol.json"
     _feature_frame(row_count=5, include_protective_columns=True).to_csv(
         input_path,
         index=False,
+    )
+    fx_spec_path.write_text(
+        json.dumps(
+            {
+                "fx_symbol": {
+                    "base_currency": "EUR",
+                    "quote_currency": "USD",
+                    "account_currency": "USD",
+                    "pip_size": 0.0001,
+                    "margin_rate": 0.02,
+                }
+            }
+        ),
+        encoding="utf-8",
     )
 
     payload = script.run_backtest_cli(
@@ -54,8 +70,7 @@ def test_run_backtest_cli_writes_explicit_cost_baseline_report(tmp_path: Path) -
         commission_bps=0.05,
         high_price_column="high_price",
         low_price_column="low_price",
-        fx_pip_size=0.0001,
-        fx_margin_rate=0.02,
+        fx_symbol_spec_path=fx_spec_path,
         margin_call_level=1.0,
         stop_loss_price_column="stop_loss_price",
         take_profit_price_column="take_profit_price",
@@ -66,6 +81,7 @@ def test_run_backtest_cli_writes_explicit_cost_baseline_report(tmp_path: Path) -
     assert output_path.exists()
     assert payload["strategies"] == ["spread_mean_reversion"]
     assert payload["backtest_config"]["margin_call_level"] == 1.0
+    assert payload["backtest_config"]["fx_symbol"]["pip_size"] == 0.0001
     assert payload["backtest_config"]["fx_symbol"]["margin_rate"] == 0.02
     assert payload["backtest_config"]["protective_exit_priority"] == "take_profit"
     summary = payload["summary"]

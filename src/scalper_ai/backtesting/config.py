@@ -2,8 +2,33 @@
 
 from __future__ import annotations
 
+import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Final
+
+_FX_SYMBOL_SPEC_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "base_currency",
+        "quote_currency",
+        "account_currency",
+        "pip_size",
+        "contract_size",
+        "quote_to_account_rate",
+        "margin_rate",
+        "swap_long_per_lot",
+        "swap_short_per_lot",
+        "rollover_hour_utc",
+    }
+)
+_FX_SYMBOL_SPEC_REQUIRED_FIELDS: Final[tuple[str, ...]] = (
+    "base_currency",
+    "quote_currency",
+    "account_currency",
+    "pip_size",
+)
 
 
 @dataclass(frozen=True)
@@ -45,6 +70,52 @@ class FxSymbolSpec:
         """Return account-currency value of one pip for one broker lot."""
 
         return self.pip_value_per_unit * self.contract_size
+
+
+def fx_symbol_spec_from_mapping(payload: Mapping[str, object]) -> FxSymbolSpec:
+    """Build an FX symbol spec from a strict JSON-like mapping."""
+
+    spec_payload = _normalize_fx_symbol_spec_payload(payload)
+    unknown_fields = sorted(set(spec_payload) - _FX_SYMBOL_SPEC_FIELDS)
+    if unknown_fields:
+        raise ValueError(
+            "Unknown FX symbol spec fields: " + ", ".join(unknown_fields) + "."
+        )
+    missing_fields = [
+        field_name
+        for field_name in _FX_SYMBOL_SPEC_REQUIRED_FIELDS
+        if field_name not in spec_payload
+    ]
+    if missing_fields:
+        raise ValueError(
+            "Missing required FX symbol spec fields: " + ", ".join(missing_fields) + "."
+        )
+    return FxSymbolSpec(
+        base_currency=_required_string(spec_payload, "base_currency"),
+        quote_currency=_required_string(spec_payload, "quote_currency"),
+        account_currency=_required_string(spec_payload, "account_currency"),
+        pip_size=_required_number(spec_payload, "pip_size"),
+        contract_size=_optional_number(spec_payload, "contract_size", 100_000.0),
+        quote_to_account_rate=_optional_number(
+            spec_payload,
+            "quote_to_account_rate",
+            1.0,
+        ),
+        margin_rate=_optional_number(spec_payload, "margin_rate", 0.0),
+        swap_long_per_lot=_optional_number(spec_payload, "swap_long_per_lot", 0.0),
+        swap_short_per_lot=_optional_number(spec_payload, "swap_short_per_lot", 0.0),
+        rollover_hour_utc=_optional_int(spec_payload, "rollover_hour_utc", 21),
+    )
+
+
+def load_fx_symbol_spec(path: str | Path) -> FxSymbolSpec:
+    """Load a broker-style FX symbol spec from a JSON file."""
+
+    spec_path = Path(path)
+    payload = json.loads(spec_path.read_text(encoding="utf-8"))
+    return fx_symbol_spec_from_mapping(
+        _require_string_key_mapping(payload, "FX symbol spec file")
+    )
 
 
 @dataclass(frozen=True)
@@ -143,6 +214,71 @@ def _currency_code(value: str) -> str:
     if len(normalized) != 3 or not normalized.isalpha():
         raise ValueError("currency code must be a three-letter ISO-like code.")
     return normalized
+
+
+def _normalize_fx_symbol_spec_payload(
+    payload: Mapping[str, object],
+) -> Mapping[str, object]:
+    normalized = _require_string_key_mapping(payload, "FX symbol spec")
+    if "fx_symbol" not in normalized:
+        return normalized
+    if len(normalized) != 1:
+        raise ValueError(
+            "FX symbol spec files using the 'fx_symbol' wrapper must not include "
+            "sibling fields."
+        )
+    return _require_string_key_mapping(normalized["fx_symbol"], "fx_symbol")
+
+
+def _require_string_key_mapping(payload: object, description: str) -> Mapping[str, object]:
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"{description} must be a JSON object.")
+    normalized: dict[str, object] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            raise ValueError(f"{description} keys must be strings.")
+        normalized[key] = value
+    return normalized
+
+
+def _required_string(payload: Mapping[str, object], field_name: str) -> str:
+    value = payload[field_name]
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string.")
+    return value
+
+
+def _required_number(payload: Mapping[str, object], field_name: str) -> float:
+    return _number(payload[field_name], field_name)
+
+
+def _optional_number(
+    payload: Mapping[str, object],
+    field_name: str,
+    default: float,
+) -> float:
+    if field_name not in payload:
+        return default
+    return _number(payload[field_name], field_name)
+
+
+def _number(value: object, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{field_name} must be numeric.")
+    return float(value)
+
+
+def _optional_int(
+    payload: Mapping[str, object],
+    field_name: str,
+    default: int,
+) -> int:
+    if field_name not in payload:
+        return default
+    value = payload[field_name]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} must be an integer.")
+    return value
 
 
 def _validate_optional_column_name(value: str | None, field_name: str) -> None:

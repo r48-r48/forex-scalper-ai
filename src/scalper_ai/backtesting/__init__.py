@@ -19,7 +19,12 @@ from scalper_ai.backtesting.baselines import (
     VolatilityBreakoutStrategy,
     build_default_baseline_specs,
 )
-from scalper_ai.backtesting.config import BacktestConfig, FxSymbolSpec
+from scalper_ai.backtesting.config import (
+    BacktestConfig,
+    FxSymbolSpec,
+    fx_symbol_spec_from_mapping,
+    load_fx_symbol_spec,
+)
 from scalper_ai.backtesting.engine import (
     BacktestEvent,
     BacktestMetrics,
@@ -63,6 +68,8 @@ __all__ = [
     "build_default_baseline_specs",
     "calculate_drawdown",
     "calculate_equity",
+    "fx_symbol_spec_from_mapping",
+    "load_fx_symbol_spec",
     "mark_position",
     "run_backtest",
     "run_execution_aware_backtest",
