@@ -49,11 +49,16 @@ def test_run_backtest_cli_writes_explicit_cost_baseline_report(tmp_path: Path) -
         spread_bps=0.4,
         slippage_bps=0.1,
         commission_bps=0.05,
+        fx_pip_size=0.0001,
+        fx_margin_rate=0.02,
+        margin_call_level=1.0,
         max_abs_position=0.5,
     )
 
     assert output_path.exists()
     assert payload["strategies"] == ["spread_mean_reversion"]
+    assert payload["backtest_config"]["margin_call_level"] == 1.0
+    assert payload["backtest_config"]["fx_symbol"]["margin_rate"] == 0.02
     summary = payload["summary"]
     assert len(summary) == 1
     assert summary[0]["strategy_name"] == "spread_mean_reversion"

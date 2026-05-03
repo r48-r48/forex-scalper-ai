@@ -22,6 +22,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed the second FX backtest realism slice:
+  - added opt-in `margin_call_level` to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/config.py`; the threshold is expressed as `equity / margin_required`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/engine.py` now observes margin level and effective leverage before/after strategy decisions and can force broker-style same-row or next-row liquidation to flat when the threshold is breached
+  - equity rows now include `margin_level`, `effective_leverage`, `margin_call_count`, `liquidation_count`, and `liquidated_on_margin_call`; aggregate metrics expose min margin level, max effective leverage, margin-call count, and liquidation count
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_backtest.py` exposes the behavior through `--margin-call-level`
+  - focused validation passed: targeted Ruff, strict mypy, and backtesting/script pytest with `21 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `91` source files, compileall green, full pytest `323 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed the first FX backtest realism slice:
   - added `FxSymbolSpec` in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/config.py` for base/quote/account currency, pip size, contract size, quote-account conversion, margin rate, swap cost per lot, and UTC rollover hour assumptions
   - `BacktestConfig` now accepts optional row-level `spread_bps_column`, `slippage_bps_column`, and `commission_bps_column`
@@ -849,7 +856,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
 - use `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` for future latest-code Parallels MT5 checks
-- first FX backtest realism metrics are complete for row-level costs, pip value, margin-rate utilization, and swap/rollover; next continue broker symbol-spec ingestion, margin-call/leverage behavior, stop/TP path realism, concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
+- FX backtest realism now covers row-level costs, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, and opt-in margin-call liquidation; next continue broker symbol-spec ingestion, stop/TP path realism, concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
 
 If further MT5 validation is paused:
 - continue with FX backtest realism and network alert transport topology now that Docker/Compose validation is complete

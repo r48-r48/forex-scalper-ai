@@ -67,6 +67,10 @@ class BacktestMetrics:
     pip_value_per_lot: float = 0.0
     max_margin_required: float = 0.0
     max_margin_utilization: float = 0.0
+    min_margin_level: float = 0.0
+    max_effective_leverage: float = 0.0
+    margin_call_count: int = 0
+    liquidation_count: int = 0
     swap_cost: float = 0.0
 
 
@@ -88,6 +92,23 @@ class _ExecutionCostBps:
     commission_bps: float
 
 
+@dataclass(frozen=True)
+class _MarginObservation:
+    margin_required: float
+    margin_utilization: float
+    margin_level: float
+    effective_leverage: float
+
+
+@dataclass(frozen=True)
+class _MarketDeltaResult:
+    order: OrderIntent
+    fill: FillEvent
+    position: PositionState
+    cash_balance: float
+    turnover_quote: float
+
+
 def run_backtest(
     frame: pd.DataFrame,
     strategy: TargetPositionStrategy,
@@ -105,6 +126,12 @@ def run_backtest(
     trade_count = 0
     turnover_quote = 0.0
     swap_cost = 0.0
+    margin_call_count = 0
+    liquidation_count = 0
+    max_margin_required = 0.0
+    max_margin_utilization = 0.0
+    max_effective_leverage = 0.0
+    min_margin_level: float | None = None
     position: PositionState | None = None
     previous_timestamp: pd.Timestamp | None = None
 
@@ -134,67 +161,154 @@ def run_backtest(
         pretrade_equity = calculate_equity(cash_balance, pretrade_position)
         pretrade_peak_equity = max(peak_equity, pretrade_equity)
         pretrade_drawdown = calculate_drawdown(pretrade_equity, pretrade_peak_equity)
-
-        strategy_state = BacktestState(
-            current_position=pretrade_position,
-            cash_balance=cash_balance,
+        pretrade_margin = _observe_margin_state(
+            pretrade_position,
             equity=pretrade_equity,
-            peak_equity=pretrade_peak_equity,
-            drawdown=pretrade_drawdown,
-            trade_count=trade_count,
-            turnover_quote=turnover_quote,
+            config=resolved_config,
         )
-        target_position = strategy(event, strategy_state)
+        max_margin_required = max(max_margin_required, pretrade_margin.margin_required)
+        max_margin_utilization = max(
+            max_margin_utilization,
+            pretrade_margin.margin_utilization,
+        )
+        max_effective_leverage = max(
+            max_effective_leverage,
+            pretrade_margin.effective_leverage,
+        )
+        min_margin_level = _update_min_margin_level(min_margin_level, pretrade_margin)
 
         posttrade_position = pretrade_position
-        if target_position is not None:
-            delta_quantity = _coerce_target_position(target_position) - float(
-                pretrade_position.net_quantity
+        liquidated_on_margin_call = False
+        if _should_liquidate_for_margin(
+            pretrade_position,
+            margin=pretrade_margin,
+            config=resolved_config,
+        ):
+            liquidation = _execute_market_delta(
+                event=event,
+                symbol=symbol,
+                strategy_id="broker_margin_call",
+                order_index=len(orders) + 1,
+                fill_index=len(fills) + 1,
+                current_position=pretrade_position,
+                target_position=0.0,
+                delta_quantity=-float(pretrade_position.net_quantity),
+                cash_balance=cash_balance,
+                config=resolved_config,
+                reason="margin_call",
             )
-            if not math.isclose(delta_quantity, 0.0, abs_tol=_ZERO_TOLERANCE):
-                order_side = OrderSide.BUY if delta_quantity > 0 else OrderSide.SELL
-                execution_reference_price = _execution_reference_price(
-                    event,
-                    side=order_side,
-                    config=resolved_config,
-                )
-                execution_costs = _resolve_execution_costs(event, config=resolved_config)
-                order = _build_market_order(
+            cash_balance = liquidation.cash_balance
+            posttrade_position = liquidation.position
+            trade_count += 1
+            turnover_quote += liquidation.turnover_quote
+            margin_call_count += 1
+            liquidation_count += 1
+            liquidated_on_margin_call = True
+            orders.append(liquidation.order)
+            fills.append(liquidation.fill)
+
+        if not liquidated_on_margin_call:
+            strategy_state = BacktestState(
+                current_position=pretrade_position,
+                cash_balance=cash_balance,
+                equity=pretrade_equity,
+                peak_equity=pretrade_peak_equity,
+                drawdown=pretrade_drawdown,
+                trade_count=trade_count,
+                turnover_quote=turnover_quote,
+            )
+            target_position = strategy(event, strategy_state)
+            if target_position is not None:
+                target_position_value = _coerce_target_position(target_position)
+                delta_quantity = target_position_value - float(pretrade_position.net_quantity)
+                if not math.isclose(delta_quantity, 0.0, abs_tol=_ZERO_TOLERANCE):
+                    executed = _execute_market_delta(
+                        event=event,
+                        symbol=symbol,
+                        strategy_id=strategy_id,
+                        order_index=len(orders) + 1,
+                        fill_index=len(fills) + 1,
+                        current_position=pretrade_position,
+                        target_position=target_position_value,
+                        delta_quantity=delta_quantity,
+                        cash_balance=cash_balance,
+                        config=resolved_config,
+                    )
+                    cash_balance = executed.cash_balance
+                    posttrade_position = executed.position
+                    trade_count += 1
+                    turnover_quote += executed.turnover_quote
+                    orders.append(executed.order)
+                    fills.append(executed.fill)
+
+            post_strategy_equity = calculate_equity(cash_balance, posttrade_position)
+            post_strategy_margin = _observe_margin_state(
+                posttrade_position,
+                equity=post_strategy_equity,
+                config=resolved_config,
+            )
+            max_margin_required = max(
+                max_margin_required,
+                post_strategy_margin.margin_required,
+            )
+            max_margin_utilization = max(
+                max_margin_utilization,
+                post_strategy_margin.margin_utilization,
+            )
+            max_effective_leverage = max(
+                max_effective_leverage,
+                post_strategy_margin.effective_leverage,
+            )
+            min_margin_level = _update_min_margin_level(
+                min_margin_level,
+                post_strategy_margin,
+            )
+            if _should_liquidate_for_margin(
+                posttrade_position,
+                margin=post_strategy_margin,
+                config=resolved_config,
+            ):
+                liquidation = _execute_market_delta(
                     event=event,
-                    strategy_id=strategy_id,
                     symbol=symbol,
+                    strategy_id="broker_margin_call",
                     order_index=len(orders) + 1,
-                    current_position=pretrade_position.net_quantity,
-                    target_position=float(target_position),
-                    delta_quantity=delta_quantity,
-                    execution_reference_price=execution_reference_price,
+                    fill_index=len(fills) + 1,
+                    current_position=posttrade_position,
+                    target_position=0.0,
+                    delta_quantity=-float(posttrade_position.net_quantity),
+                    cash_balance=cash_balance,
+                    config=resolved_config,
+                    reason="margin_call",
                 )
-                fill = simulate_market_fill(
-                    order,
-                    fill_id=f"bt-fill-{len(fills) + 1:06d}",
-                    event_timestamp=event.available_timestamp.to_pydatetime(),
-                    received_timestamp=event.available_timestamp.to_pydatetime(),
-                    mark_price=execution_reference_price,
-                    spread_bps=execution_costs.spread_bps,
-                    slippage_bps=execution_costs.slippage_bps,
-                    commission_bps=execution_costs.commission_bps,
-                )
-                cash_balance = apply_fill_to_cash(cash_balance, fill)
-                posttrade_position = apply_fill_to_position(
-                    pretrade_position,
-                    fill,
-                    mark_price=event.mark_price,
-                )
+                cash_balance = liquidation.cash_balance
+                posttrade_position = liquidation.position
                 trade_count += 1
-                turnover_quote += fill.fill_price * fill.fill_quantity
-                orders.append(order)
-                fills.append(fill)
+                turnover_quote += liquidation.turnover_quote
+                margin_call_count += 1
+                liquidation_count += 1
+                liquidated_on_margin_call = True
+                orders.append(liquidation.order)
+                fills.append(liquidation.fill)
 
         posttrade_equity = calculate_equity(cash_balance, posttrade_position)
         peak_equity = max(pretrade_peak_equity, posttrade_equity)
         drawdown = calculate_drawdown(posttrade_equity, peak_equity)
-        margin_required = _calculate_margin_required(posttrade_position, config=resolved_config)
-        margin_utilization = _safe_ratio(margin_required, posttrade_equity)
+        posttrade_margin = _observe_margin_state(
+            posttrade_position,
+            equity=posttrade_equity,
+            config=resolved_config,
+        )
+        max_margin_required = max(max_margin_required, posttrade_margin.margin_required)
+        max_margin_utilization = max(
+            max_margin_utilization,
+            posttrade_margin.margin_utilization,
+        )
+        max_effective_leverage = max(
+            max_effective_leverage,
+            posttrade_margin.effective_leverage,
+        )
+        min_margin_level = _update_min_margin_level(min_margin_level, posttrade_margin)
 
         position = posttrade_position
         position_history.append(posttrade_position)
@@ -211,8 +325,13 @@ def run_backtest(
                 "realized_pnl": float(posttrade_position.realized_pnl),
                 "unrealized_pnl": float(posttrade_position.unrealized_pnl),
                 "drawdown": drawdown,
-                "margin_required": margin_required,
-                "margin_utilization": margin_utilization,
+                "margin_required": posttrade_margin.margin_required,
+                "margin_utilization": posttrade_margin.margin_utilization,
+                "margin_level": posttrade_margin.margin_level,
+                "effective_leverage": posttrade_margin.effective_leverage,
+                "margin_call_count": margin_call_count,
+                "liquidation_count": liquidation_count,
+                "liquidated_on_margin_call": liquidated_on_margin_call,
                 "swap_cost": swap_cost,
                 "trade_count": trade_count,
                 "turnover_quote": turnover_quote,
@@ -231,8 +350,12 @@ def run_backtest(
         turnover_quote=turnover_quote,
         pip_value_per_unit=pip_value_per_unit,
         pip_value_per_lot=pip_value_per_lot,
-        max_margin_required=float(equity_curve["margin_required"].max()),
-        max_margin_utilization=float(equity_curve["margin_utilization"].max()),
+        max_margin_required=max_margin_required,
+        max_margin_utilization=max_margin_utilization,
+        min_margin_level=0.0 if min_margin_level is None else min_margin_level,
+        max_effective_leverage=max_effective_leverage,
+        margin_call_count=margin_call_count,
+        liquidation_count=liquidation_count,
         swap_cost=swap_cost,
     )
     return BacktestResult(
@@ -241,6 +364,63 @@ def run_backtest(
         position_history=tuple(position_history),
         equity_curve=equity_curve,
         metrics=metrics,
+    )
+
+
+def _execute_market_delta(
+    *,
+    event: BacktestEvent,
+    symbol: str,
+    strategy_id: str,
+    order_index: int,
+    fill_index: int,
+    current_position: PositionState,
+    target_position: float,
+    delta_quantity: float,
+    cash_balance: float,
+    config: BacktestConfig,
+    reason: str | None = None,
+) -> _MarketDeltaResult:
+    order_side = OrderSide.BUY if delta_quantity > 0 else OrderSide.SELL
+    execution_reference_price = _execution_reference_price(
+        event,
+        side=order_side,
+        config=config,
+    )
+    execution_costs = _resolve_execution_costs(event, config=config)
+    order = _build_market_order(
+        event=event,
+        strategy_id=strategy_id,
+        symbol=symbol,
+        order_index=order_index,
+        current_position=float(current_position.net_quantity),
+        target_position=target_position,
+        delta_quantity=delta_quantity,
+        execution_reference_price=execution_reference_price,
+        reason=reason,
+    )
+    fill = simulate_market_fill(
+        order,
+        fill_id=f"bt-fill-{fill_index:06d}",
+        event_timestamp=event.available_timestamp.to_pydatetime(),
+        received_timestamp=event.available_timestamp.to_pydatetime(),
+        mark_price=execution_reference_price,
+        spread_bps=execution_costs.spread_bps,
+        slippage_bps=execution_costs.slippage_bps,
+        commission_bps=execution_costs.commission_bps,
+    )
+    next_cash_balance = apply_fill_to_cash(cash_balance, fill)
+    next_position = apply_fill_to_position(
+        current_position,
+        fill,
+        mark_price=event.mark_price,
+    )
+    return _MarketDeltaResult(
+        order=order,
+        fill=fill,
+        position=next_position,
+        cash_balance=next_cash_balance,
+        turnover_quote=fill.fill_price * fill.fill_quantity,
     )
 
 
@@ -367,12 +547,21 @@ def _build_market_order(
     target_position: float,
     delta_quantity: float,
     execution_reference_price: float | None = None,
+    reason: str | None = None,
 ) -> OrderIntent:
     resolved_execution_reference_price = (
         event.mark_price
         if execution_reference_price is None
         else execution_reference_price
     )
+    metadata: dict[str, object] = {
+        "current_position": current_position,
+        "target_position": target_position,
+        "mark_price": event.mark_price,
+        "execution_reference_price": resolved_execution_reference_price,
+    }
+    if reason is not None:
+        metadata["reason"] = reason
     return OrderIntent(
         intent_id=f"bt-order-{order_index:06d}",
         strategy_id=strategy_id,
@@ -382,12 +571,7 @@ def _build_market_order(
         order_type=OrderType.MARKET,
         quantity=abs(delta_quantity),
         paper=True,
-        metadata={
-            "current_position": current_position,
-            "target_position": target_position,
-            "mark_price": event.mark_price,
-            "execution_reference_price": resolved_execution_reference_price,
-        },
+        metadata=metadata,
     )
 
 
@@ -508,6 +692,72 @@ def _calculate_margin_required(
     return abs(float(position.exposure_quote)) * symbol_spec.margin_rate * (
         symbol_spec.quote_to_account_rate
     )
+
+
+def _observe_margin_state(
+    position: PositionState,
+    *,
+    equity: float,
+    config: BacktestConfig,
+) -> _MarginObservation:
+    margin_required = _calculate_margin_required(position, config=config)
+    return _MarginObservation(
+        margin_required=margin_required,
+        margin_utilization=_safe_ratio(margin_required, equity),
+        margin_level=_calculate_margin_level(
+            equity=equity,
+            margin_required=margin_required,
+        ),
+        effective_leverage=_calculate_effective_leverage(
+            position,
+            equity=equity,
+            config=config,
+        ),
+    )
+
+
+def _calculate_margin_level(*, equity: float, margin_required: float) -> float:
+    if margin_required <= _ZERO_TOLERANCE:
+        return 0.0
+    return equity / margin_required
+
+
+def _calculate_effective_leverage(
+    position: PositionState,
+    *,
+    equity: float,
+    config: BacktestConfig,
+) -> float:
+    exposure_account = abs(float(position.exposure_quote))
+    if config.fx_symbol is not None:
+        exposure_account *= config.fx_symbol.quote_to_account_rate
+    return _safe_ratio(exposure_account, equity)
+
+
+def _update_min_margin_level(
+    current: float | None,
+    observation: _MarginObservation,
+) -> float | None:
+    if observation.margin_required <= _ZERO_TOLERANCE:
+        return current
+    if current is None:
+        return observation.margin_level
+    return min(current, observation.margin_level)
+
+
+def _should_liquidate_for_margin(
+    position: PositionState,
+    *,
+    margin: _MarginObservation,
+    config: BacktestConfig,
+) -> bool:
+    if config.margin_call_level is None:
+        return False
+    if math.isclose(float(position.net_quantity), 0.0, abs_tol=_ZERO_TOLERANCE):
+        return False
+    if margin.margin_required <= _ZERO_TOLERANCE:
+        return False
+    return margin.margin_level <= config.margin_call_level
 
 
 def _pip_values(config: BacktestConfig) -> tuple[float, float]:

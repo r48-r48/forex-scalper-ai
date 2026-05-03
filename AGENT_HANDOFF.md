@@ -463,6 +463,7 @@ Current repository status:
 - Session updated on: 2026-05-03
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - second FX backtest realism slice is complete: `BacktestConfig` now supports opt-in broker-style `margin_call_level`, `run_backtest()` can force same-row or next-row liquidation when equity/margin-required breaches the configured threshold, equity rows and metrics expose margin level, effective leverage, margin-call count, and liquidation count, `scripts/run_backtest.py` exposes `--margin-call-level`, targeted validation passed with `21 passed`, and `make PYTHON=.venv/bin/python ci` passed with full pytest `323 passed`
   - risk-budget config/runtime broker-context wiring is complete: added generic `BrokerAccountSnapshot` / `BrokerAccountProvider`, config/env fields for weekly-loss, risk-per-trade, max-open-position, margin-level, and leverage budgets, MT5 account margin fields, MT5 adapter broker account snapshots with gross-position effective leverage, and runtime `RiskContext` wiring for live broker account state, broker-source live positions, quote-based market entry estimates, and UTC day/week realized-PnL baselines; targeted validation passed, and `make PYTHON=.venv/bin/python ci` passed with full pytest `309 passed`
   - four-way parallel hardening batch is complete: added `scripts/build_features.py`, `scripts/run_supervised_filter.py`, tests for both CLIs, opt-in `RiskEngine` risk-per-trade/open-position/weekly-loss/margin/leverage guards, and optional bid/ask-aware `run_backtest()` execution while preserving default mid-price behavior; targeted validation passed with `34 passed`, and `make PYTHON=.venv/bin/python ci` passed with full pytest `306 passed`
   - production CLI first slice is complete: added `scripts/cli_utils.py`, `scripts/build_dataset.py`, `scripts/run_backtest.py`, `scripts/run_walk_forward.py`, `tests/unit/test_scripts_production_cli.py`, and `docs/production-cli.md` for UTC-safe dataset building, explicit-cost baseline backtests, and baseline walk-forward validation; targeted script tests passed with `3 passed`, and `make PYTHON=.venv/bin/python ci` passed with full pytest `293 passed`
@@ -540,7 +541,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
   - supervised baseline training/export and runtime inference packaging are complete; extend export coverage toward transformer models when that becomes the next model slice
-  - first FX backtest realism metrics are complete for row-level costs, pip value, margin-rate utilization, and swap/rollover; continue with broker symbol-spec ingestion, margin-call/leverage behavior, and stop/TP path realism
+  - FX backtest realism now covers row-level costs, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, and opt-in margin-call liquidation; continue with broker symbol-spec ingestion and stop/TP path realism
   - extend longer paper/shadow supervision evidence with a real alert sink topology, and continue production-startup hardening
   - keep remaining MT5 fault-injection, broker metadata, and operator recovery items in scope, especially IOC/Dukascopy hedging behavior and explicit terminal-path history checks
 

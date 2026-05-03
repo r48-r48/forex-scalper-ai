@@ -55,6 +55,7 @@ def run_backtest_cli(
     fx_swap_long_per_lot: float = 0.0,
     fx_swap_short_per_lot: float = 0.0,
     fx_rollover_hour_utc: int = 21,
+    margin_call_level: float | None = None,
     max_abs_position: float = 1.0,
     max_spread_bps: float = 2.0,
     disable_spread_filter: bool = False,
@@ -85,6 +86,7 @@ def run_backtest_cli(
             swap_short_per_lot=fx_swap_short_per_lot,
             rollover_hour_utc=fx_rollover_hour_utc,
         ),
+        margin_call_level=margin_call_level,
     )
     specs = _select_baseline_specs(
         strategy=strategy,
@@ -164,6 +166,7 @@ def main() -> None:
         fx_swap_long_per_lot=args.fx_swap_long_per_lot,
         fx_swap_short_per_lot=args.fx_swap_short_per_lot,
         fx_rollover_hour_utc=args.fx_rollover_hour_utc,
+        margin_call_level=args.margin_call_level,
         max_abs_position=args.max_abs_position,
         max_spread_bps=args.max_spread_bps,
         disable_spread_filter=args.disable_spread_filter,
@@ -230,6 +233,15 @@ def _add_backtest_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--fx-swap-long-per-lot", type=float, default=0.0)
     parser.add_argument("--fx-swap-short-per-lot", type=float, default=0.0)
     parser.add_argument("--fx-rollover-hour-utc", type=int, default=21)
+    parser.add_argument(
+        "--margin-call-level",
+        type=float,
+        default=None,
+        help=(
+            "Optional forced-liquidation threshold expressed as "
+            "equity / margin_required. Example: 1.0 means 100% margin level."
+        ),
+    )
 
 
 def _add_baseline_risk_arguments(parser: argparse.ArgumentParser) -> None:

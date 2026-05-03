@@ -65,6 +65,7 @@ class BacktestConfig:
     slippage_bps_column: str | None = None
     commission_bps_column: str | None = None
     fx_symbol: FxSymbolSpec | None = None
+    margin_call_level: float | None = None
 
     def __post_init__(self) -> None:
         if not self.price_column.strip():
@@ -92,6 +93,8 @@ class BacktestConfig:
         _validate_optional_column_name(self.spread_bps_column, "spread_bps_column")
         _validate_optional_column_name(self.slippage_bps_column, "slippage_bps_column")
         _validate_optional_column_name(self.commission_bps_column, "commission_bps_column")
+        if self.margin_call_level is not None:
+            _require_positive_finite(self.margin_call_level, "margin_call_level")
 
     @property
     def uses_bid_ask_execution(self) -> bool:

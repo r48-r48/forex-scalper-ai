@@ -62,7 +62,10 @@ For session or regime-specific costs, pass `--spread-bps-column`,
 and overrides the constant cost for that event. FX symbol realism metrics can be
 enabled with `--fx-pip-size`, plus optional contract size, margin rate, rollover hour,
 and long/short swap-per-lot assumptions. These fields add pip value, margin
-utilization, and rollover swap cost metrics without changing defaults.
+utilization, margin-level, effective-leverage, and rollover swap cost metrics without
+changing defaults. To model broker-style forced liquidation, pass
+`--margin-call-level` as an `equity / margin_required` threshold, for example `1.0`
+for a 100% margin level stop-out.
 
 ## Run Walk-Forward Validation
 
