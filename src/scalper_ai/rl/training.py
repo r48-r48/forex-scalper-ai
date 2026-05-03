@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 import torch
 from torch import nn
 
 from scalper_ai.rl.config import PolicyTrainingConfig
-from scalper_ai.rl.environment import TradingEnvironment, TradingStepResult
+from scalper_ai.rl.environment import TradingEnvironment
 from scalper_ai.rl.policy import TradingPolicyNetwork, action_index_to_value, select_action
 
 
@@ -49,11 +48,15 @@ class EpisodeRollout:
         *,
         gamma: float = 0.99,
         normalize_returns: bool = True,
-        device: Optional[torch.device | str] = None,
+        device: torch.device | str | None = None,
     ) -> PolicyTrainingBatch:
         """Convert rollout data into a policy-gradient batch."""
 
-        returns = discounted_returns(self.rewards.tolist(), gamma=gamma, normalize=normalize_returns)
+        returns = discounted_returns(
+            self.rewards.tolist(),
+            gamma=gamma,
+            normalize=normalize_returns,
+        )
         return PolicyTrainingBatch(
             observations=torch.as_tensor(self.observations, dtype=torch.float32, device=device),
             action_indices=torch.as_tensor(self.action_indices, dtype=torch.int64, device=device),
@@ -125,7 +128,11 @@ def train_policy_batch(
     optimizer.step()
     return PolicyTrainingResult(
         loss=float(loss.detach().item()),
-        mean_return=float(batch.returns.mean().detach().item()) if batch.returns.numel() > 0 else 0.0,
+        mean_return=(
+            float(batch.returns.mean().detach().item())
+            if batch.returns.numel() > 0
+            else 0.0
+        ),
         mean_entropy=float(entropy.mean().detach().item()) if entropy.numel() > 0 else 0.0,
     )
 
@@ -136,7 +143,7 @@ def rollout_policy_episode(
     policy: TradingPolicyNetwork,
     *,
     deterministic: bool = True,
-    device: Optional[torch.device | str] = None,
+    device: torch.device | str | None = None,
 ) -> EpisodeRollout:
     """Roll out one full episode using the provided policy."""
 
@@ -156,7 +163,10 @@ def rollout_policy_episode(
             device=device,
         )
         output = policy(observation_tensor)
-        selected_indices, selected_log_probabilities = select_action(output, deterministic=deterministic)
+        selected_indices, selected_log_probabilities = select_action(
+            output,
+            deterministic=deterministic,
+        )
         action_index = int(selected_indices.item())
         step_result = environment.step(action_index_to_value(action_index))
 

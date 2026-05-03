@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-import pytest
 import pandas as pd
+import pytest
 
 from scalper_ai.rl.config import TradingEnvironmentConfig
 from scalper_ai.rl.environment import TradingAction, TradingEnvironment
@@ -55,7 +55,7 @@ def test_environment_rejects_step_after_done() -> None:
 
 
 def _market_frame(prices: list[float]) -> pd.DataFrame:
-    base_time = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC)
     records: list[dict[str, object]] = []
     for index, price in enumerate(prices):
         records.append(

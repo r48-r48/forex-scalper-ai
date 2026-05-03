@@ -43,7 +43,12 @@ class TradingStepResult:
 class TradingEnvironment:
     """Step-based trading environment with explicit cost accounting."""
 
-    def __init__(self, market_frame: pd.DataFrame, *, config: TradingEnvironmentConfig | None = None) -> None:
+    def __init__(
+        self,
+        market_frame: pd.DataFrame,
+        *,
+        config: TradingEnvironmentConfig | None = None,
+    ) -> None:
         self._config = config or TradingEnvironmentConfig()
         self._market_frame = _prepare_market_frame(market_frame, config=self._config)
         self._feature_columns = _resolve_feature_columns(self._market_frame, config=self._config)
@@ -111,7 +116,11 @@ class TradingEnvironment:
 
         spread_cost = abs(traded_units) * current_price * (self._config.spread_bps / 10_000.0)
         slippage_cost = abs(traded_units) * current_price * (self._config.slippage_bps / 10_000.0)
-        holding_cost = abs(target_position) * current_price * (self._config.holding_cost_bps / 10_000.0)
+        holding_cost = (
+            abs(target_position)
+            * current_price
+            * (self._config.holding_cost_bps / 10_000.0)
+        )
         price_pnl = target_position * (next_price - current_price)
         net_pnl = price_pnl - spread_cost - slippage_cost - holding_cost
         reward = net_pnl * self._config.reward_scale
@@ -143,7 +152,9 @@ class TradingEnvironment:
         row = self._market_frame.iloc[index]
         feature_values = row.loc[list(self._feature_columns)].to_numpy(dtype=np.float32, copy=True)
         if self._config.include_position_in_observation:
-            values = np.concatenate([feature_values, np.asarray([self._position], dtype=np.float32)])
+            values = np.concatenate(
+                [feature_values, np.asarray([self._position], dtype=np.float32)]
+            )
         else:
             values = feature_values
         return TradingObservation(
@@ -189,9 +200,15 @@ def _resolve_feature_columns(
     config: TradingEnvironmentConfig,
 ) -> tuple[str, ...]:
     if config.feature_columns is not None:
-        missing = [column for column in config.feature_columns if column not in market_frame.columns]
+        missing = [
+            column
+            for column in config.feature_columns
+            if column not in market_frame.columns
+        ]
         if missing:
-            raise ValueError(f"Market frame is missing configured feature columns: {', '.join(missing)}")
+            raise ValueError(
+                f"Market frame is missing configured feature columns: {', '.join(missing)}"
+            )
         return tuple(config.feature_columns)
 
     excluded = {config.timestamp_column}

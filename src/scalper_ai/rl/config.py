@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -12,7 +11,7 @@ class TradingEnvironmentConfig:
 
     price_column: str = "mid_price"
     timestamp_column: str = "available_timestamp"
-    feature_columns: Optional[tuple[str, ...]] = None
+    feature_columns: tuple[str, ...] | None = None
     position_size: float = 1.0
     spread_bps: float = 0.0
     slippage_bps: float = 0.0

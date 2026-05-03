@@ -337,6 +337,7 @@ Current repository status:
 - Data-layer Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `374` to `163` issues
 - Backtesting Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `163` to `138` issues
 - Features Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `138` to `93` issues
+- RL Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `93` to `77` issues
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -419,6 +420,9 @@ Current repository status:
 - Features Ruff cleanup passed on 2026-05-03: targeted Ruff is green for `src/scalper_ai/features` plus selected feature tests; full Ruff baseline dropped from `138` to `93` issues
 - `.venv/bin/python -m pytest tests/unit/test_features_primitives.py tests/unit/test_features_online.py tests/integration/test_feature_offline_online_parity.py` passed on 2026-05-03 with `9 passed` after features cleanup
 - `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed on 2026-05-03 with `265 passed` after features cleanup
+- RL Ruff cleanup passed on 2026-05-03: targeted Ruff is green for `src/scalper_ai/rl` plus selected RL tests; full Ruff baseline dropped from `93` to `77` issues
+- `.venv/bin/python -m pytest tests/unit/test_rl_environment.py tests/unit/test_rl_policy_training.py tests/integration/test_rl_episode_rollout.py` passed on 2026-05-03 with `5 passed` after RL cleanup
+- `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed on 2026-05-03 with `265 passed` after RL cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -450,6 +454,7 @@ Current repository status:
   - data-layer Ruff cleanup is complete: `src/scalper_ai/data` and selected data tests now pass targeted Ruff; selected data pytest passed with `20 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `374` to `163`
   - backtesting Ruff cleanup is complete: `src/scalper_ai/backtesting` and selected backtesting tests now pass targeted Ruff; selected backtesting pytest passed with `14 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `163` to `138`
   - features Ruff cleanup is complete: `src/scalper_ai/features` and selected feature tests now pass targeted Ruff; selected feature pytest passed with `9 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `138` to `93`
+  - RL Ruff cleanup is complete: `src/scalper_ai/rl` and selected RL tests now pass targeted Ruff; selected RL pytest passed with `5 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `93` to `77`
   - Docker/Compose bounded paper supervisor validation is complete: added `make compose-supervise` for reproducible bounded supervisor runs, then ran Compose `paper-runtime supervise` for 5 paper iterations with `health_due=true`, `reconciliation_due=true`, `overall_status=pass`, rendered metrics on every iteration, `alert_count=0`, no alert errors, no runtime errors, and Compose cleanup afterward
   - Docker/Compose paper-runtime validation is complete on Docker Desktop: `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1`, `docker build -t forex-scalper-ai:local .` passed, Compose `paper-runtime describe` returned paper mode, Compose `health` returned `overall_status=pass`, Compose `metrics` emitted Prometheus-style runtime metrics, and `docker compose --profile paper down` cleaned up the test Redis container/network
   - MT5 post-send fallback fault-injection validation is complete: after a successful MT5 `order_send`, `Mt5TerminalClient` now falls back to the broker send result instead of raising if immediate order/history/deal refresh fails or the success response lacks a numeric ticket; explicit non-success `order_send` retcodes remain normalized rejected states; targeted Ruff, `25 passed` targeted MT5 client pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `265 passed`
