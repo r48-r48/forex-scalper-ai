@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from scalper_ai.domain import BookSnapshot, FeatureSnapshot, TickEvent
+from scalper_ai.execution.models import ExecutionQuote
 from scalper_ai.features.schema import REALIZED_VOLATILITY_FEATURE
 
 Clock = Callable[[], datetime]
@@ -217,6 +218,21 @@ class RuntimeDataFreshnessProvider:
             details={
                 "market_data_event_timestamp": event.event_timestamp.isoformat(),
                 "market_data_venue": event.venue,
+            },
+        )
+
+    def record_execution_quote(self, quote: ExecutionQuote) -> None:
+        """Record freshness from the runtime execution quote surface."""
+
+        self.record_market_data_timestamp(
+            quote.received_timestamp,
+            symbol=quote.symbol,
+            details={
+                "market_data_event_timestamp": quote.event_timestamp.isoformat(),
+                "market_data_venue": quote.venue,
+                "market_data_source": "execution_quote",
+                "bid": quote.bid,
+                "ask": quote.ask,
             },
         )
 

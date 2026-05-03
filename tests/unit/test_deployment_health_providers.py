@@ -11,6 +11,7 @@ from scalper_ai.deployment import (
 )
 from scalper_ai.domain import FeatureSnapshot, TickEvent
 from scalper_ai.domain.enums import EventSource
+from scalper_ai.execution import ExecutionQuote
 
 
 def test_runtime_data_freshness_provider_tracks_market_and_feature_timestamps() -> None:
@@ -93,6 +94,33 @@ def test_runtime_model_health_provider_tracks_prediction_freshness() -> None:
     stale_snapshot = provider.describe_model_health()
     assert stale_snapshot.ready is True
     assert stale_snapshot.healthy_for_trading() is False
+
+
+def test_runtime_data_freshness_provider_records_execution_quotes() -> None:
+    now = datetime(2026, 5, 3, 10, 1, tzinfo=UTC)
+    provider = RuntimeDataFreshnessProvider(
+        market_data_stale_after_seconds=10.0,
+        features_stale_after_seconds=10.0,
+        clock=lambda: now,
+    )
+
+    provider.record_execution_quote(
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=now - timedelta(milliseconds=200),
+            received_timestamp=now,
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        )
+    )
+
+    snapshot = provider.describe_data_freshness()
+    assert snapshot.latest_market_data_at == now
+    assert snapshot.details["market_data_source"] == "execution_quote"
+    assert snapshot.details["market_data_venue"] == "paper"
+    assert snapshot.details["bid"] == 1.0999
+    assert snapshot.details["ask"] == 1.1001
 
 
 def test_runtime_guard_state_provider_derives_volatility_and_tracks_news_guard() -> None:

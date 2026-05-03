@@ -22,6 +22,16 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed the concrete runtime dependency provider event-loop wiring slice:
+  - `DeploymentRuntime.submit_order()` and `DeploymentRuntime.process_quote()` now record execution quotes into concrete data freshness providers when they expose `record_execution_quote`
+  - when an `OnlineFeatureCalculator` is configured, runtime quote and canonical market-event updates produce leakage-safe `FeatureSnapshot` objects and feed both data freshness and guard-state providers
+  - `DeploymentRuntime.record_market_data_event()` and `record_feature_snapshot()` expose direct live/paper loop hooks for ingestion and feature stages
+  - `DeploymentRuntime.record_model_loaded()`, `record_model_prediction()`, and `mark_model_unavailable()` expose model loop hooks for concrete model health providers
+  - `bootstrap_runtime()` now accepts dependency providers plus an optional online feature calculator and passes them through to the runtime
+  - targeted Ruff passed for touched deployment/provider/runtime/bootstrap test files
+  - `.venv/bin/python -m pytest tests/unit/test_deployment_health_providers.py tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py` passed with `45 passed`
+  - `.venv/bin/python scripts/run_runtime.py describe --config-name paper` and `health --config-name paper` passed
+  - `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `258 passed`
 - 2026-05-03 completed the first concrete runtime dependency provider implementation slice:
   - `RuntimeDataFreshnessProvider` tracks latest market-data and `FeatureSnapshot` timestamps for health/risk freshness checks
   - `RuntimeModelHealthProvider` tracks model loaded/unavailable state and prediction freshness

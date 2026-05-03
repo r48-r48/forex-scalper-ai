@@ -27,7 +27,16 @@ from scalper_ai.deployment.health_providers import (
     ModelHealthSnapshot,
 )
 from scalper_ai.deployment.metrics import MetricsRegistry
-from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionState
+from scalper_ai.domain import (
+    BookSnapshot,
+    EventSource,
+    FeatureSnapshot,
+    OrderIntent,
+    OrderSide,
+    OrderType,
+    PositionState,
+    TickEvent,
+)
 from scalper_ai.execution import (
     BrokerConnectivityProvider,
     BrokerConnectivitySnapshot,
@@ -47,6 +56,7 @@ from scalper_ai.execution import (
     ReconciliationReport,
     build_snapshot_reconciliation_report,
 )
+from scalper_ai.features import OnlineFeatureCalculator
 from scalper_ai.journal import JournalEvent, JournalEventType
 from scalper_ai.risk import RiskContext, RiskDecision, RiskDecisionStatus, RiskEngine, RiskLimits
 from scalper_ai.services import OmsOrderRecord, OmsOrderStatus, transition_order
@@ -140,6 +150,7 @@ class DeploymentRuntime:
         data_freshness_provider: DataFreshnessProvider | None = None,
         model_health_provider: ModelHealthProvider | None = None,
         guard_state_provider: GuardStateProvider | None = None,
+        online_feature_calculator: OnlineFeatureCalculator | None = None,
         risk_engine: RiskEngine | None = None,
         risk_context_provider: RiskContextProvider | None = None,
         journal_writer: JournalWriterProtocol | None = None,
@@ -157,6 +168,7 @@ class DeploymentRuntime:
         self._data_freshness_provider = data_freshness_provider
         self._model_health_provider = model_health_provider
         self._guard_state_provider = guard_state_provider
+        self._online_feature_calculator = online_feature_calculator
         self._risk_engine = risk_engine or RiskEngine(RiskLimits.from_risk_config(config.risk))
         self._risk_context_provider = risk_context_provider
         self._journal_writer = journal_writer
@@ -425,6 +437,7 @@ class DeploymentRuntime:
     def submit_order(self, intent: OrderIntent, quote: ExecutionQuote) -> ExecutionUpdate:
         """Submit one order through mandatory risk, OMS, journal, and routing gates."""
 
+        self._record_execution_quote_dependencies(quote)
         risk_context = self._build_risk_context(intent, quote)
         risk_decision = self._risk_engine.evaluate_order(intent, risk_context)
         self._record_risk_decision(risk_decision)
@@ -727,6 +740,7 @@ class DeploymentRuntime:
     def process_quote(self, quote: ExecutionQuote) -> tuple[ExecutionUpdate, ...]:
         """Advance the execution router with a fresh quote."""
 
+        self._record_execution_quote_dependencies(quote)
         updates = self.require_execution_router().process_quote(quote)
         self._state_tracker.apply_updates(updates)
         for update in updates:
@@ -744,6 +758,69 @@ class DeploymentRuntime:
                 effective_mode=self.effective_mode,
             )
         return updates
+
+    def record_market_data_event(
+        self,
+        event: TickEvent | BookSnapshot,
+    ) -> FeatureSnapshot | None:
+        """Record one live/paper market event into configured dependency trackers."""
+
+        self._record_market_data_event_for_data_provider(event)
+        if self._online_feature_calculator is None:
+            return None
+        feature_snapshot = self._online_feature_calculator.update(event)
+        self.record_feature_snapshot(feature_snapshot)
+        return feature_snapshot
+
+    def record_feature_snapshot(self, snapshot: FeatureSnapshot) -> None:
+        """Record one online feature snapshot into configured dependency trackers."""
+
+        self._record_feature_snapshot_dependencies(snapshot)
+
+    def record_model_loaded(
+        self,
+        *,
+        model_id: str | None = None,
+        timestamp: datetime | None = None,
+        details: Mapping[str, object] | None = None,
+    ) -> bool:
+        """Record model load readiness when the configured model provider supports it."""
+
+        mark_loaded = getattr(self._model_health_provider, "mark_loaded", None)
+        if not callable(mark_loaded):
+            return False
+        mark_loaded(model_id=model_id, timestamp=timestamp, details=details)
+        return True
+
+    def record_model_prediction(
+        self,
+        *,
+        timestamp: datetime | None = None,
+        model_id: str | None = None,
+        details: Mapping[str, object] | None = None,
+    ) -> bool:
+        """Record a successful model prediction into the configured model provider."""
+
+        record_prediction = getattr(self._model_health_provider, "record_prediction", None)
+        if not callable(record_prediction):
+            return False
+        record_prediction(timestamp=timestamp, model_id=model_id, details=details)
+        return True
+
+    def mark_model_unavailable(
+        self,
+        reason: str,
+        *,
+        timestamp: datetime | None = None,
+        details: Mapping[str, object] | None = None,
+    ) -> bool:
+        """Record model unavailability when the configured model provider supports it."""
+
+        mark_unavailable = getattr(self._model_health_provider, "mark_unavailable", None)
+        if not callable(mark_unavailable):
+            return False
+        mark_unavailable(reason, timestamp=timestamp, details=details)
+        return True
 
     def _reset_recoverable_state(self) -> None:
         self._state_tracker.clear()
@@ -834,6 +911,44 @@ class DeploymentRuntime:
                 "Startup reconciliation detected error-level broker/internal drift; "
                 "session kill-switch is active."
             )
+
+    def _record_execution_quote_dependencies(self, quote: ExecutionQuote) -> None:
+        record_quote = getattr(self._data_freshness_provider, "record_execution_quote", None)
+        if callable(record_quote):
+            record_quote(quote)
+        if self._online_feature_calculator is None:
+            return
+        feature_snapshot = self._online_feature_calculator.update_tick(
+            _tick_event_from_execution_quote(
+                quote,
+                source=_event_source_for_runtime_mode(self.effective_mode),
+            )
+        )
+        self._record_feature_snapshot_dependencies(feature_snapshot)
+
+    def _record_market_data_event_for_data_provider(
+        self,
+        event: TickEvent | BookSnapshot,
+    ) -> None:
+        record_event = getattr(self._data_freshness_provider, "record_market_data_event", None)
+        if callable(record_event):
+            record_event(event)
+
+    def _record_feature_snapshot_dependencies(self, snapshot: FeatureSnapshot) -> None:
+        record_data_features = getattr(
+            self._data_freshness_provider,
+            "record_feature_snapshot",
+            None,
+        )
+        if callable(record_data_features):
+            record_data_features(snapshot)
+        record_guard_features = getattr(
+            self._guard_state_provider,
+            "record_feature_snapshot",
+            None,
+        )
+        if callable(record_guard_features):
+            record_guard_features(snapshot)
 
     def _build_risk_context(self, intent: OrderIntent, quote: ExecutionQuote) -> RiskContext:
         if self._risk_context_provider is not None:
@@ -2248,6 +2363,30 @@ def _quote_to_payload(quote: ExecutionQuote) -> dict[str, object]:
         "spread": quote.spread,
         "venue": quote.venue,
     }
+
+
+def _tick_event_from_execution_quote(
+    quote: ExecutionQuote,
+    *,
+    source: EventSource,
+) -> TickEvent:
+    return TickEvent(
+        symbol=quote.symbol,
+        venue=quote.venue,
+        event_timestamp=quote.event_timestamp,
+        received_timestamp=quote.received_timestamp,
+        bid=quote.bid,
+        ask=quote.ask,
+        source=source,
+    )
+
+
+def _event_source_for_runtime_mode(mode: str) -> EventSource:
+    if mode == "live":
+        return EventSource.LIVE
+    if mode == "paper":
+        return EventSource.PAPER
+    return EventSource.EXTERNAL
 
 
 def _data_freshness_details(snapshot: DataFreshnessSnapshot) -> dict[str, object]:
