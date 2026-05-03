@@ -102,7 +102,25 @@ def test_bootstrap_runtime_can_auto_build_mt5_live_adapter(monkeypatch: pytest.M
 
         assert update.order.status is ExecutionOrderStatus.FILLED
         snapshot = runtime.health_snapshot()
-        assert snapshot.overall_status is HealthStatus.PASS
+        assert snapshot.overall_status is HealthStatus.WARN
+        missing_dependency_checks = {
+            check.name: check
+            for check in snapshot.checks
+            if check.name in {"data_freshness", "model_readiness", "dependency_guards"}
+        }
+        assert set(missing_dependency_checks) == {
+            "data_freshness",
+            "model_readiness",
+            "dependency_guards",
+        }
+        assert all(
+            check.status is HealthStatus.WARN
+            for check in missing_dependency_checks.values()
+        )
+        assert any(
+            check.name == "broker_connectivity" and check.status is HealthStatus.PASS
+            for check in snapshot.checks
+        )
     finally:
         runtime.stop()
 

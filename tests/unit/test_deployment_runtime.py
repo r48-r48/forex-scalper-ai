@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from scalper_ai.config import AppConfig, load_app_config
 from scalper_ai.deployment import (
+    DataFreshnessSnapshot,
     DeploymentRuntime,
+    GuardStateSnapshot,
     HealthStatus,
     MetricsRegistry,
+    ModelHealthSnapshot,
     RuntimeLifecycleState,
 )
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionState
@@ -284,6 +287,265 @@ def test_health_snapshot_warns_on_stale_broker_snapshot_and_exports_metrics() ->
     metrics_text = runtime.metrics_text()
     assert "scalper_ai_broker_snapshot_age_seconds" in metrics_text
     assert "scalper_ai_broker_ping_latency_ms" in metrics_text
+
+
+def test_live_health_snapshot_warns_when_dependency_providers_are_missing() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    live_adapter = LiveExecutionStubAdapter()
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: live_adapter,
+        broker_snapshot_provider=live_adapter,
+        live_confirmation_token="ENABLE_ME",
+    )
+    runtime.start()
+
+    snapshot = runtime.health_snapshot()
+
+    assert snapshot.overall_status is HealthStatus.WARN
+    missing_checks = {
+        check.name: check
+        for check in snapshot.checks
+        if check.name in {"data_freshness", "model_readiness", "dependency_guards"}
+    }
+    assert set(missing_checks) == {
+        "data_freshness",
+        "model_readiness",
+        "dependency_guards",
+    }
+    assert all(check.status is HealthStatus.WARN for check in missing_checks.values())
+
+
+def test_health_snapshot_warns_on_stale_data_freshness_provider_and_exports_metrics() -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    checked_at = datetime(2026, 3, 28, 10, 0, 10, tzinfo=UTC)
+    provider = _StaticDataFreshnessProvider(
+        DataFreshnessSnapshot(
+            checked_at=checked_at,
+            latest_market_data_at=datetime(2026, 3, 28, 10, 0, tzinfo=UTC),
+            latest_features_at=datetime(2026, 3, 28, 10, 0, 2, tzinfo=UTC),
+            market_data_stale_after_seconds=5.0,
+            features_stale_after_seconds=5.0,
+            source="unit-test",
+        )
+    )
+    runtime = DeploymentRuntime(config, data_freshness_provider=provider)
+    runtime.start()
+
+    snapshot = runtime.health_snapshot()
+
+    check = next(check for check in snapshot.checks if check.name == "data_freshness")
+    assert snapshot.overall_status is HealthStatus.WARN
+    assert check.status is HealthStatus.WARN
+    assert check.details["market_data_age_seconds"] == 10.0
+    assert check.details["features_age_seconds"] == 8.0
+
+    metrics_text = runtime.metrics_text()
+    assert "scalper_ai_market_data_age_seconds" in metrics_text
+    assert "scalper_ai_feature_age_seconds" in metrics_text
+
+
+def test_live_health_snapshot_fails_when_model_provider_is_not_ready() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    live_adapter = LiveExecutionStubAdapter()
+    dependency_provider = _HealthyRuntimeDependencyProvider()
+    timestamp = datetime(2026, 3, 28, 10, 2, tzinfo=UTC)
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: live_adapter,
+        broker_snapshot_provider=live_adapter,
+        data_freshness_provider=dependency_provider,
+        model_health_provider=_StaticModelHealthProvider(
+            ModelHealthSnapshot(
+                checked_at=timestamp,
+                ready=False,
+                model_id="eurusd-transformer",
+                reason="artifact_missing",
+                source="unit-test",
+            )
+        ),
+        guard_state_provider=dependency_provider,
+        live_confirmation_token="ENABLE_ME",
+    )
+    runtime.start()
+
+    snapshot = runtime.health_snapshot()
+
+    check = next(check for check in snapshot.checks if check.name == "model_readiness")
+    assert snapshot.overall_status is HealthStatus.FAIL
+    assert check.status is HealthStatus.FAIL
+    assert check.details["reason"] == "artifact_missing"
+
+
+def test_health_snapshot_warns_when_dependency_guards_are_active() -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    runtime = DeploymentRuntime(
+        config,
+        guard_state_provider=_StaticGuardStateProvider(
+            GuardStateSnapshot(
+                checked_at=datetime(2026, 3, 28, 10, 3, tzinfo=UTC),
+                volatility_guard_active=True,
+                news_guard_active=True,
+                volatility_reason="spread_regime",
+                news_reason="central_bank_event",
+                source="unit-test",
+            )
+        ),
+    )
+    runtime.start()
+
+    snapshot = runtime.health_snapshot()
+
+    check = next(check for check in snapshot.checks if check.name == "dependency_guards")
+    assert snapshot.overall_status is HealthStatus.WARN
+    assert check.status is HealthStatus.WARN
+    assert check.details["volatility_reason"] == "spread_regime"
+    assert check.details["news_reason"] == "central_bank_event"
+
+
+def test_runtime_risk_rejects_when_model_health_provider_is_unhealthy() -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    adapter = _RejectIfSubmittedAdapter()
+    timestamp = datetime(2026, 3, 28, 10, 4, tzinfo=UTC)
+    runtime = DeploymentRuntime(
+        config,
+        paper_adapter_factory=lambda: adapter,
+        model_health_provider=_StaticModelHealthProvider(
+            ModelHealthSnapshot(
+                checked_at=timestamp,
+                ready=False,
+                reason="no_recent_prediction",
+                source="unit-test",
+            )
+        ),
+    )
+    runtime.start()
+
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="blocked-by-model-health",
+            strategy_id="dependency-health-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=2.0,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "model_unhealthy"
+
+
+def test_runtime_risk_rejects_when_data_freshness_provider_is_stale() -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    adapter = _RejectIfSubmittedAdapter()
+    timestamp = datetime(2026, 3, 28, 10, 4, 30, tzinfo=UTC)
+    runtime = DeploymentRuntime(
+        config,
+        paper_adapter_factory=lambda: adapter,
+        data_freshness_provider=_StaticDataFreshnessProvider(
+            DataFreshnessSnapshot(
+                checked_at=timestamp,
+                latest_market_data_at=timestamp - timedelta(seconds=5),
+                latest_features_at=timestamp,
+                market_data_stale_after_seconds=2.0,
+                features_stale_after_seconds=30.0,
+                source="unit-test",
+            )
+        ),
+    )
+    runtime.start()
+
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="blocked-by-stale-data-provider",
+            strategy_id="dependency-health-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=2.0,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "stale_market_data"
+
+
+def test_health_snapshot_reports_recovered_session_kill_switch(tmp_path) -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    store = SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite")
+    store.save_kill_switch_state(
+        KillSwitchState(
+            scope=KillSwitchScope.SESSION,
+            enabled=True,
+            updated_at=datetime(2026, 3, 28, 10, 5, tzinfo=UTC),
+            reason="operator_pause",
+        )
+    )
+    runtime = DeploymentRuntime(config, state_store=store)
+    runtime.start()
+
+    snapshot = runtime.health_snapshot()
+
+    check = next(check for check in snapshot.checks if check.name == "risk_guardrails")
+    assert snapshot.overall_status is HealthStatus.FAIL
+    assert check.status is HealthStatus.FAIL
+    assert check.details["session_kill_switch"] is True
+    assert "scalper_ai_session_kill_switch_active" in runtime.metrics_text()
 
 
 def test_runtime_can_build_reconciliation_from_snapshot_provider() -> None:
@@ -1373,10 +1635,14 @@ def test_live_runtime_can_use_live_stub_adapter_with_snapshot_reconciliation() -
         }
     )
     live_adapter = LiveExecutionStubAdapter()
+    dependency_provider = _HealthyRuntimeDependencyProvider()
     runtime = DeploymentRuntime(
         config,
         live_adapter_factory=lambda: live_adapter,
         broker_snapshot_provider=live_adapter,
+        data_freshness_provider=dependency_provider,
+        model_health_provider=dependency_provider,
+        guard_state_provider=dependency_provider,
         live_confirmation_token="ENABLE_ME",
     )
 
@@ -1448,6 +1714,63 @@ class _EmptyBrokerSnapshotProvider:
 
     def list_broker_positions(self) -> tuple[BrokerPositionSnapshot, ...]:
         return ()
+
+
+class _StaticDataFreshnessProvider:
+    def __init__(self, snapshot: DataFreshnessSnapshot) -> None:
+        self._snapshot = snapshot
+
+    def describe_data_freshness(self) -> DataFreshnessSnapshot:
+        return self._snapshot
+
+
+class _StaticModelHealthProvider:
+    def __init__(self, snapshot: ModelHealthSnapshot) -> None:
+        self._snapshot = snapshot
+
+    def describe_model_health(self) -> ModelHealthSnapshot:
+        return self._snapshot
+
+
+class _StaticGuardStateProvider:
+    def __init__(self, snapshot: GuardStateSnapshot) -> None:
+        self._snapshot = snapshot
+
+    def describe_guard_state(self) -> GuardStateSnapshot:
+        return self._snapshot
+
+
+class _HealthyRuntimeDependencyProvider:
+    def describe_data_freshness(self) -> DataFreshnessSnapshot:
+        timestamp = datetime.now(UTC)
+        return DataFreshnessSnapshot(
+            checked_at=timestamp,
+            latest_market_data_at=timestamp,
+            latest_features_at=timestamp,
+            market_data_stale_after_seconds=30.0,
+            features_stale_after_seconds=30.0,
+            source="unit-test",
+        )
+
+    def describe_model_health(self) -> ModelHealthSnapshot:
+        timestamp = datetime.now(UTC)
+        return ModelHealthSnapshot(
+            checked_at=timestamp,
+            ready=True,
+            model_id="healthy-test-model",
+            last_loaded_at=timestamp,
+            last_prediction_at=timestamp,
+            last_prediction_stale_after_seconds=30.0,
+            source="unit-test",
+        )
+
+    def describe_guard_state(self) -> GuardStateSnapshot:
+        return GuardStateSnapshot(
+            checked_at=datetime.now(UTC),
+            volatility_guard_active=False,
+            news_guard_active=False,
+            source="unit-test",
+        )
 
 
 class _RecordingFlattenAdapter:
@@ -1627,9 +1950,13 @@ def test_live_runtime_can_use_mt5_adapter_skeleton_without_manual_snapshot_provi
         ImmediateFillMt5Client(),
         config=Mt5ExecutionConfig(base_units_per_lot=100_000.0),
     )
+    dependency_provider = _HealthyRuntimeDependencyProvider()
     runtime = DeploymentRuntime(
         config,
         live_adapter_factory=lambda: live_adapter,
+        data_freshness_provider=dependency_provider,
+        model_health_provider=dependency_provider,
+        guard_state_provider=dependency_provider,
         live_confirmation_token="ENABLE_ME",
     )
 

@@ -18,6 +18,14 @@ from scalper_ai.deployment.health import (
     HealthSnapshot,
     HealthStatus,
 )
+from scalper_ai.deployment.health_providers import (
+    DataFreshnessProvider,
+    DataFreshnessSnapshot,
+    GuardStateProvider,
+    GuardStateSnapshot,
+    ModelHealthProvider,
+    ModelHealthSnapshot,
+)
 from scalper_ai.deployment.metrics import MetricsRegistry
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionState
 from scalper_ai.execution import (
@@ -129,6 +137,9 @@ class DeploymentRuntime:
         broker_snapshot_provider: BrokerSnapshotProvider | None = None,
         broker_connectivity_provider: BrokerConnectivityProvider | None = None,
         reconciliation_report_provider: ReconciliationReportProvider | None = None,
+        data_freshness_provider: DataFreshnessProvider | None = None,
+        model_health_provider: ModelHealthProvider | None = None,
+        guard_state_provider: GuardStateProvider | None = None,
         risk_engine: RiskEngine | None = None,
         risk_context_provider: RiskContextProvider | None = None,
         journal_writer: JournalWriterProtocol | None = None,
@@ -143,6 +154,9 @@ class DeploymentRuntime:
         self._broker_snapshot_provider = broker_snapshot_provider
         self._broker_connectivity_provider = broker_connectivity_provider
         self._reconciliation_report_provider = reconciliation_report_provider
+        self._data_freshness_provider = data_freshness_provider
+        self._model_health_provider = model_health_provider
+        self._guard_state_provider = guard_state_provider
         self._risk_engine = risk_engine or RiskEngine(RiskLimits.from_risk_config(config.risk))
         self._risk_context_provider = risk_context_provider
         self._journal_writer = journal_writer
@@ -173,6 +187,12 @@ class DeploymentRuntime:
         self._last_broker_connectivity_provider_error: str | None = None
         self._last_reconciliation_report: ReconciliationReport | None = None
         self._last_reconciliation_provider_error: str | None = None
+        self._last_data_freshness_snapshot: DataFreshnessSnapshot | None = None
+        self._last_data_freshness_provider_error: str | None = None
+        self._last_model_health_snapshot: ModelHealthSnapshot | None = None
+        self._last_model_health_provider_error: str | None = None
+        self._last_guard_state_snapshot: GuardStateSnapshot | None = None
+        self._last_guard_state_provider_error: str | None = None
         self._register_default_health_checks()
 
     @property
@@ -240,6 +260,7 @@ class DeploymentRuntime:
         self._last_broker_connectivity_provider_error = None
         self._last_reconciliation_report = None
         self._last_reconciliation_provider_error = None
+        self._reset_dependency_health_state()
         self._metrics.increment(
             "scalper_ai_runtime_start_total",
             requested_mode=self.requested_mode,
@@ -330,6 +351,14 @@ class DeploymentRuntime:
             execution_enabled=self.execution_enabled,
         )
 
+    def _reset_dependency_health_state(self) -> None:
+        self._last_data_freshness_snapshot = None
+        self._last_data_freshness_provider_error = None
+        self._last_model_health_snapshot = None
+        self._last_model_health_provider_error = None
+        self._last_guard_state_snapshot = None
+        self._last_guard_state_provider_error = None
+
     def health_snapshot(self) -> HealthSnapshot:
         """Run all registered health checks and return an aggregated snapshot."""
 
@@ -362,6 +391,7 @@ class DeploymentRuntime:
         if self.config.monitoring.metrics_enabled:
             self._update_broker_connectivity_metrics()
             self._update_reconciliation_metrics()
+            self._update_dependency_health_metrics()
         if self.config.monitoring.metrics_enabled and warning_count > 0:
             self._metrics.increment(
                 "scalper_ai_healthcheck_warn_total",
@@ -815,6 +845,33 @@ class DeploymentRuntime:
             position.symbol: position
             for position in self._state_tracker.list_positions(paper=intent.paper)
         }
+        data_snapshot = self._data_freshness_snapshot_for_risk()
+        model_snapshot = self._model_health_snapshot_for_risk()
+        guard_snapshot = self._guard_state_snapshot_for_risk()
+        latest_market_data_at = quote.received_timestamp
+        features_healthy = True
+        model_healthy = True
+        volatility_guard_active = False
+        news_guard_active = False
+
+        if data_snapshot is not None:
+            latest_market_data_at = data_snapshot.latest_market_data_at
+            features_healthy = data_snapshot.features_fresh()
+        elif self._data_freshness_provider is not None:
+            features_healthy = False
+
+        if model_snapshot is not None:
+            model_healthy = model_snapshot.healthy_for_trading()
+        elif self._model_health_provider is not None:
+            model_healthy = False
+
+        if guard_snapshot is not None:
+            volatility_guard_active = guard_snapshot.volatility_guard_active
+            news_guard_active = guard_snapshot.news_guard_active
+        elif self._guard_state_provider is not None:
+            volatility_guard_active = self.config.risk.volatility_filter_enabled
+            news_guard_active = self.config.risk.news_filter_enabled
+
         return RiskContext(
             checked_at=checked_at,
             positions=route_positions,
@@ -826,7 +883,7 @@ class DeploymentRuntime:
                 for order in route_orders
                 if order.status is ExecutionOrderStatus.REJECTED
             ),
-            latest_market_data_at=quote.received_timestamp,
+            latest_market_data_at=latest_market_data_at,
             current_spread_pips=(
                 _spread_pips_for_quote(quote) if not intent.paper else None
             ),
@@ -837,7 +894,47 @@ class DeploymentRuntime:
             current_equity=self._last_equity_by_route.get(intent.paper),
             session_kill_switch=self._session_kill_switch_enabled,
             symbol_kill_switches=frozenset(self._symbol_kill_switches),
+            volatility_guard_active=volatility_guard_active,
+            news_guard_active=news_guard_active,
+            features_healthy=features_healthy,
+            model_healthy=model_healthy,
         )
+
+    def _data_freshness_snapshot_for_risk(self) -> DataFreshnessSnapshot | None:
+        if self._data_freshness_provider is None:
+            return None
+        try:
+            snapshot = self._data_freshness_provider.describe_data_freshness()
+        except Exception as exc:
+            self._last_data_freshness_provider_error = str(exc)
+            return None
+        self._last_data_freshness_snapshot = snapshot
+        self._last_data_freshness_provider_error = None
+        return snapshot
+
+    def _model_health_snapshot_for_risk(self) -> ModelHealthSnapshot | None:
+        if self._model_health_provider is None:
+            return None
+        try:
+            snapshot = self._model_health_provider.describe_model_health()
+        except Exception as exc:
+            self._last_model_health_provider_error = str(exc)
+            return None
+        self._last_model_health_snapshot = snapshot
+        self._last_model_health_provider_error = None
+        return snapshot
+
+    def _guard_state_snapshot_for_risk(self) -> GuardStateSnapshot | None:
+        if self._guard_state_provider is None:
+            return None
+        try:
+            snapshot = self._guard_state_provider.describe_guard_state()
+        except Exception as exc:
+            self._last_guard_state_provider_error = str(exc)
+            return None
+        self._last_guard_state_snapshot = snapshot
+        self._last_guard_state_provider_error = None
+        return snapshot
 
     def _build_risk_rejected_update(
         self,
@@ -1235,6 +1332,10 @@ class DeploymentRuntime:
         self._health.register("storage_directories", self._storage_directory_check)
         self._health.register("execution_mode", self._execution_mode_check)
         self._health.register("broker_connectivity", self._broker_connectivity_check)
+        self._health.register("data_freshness", self._data_freshness_check)
+        self._health.register("model_readiness", self._model_readiness_check)
+        self._health.register("dependency_guards", self._dependency_guards_check)
+        self._health.register("risk_guardrails", self._risk_guardrails_check)
         self._health.register("execution_reconciliation", self._reconciliation_check)
         self._health.register("metrics_surface", self._metrics_surface_check)
 
@@ -1447,6 +1548,24 @@ class DeploymentRuntime:
             details["snapshot_age_seconds"] = age_seconds
         if snapshot.latency_ms is not None:
             details["latency_ms"] = snapshot.latency_ms
+        if snapshot.reconnect_enabled is not None:
+            details["reconnect_enabled"] = snapshot.reconnect_enabled
+        if snapshot.reconnect_attempt_count is not None:
+            details["reconnect_attempt_count"] = snapshot.reconnect_attempt_count
+        if snapshot.circuit_breaker_open is not None:
+            details["circuit_breaker_open"] = snapshot.circuit_breaker_open
+        if snapshot.last_reconnect_at is not None:
+            details["last_reconnect_at"] = snapshot.last_reconnect_at.isoformat()
+        if snapshot.last_error is not None:
+            details["last_error"] = snapshot.last_error
+
+        if snapshot.circuit_breaker_open:
+            return HealthCheckResult(
+                name="broker_connectivity",
+                status=HealthStatus.FAIL,
+                summary="Broker reconnect circuit breaker is open.",
+                details=details,
+            )
 
         if not snapshot.connected:
             return HealthCheckResult(
@@ -1467,11 +1586,197 @@ class DeploymentRuntime:
                 details=details,
             )
 
+        if snapshot.reconnect_enabled is False and self.effective_mode == "live":
+            return HealthCheckResult(
+                name="broker_connectivity",
+                status=HealthStatus.WARN,
+                summary="Broker is connected, but automatic reconnect is disabled.",
+                details=details,
+            )
+
         return HealthCheckResult(
             name="broker_connectivity",
             status=HealthStatus.PASS,
             summary="Broker connectivity looks healthy.",
             details=details,
+        )
+
+    def _data_freshness_check(self) -> HealthCheckResult:
+        self._last_data_freshness_snapshot = None
+        self._last_data_freshness_provider_error = None
+
+        if self._data_freshness_provider is None:
+            return self._missing_optional_provider_result(
+                name="data_freshness",
+                live_summary="Live runtime has no data freshness provider configured.",
+                safe_summary="No data freshness provider is required for the current safe mode.",
+            )
+
+        try:
+            snapshot = self._data_freshness_provider.describe_data_freshness()
+        except Exception as exc:
+            self._last_data_freshness_provider_error = str(exc)
+            return HealthCheckResult(
+                name="data_freshness",
+                status=HealthStatus.FAIL,
+                summary="Data freshness provider raised an exception.",
+                details={"configured": True, "error": str(exc)},
+            )
+
+        self._last_data_freshness_snapshot = snapshot
+        details = _data_freshness_details(snapshot)
+        if not snapshot.market_data_fresh():
+            return HealthCheckResult(
+                name="data_freshness",
+                status=HealthStatus.FAIL if self.effective_mode == "live" else HealthStatus.WARN,
+                summary="Latest market-data timestamp is missing or stale.",
+                details=details,
+            )
+        if not snapshot.features_fresh():
+            return HealthCheckResult(
+                name="data_freshness",
+                status=HealthStatus.FAIL if self.effective_mode == "live" else HealthStatus.WARN,
+                summary="Latest feature timestamp is missing or stale.",
+                details=details,
+            )
+        return HealthCheckResult(
+            name="data_freshness",
+            status=HealthStatus.PASS,
+            summary="Market data and online features are fresh.",
+            details=details,
+        )
+
+    def _model_readiness_check(self) -> HealthCheckResult:
+        self._last_model_health_snapshot = None
+        self._last_model_health_provider_error = None
+
+        if self._model_health_provider is None:
+            return self._missing_optional_provider_result(
+                name="model_readiness",
+                live_summary="Live runtime has no model health provider configured.",
+                safe_summary="No model health provider is required for the current safe mode.",
+            )
+
+        try:
+            snapshot = self._model_health_provider.describe_model_health()
+        except Exception as exc:
+            self._last_model_health_provider_error = str(exc)
+            return HealthCheckResult(
+                name="model_readiness",
+                status=HealthStatus.FAIL,
+                summary="Model health provider raised an exception.",
+                details={"configured": True, "error": str(exc)},
+            )
+
+        self._last_model_health_snapshot = snapshot
+        details = _model_health_details(snapshot)
+        if not snapshot.healthy_for_trading():
+            return HealthCheckResult(
+                name="model_readiness",
+                status=HealthStatus.FAIL if self.effective_mode == "live" else HealthStatus.WARN,
+                summary="Model dependency is not ready for trading decisions.",
+                details=details,
+            )
+        return HealthCheckResult(
+            name="model_readiness",
+            status=HealthStatus.PASS,
+            summary="Model dependency is ready.",
+            details=details,
+        )
+
+    def _dependency_guards_check(self) -> HealthCheckResult:
+        self._last_guard_state_snapshot = None
+        self._last_guard_state_provider_error = None
+
+        if self._guard_state_provider is None:
+            return self._missing_optional_provider_result(
+                name="dependency_guards",
+                live_summary="Live runtime has no dependency guard provider configured.",
+                safe_summary="No dependency guard provider is required for the current safe mode.",
+            )
+
+        try:
+            snapshot = self._guard_state_provider.describe_guard_state()
+        except Exception as exc:
+            self._last_guard_state_provider_error = str(exc)
+            return HealthCheckResult(
+                name="dependency_guards",
+                status=HealthStatus.FAIL,
+                summary="Dependency guard provider raised an exception.",
+                details={"configured": True, "error": str(exc)},
+            )
+
+        self._last_guard_state_snapshot = snapshot
+        details = _guard_state_details(snapshot)
+        if snapshot.volatility_guard_active or snapshot.news_guard_active:
+            return HealthCheckResult(
+                name="dependency_guards",
+                status=HealthStatus.WARN,
+                summary="One or more online trading guards are active.",
+                details=details,
+            )
+        return HealthCheckResult(
+            name="dependency_guards",
+            status=HealthStatus.PASS,
+            summary="Online dependency guards are clear.",
+            details=details,
+        )
+
+    def _risk_guardrails_check(self) -> HealthCheckResult:
+        details: dict[str, object] = {
+            "kill_switch_enabled": self.config.risk.kill_switch_enabled,
+            "allow_live_without_kill_switch": self.config.broker.allow_live_without_kill_switch,
+            "session_kill_switch": self._session_kill_switch_enabled,
+            "symbol_kill_switch_count": len(self._symbol_kill_switches),
+            "symbol_kill_switches": ",".join(sorted(self._symbol_kill_switches)),
+        }
+        if self._session_kill_switch_enabled:
+            return HealthCheckResult(
+                name="risk_guardrails",
+                status=HealthStatus.FAIL,
+                summary="Session kill-switch is active.",
+                details=details,
+            )
+        if self._symbol_kill_switches:
+            return HealthCheckResult(
+                name="risk_guardrails",
+                status=HealthStatus.WARN,
+                summary="One or more symbol kill-switches are active.",
+                details=details,
+            )
+        if not self.config.risk.kill_switch_enabled:
+            return HealthCheckResult(
+                name="risk_guardrails",
+                status=HealthStatus.WARN,
+                summary="Risk kill-switch guardrail is disabled by configuration.",
+                details=details,
+            )
+        return HealthCheckResult(
+            name="risk_guardrails",
+            status=HealthStatus.PASS,
+            summary="Risk guardrails are armed.",
+            details=details,
+        )
+
+    def _missing_optional_provider_result(
+        self,
+        *,
+        name: str,
+        live_summary: str,
+        safe_summary: str,
+    ) -> HealthCheckResult:
+        if self.effective_mode == "live":
+            return HealthCheckResult(
+                name=name,
+                status=HealthStatus.WARN,
+                summary=live_summary,
+                details={"configured": False, "effective_mode": self.effective_mode},
+            )
+        return HealthCheckResult(
+            name=name,
+            status=HealthStatus.PASS,
+            summary=safe_summary,
+            details={"configured": False, "effective_mode": self.effective_mode},
         )
 
     def _metrics_surface_check(self) -> HealthCheckResult:
@@ -1554,6 +1859,92 @@ class DeploymentRuntime:
         self._metrics.set_gauge(
             "scalper_ai_broker_ping_latency_ms",
             0.0 if snapshot is None or snapshot.latency_ms is None else snapshot.latency_ms,
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_broker_reconnect_attempt_count",
+            (
+                0.0
+                if snapshot is None or snapshot.reconnect_attempt_count is None
+                else float(snapshot.reconnect_attempt_count)
+            ),
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_broker_reconnect_circuit_breaker_open",
+            1.0 if snapshot is not None and snapshot.circuit_breaker_open else 0.0,
+            **labels,
+        )
+
+    def _update_dependency_health_metrics(self) -> None:
+        labels = {
+            "requested_mode": self.requested_mode,
+            "effective_mode": self.effective_mode,
+        }
+        data_snapshot = self._last_data_freshness_snapshot
+        model_snapshot = self._last_model_health_snapshot
+        guard_snapshot = self._last_guard_state_snapshot
+        self._metrics.set_gauge(
+            "scalper_ai_data_freshness_provider_configured",
+            1.0 if self._data_freshness_provider is not None else 0.0,
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_market_data_age_seconds",
+            _metric_optional_seconds(
+                None if data_snapshot is None else data_snapshot.market_data_age_seconds()
+            ),
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_feature_age_seconds",
+            _metric_optional_seconds(
+                None if data_snapshot is None else data_snapshot.features_age_seconds()
+            ),
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_features_fresh",
+            1.0 if data_snapshot is not None and data_snapshot.features_fresh() else 0.0,
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_model_health_provider_configured",
+            1.0 if self._model_health_provider is not None else 0.0,
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_model_ready",
+            1.0 if model_snapshot is not None and model_snapshot.healthy_for_trading() else 0.0,
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_guard_state_provider_configured",
+            1.0 if self._guard_state_provider is not None else 0.0,
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_volatility_guard_active",
+            (
+                1.0
+                if guard_snapshot is not None and guard_snapshot.volatility_guard_active
+                else 0.0
+            ),
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_news_guard_active",
+            1.0 if guard_snapshot is not None and guard_snapshot.news_guard_active else 0.0,
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_session_kill_switch_active",
+            1.0 if self._session_kill_switch_enabled else 0.0,
+            **labels,
+        )
+        self._metrics.set_gauge(
+            "scalper_ai_symbol_kill_switch_count",
+            float(len(self._symbol_kill_switches)),
             **labels,
         )
 
@@ -1857,6 +2248,82 @@ def _quote_to_payload(quote: ExecutionQuote) -> dict[str, object]:
         "spread": quote.spread,
         "venue": quote.venue,
     }
+
+
+def _data_freshness_details(snapshot: DataFreshnessSnapshot) -> dict[str, object]:
+    details: dict[str, object] = {
+        "configured": True,
+        "source": snapshot.source,
+        "checked_at": snapshot.checked_at.isoformat(),
+        "market_data_fresh": snapshot.market_data_fresh(),
+        "features_fresh": snapshot.features_fresh(),
+    }
+    if snapshot.latest_market_data_at is not None:
+        details["latest_market_data_at"] = snapshot.latest_market_data_at.isoformat()
+    if snapshot.latest_features_at is not None:
+        details["latest_features_at"] = snapshot.latest_features_at.isoformat()
+    if snapshot.market_data_stale_after_seconds is not None:
+        details["market_data_stale_after_seconds"] = (
+            snapshot.market_data_stale_after_seconds
+        )
+    if snapshot.features_stale_after_seconds is not None:
+        details["features_stale_after_seconds"] = snapshot.features_stale_after_seconds
+    market_data_age_seconds = snapshot.market_data_age_seconds()
+    if market_data_age_seconds is not None:
+        details["market_data_age_seconds"] = market_data_age_seconds
+    features_age_seconds = snapshot.features_age_seconds()
+    if features_age_seconds is not None:
+        details["features_age_seconds"] = features_age_seconds
+    details.update(dict(snapshot.details))
+    return details
+
+
+def _model_health_details(snapshot: ModelHealthSnapshot) -> dict[str, object]:
+    details: dict[str, object] = {
+        "configured": True,
+        "source": snapshot.source,
+        "checked_at": snapshot.checked_at.isoformat(),
+        "ready": snapshot.ready,
+        "healthy_for_trading": snapshot.healthy_for_trading(),
+        "prediction_fresh": snapshot.prediction_fresh(),
+    }
+    if snapshot.model_id is not None:
+        details["model_id"] = snapshot.model_id
+    if snapshot.last_loaded_at is not None:
+        details["last_loaded_at"] = snapshot.last_loaded_at.isoformat()
+    if snapshot.last_prediction_at is not None:
+        details["last_prediction_at"] = snapshot.last_prediction_at.isoformat()
+    if snapshot.last_prediction_stale_after_seconds is not None:
+        details["last_prediction_stale_after_seconds"] = (
+            snapshot.last_prediction_stale_after_seconds
+        )
+    prediction_age_seconds = snapshot.prediction_age_seconds()
+    if prediction_age_seconds is not None:
+        details["prediction_age_seconds"] = prediction_age_seconds
+    if snapshot.reason is not None:
+        details["reason"] = snapshot.reason
+    details.update(dict(snapshot.details))
+    return details
+
+
+def _guard_state_details(snapshot: GuardStateSnapshot) -> dict[str, object]:
+    details: dict[str, object] = {
+        "configured": True,
+        "source": snapshot.source,
+        "checked_at": snapshot.checked_at.isoformat(),
+        "volatility_guard_active": snapshot.volatility_guard_active,
+        "news_guard_active": snapshot.news_guard_active,
+    }
+    if snapshot.volatility_reason is not None:
+        details["volatility_reason"] = snapshot.volatility_reason
+    if snapshot.news_reason is not None:
+        details["news_reason"] = snapshot.news_reason
+    details.update(dict(snapshot.details))
+    return details
+
+
+def _metric_optional_seconds(value: float | None) -> float:
+    return 0.0 if value is None else float(value)
 
 
 def _spread_pips_for_quote(quote: ExecutionQuote) -> float:

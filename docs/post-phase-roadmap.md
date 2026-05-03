@@ -104,7 +104,8 @@ Known gaps:
 - P0.C Broker-Source-Of-Truth MT5 Position Handling first slice: completed on 2026-04-30 with broker-position refresh before sizing, hedging ticket tracking, gross exposure reconciliation, ticket-specific reduce-only close payloads, ambiguous multi-ticket close rejection, and `182 passed` full pytest validation.
 - P0.D Deal-Based Live Accounting first slice: completed on 2026-04-30 with `Mt5DealState`, deal records on `Mt5OrderState`, unseen-deal-id fill creation, commission/fee/swap cost propagation into fill commissions, script JSON serialization, and `183 passed` full pytest validation.
 - P0.E Protective Order / Bracket Management first slice: completed on 2026-04-30 with `OrderIntent.stop_loss_price`/`take_profit_price`, MT5 native `sl`/`tp` mapping, optional config enforcement for exposure-increasing orders, broker protective-price reconciliation, script serialization, targeted Ruff, `43 passed` targeted pytest validation, compileall, and `188 passed` full pytest validation.
-- Current next task: continue with Docker host validation, richer health providers, deeper MT5 fault-injection/partial-fill validation, small-batch Ruff/mypy cleanup, and any further demo order-sending checks only as explicit controlled scenarios.
+- Richer runtime health provider contracts: completed on 2026-05-01 with data freshness, model readiness, dependency guard, and risk-guardrail health checks; provider metrics; RiskContext wiring; broker reconnect/circuit-breaker observability; and `250 passed` full pytest validation.
+- Current next task: continue with Docker host validation, concrete live data/model/guard health provider integrations, deeper MT5 fault-injection/partial-fill validation, small-batch Ruff/mypy cleanup, and any further demo order-sending checks only as explicit controlled scenarios.
 
 ## P0 Workstream
 

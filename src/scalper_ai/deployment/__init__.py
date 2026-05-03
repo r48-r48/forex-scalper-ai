@@ -9,6 +9,14 @@ from scalper_ai.deployment.alerts import (
 )
 from scalper_ai.deployment.entrypoints import bootstrap_runtime
 from scalper_ai.deployment.health import HealthCheckResult, HealthSnapshot, HealthStatus
+from scalper_ai.deployment.health_providers import (
+    DataFreshnessProvider,
+    DataFreshnessSnapshot,
+    GuardStateProvider,
+    GuardStateSnapshot,
+    ModelHealthProvider,
+    ModelHealthSnapshot,
+)
 from scalper_ai.deployment.live_factory import (
     build_mt5_execution_adapter,
     build_mt5_terminal_client,
@@ -31,12 +39,18 @@ __all__ = [
     "build_mt5_preflight_report",
     "build_mt5_terminal_client",
     "DeploymentRuntime",
+    "DataFreshnessProvider",
+    "DataFreshnessSnapshot",
+    "GuardStateProvider",
+    "GuardStateSnapshot",
     "HealthCheckResult",
     "HealthSnapshot",
     "HealthStatus",
     "JsonlAlertTransport",
     "MetricSample",
     "MetricsRegistry",
+    "ModelHealthProvider",
+    "ModelHealthSnapshot",
     "Mt5PreflightReport",
     "WebhookAlertTransport",
     "alerts_from_health_snapshot",

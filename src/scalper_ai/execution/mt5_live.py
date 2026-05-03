@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
-from typing import Protocol
+from typing import Protocol, cast
 
 from scalper_ai.backtesting.accounting import (
     apply_fill_to_cash,
@@ -487,6 +487,23 @@ class Mt5ExecutionClientProtocol(Protocol):
 
     def ping_latency_ms(self) -> float | None:
         """Return an optional dependency round-trip latency estimate."""
+
+
+class _Mt5ConnectionSnapshotProtocol(Protocol):
+    reconnect_enabled: bool
+    reconnect_attempt_count: int
+    circuit_breaker_open: bool
+    last_reconnect_at: datetime | None
+    last_error: str | None
+
+
+def _describe_mt5_connection(
+    client: object,
+) -> _Mt5ConnectionSnapshotProtocol | None:
+    describe_connection = getattr(client, "describe_connection", None)
+    if not callable(describe_connection):
+        return None
+    return cast(_Mt5ConnectionSnapshotProtocol, describe_connection())
 
 
 class Mt5ExecutionAdapter:
@@ -988,12 +1005,28 @@ class Mt5ExecutionAdapter:
         checked_at = datetime.now(UTC)
         connected = self._client.is_connected()
         latest_broker_timestamp = self._latest_broker_snapshot_timestamp()
+        connection_snapshot = _describe_mt5_connection(self._client)
         return BrokerConnectivitySnapshot(
             venue=self._config.default_venue,
             checked_at=checked_at,
             connected=connected,
             last_snapshot_at=latest_broker_timestamp,
             latency_ms=self._client.ping_latency_ms(),
+            reconnect_enabled=(
+                None if connection_snapshot is None else connection_snapshot.reconnect_enabled
+            ),
+            reconnect_attempt_count=(
+                None
+                if connection_snapshot is None
+                else connection_snapshot.reconnect_attempt_count
+            ),
+            circuit_breaker_open=(
+                None if connection_snapshot is None else connection_snapshot.circuit_breaker_open
+            ),
+            last_reconnect_at=(
+                None if connection_snapshot is None else connection_snapshot.last_reconnect_at
+            ),
+            last_error=None if connection_snapshot is None else connection_snapshot.last_error,
         )
 
     def close(self) -> None:

@@ -22,6 +22,17 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-01 completed richer runtime health provider contracts:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/health_providers.py`
+  - `DeploymentRuntime` now accepts data freshness, model health, and dependency guard providers
+  - health snapshots now include `data_freshness`, `model_readiness`, `dependency_guards`, and `risk_guardrails`
+  - provider state now exports Prometheus-style metrics and feeds `RiskContext` before order submission
+  - missing live providers warn; stale live data or an unready model fails health; provider errors fail health
+  - broker connectivity snapshots now expose reconnect attempts, reconnect-disabled state, last reconnect, last error, and circuit-breaker state
+  - unit coverage was added in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_deployment_runtime.py`
+  - targeted Ruff passed for the touched runtime/execution/test files
+  - `.venv/bin/python -m pytest tests/unit/test_deployment_runtime.py tests/integration/test_deployment_bootstrap.py -q` passed with `37 passed`
+  - `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `250 passed`
 - 2026-04-27 external research reports were reviewed and converted into the canonical post-phase backlog:
   - `/Users/dzhabrailtalkanov/Downloads/deep-research-report.md`
   - `/Users/dzhabrailtalkanov/Downloads/мм.md`
@@ -613,7 +624,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
-- continue concrete volatility/news/model/feature health providers, Docker validation on a Docker-enabled host, deeper MT5 fault-injection/partial-fill validation, and small-batch Ruff/mypy cleanup
+- continue concrete volatility/news/model/feature provider integrations, Docker validation on a Docker-enabled host, deeper MT5 fault-injection/partial-fill validation, and small-batch Ruff/mypy cleanup
 
 If further MT5 validation is paused:
 - validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup

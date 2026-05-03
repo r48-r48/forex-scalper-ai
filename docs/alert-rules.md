@@ -7,17 +7,31 @@ They are written as operator guidance first and now have local JSONL and HTTP we
 
 ## Broker Disconnect
 
-- Signal: broker connectivity status is not connected, or broker heartbeat age exceeds the configured threshold.
+- Signal: broker connectivity status is not connected, broker heartbeat age exceeds the configured threshold, reconnect is disabled in live mode, or the reconnect circuit breaker is open.
 - Severity: critical in live-safe mode, warning in paper mode.
 - Initial threshold: 2 missed heartbeat intervals or 30 seconds, whichever is longer.
 - Action: stop new order submission, keep paper fallback available, run MT5 preflight, inspect terminal/session status, and reconcile open orders before resuming.
 
 ## Stale Data
 
-- Signal: latest market `available_timestamp` is older than the stale-data threshold.
+- Signal: latest market data or online feature timestamp from the data freshness provider is missing or older than its stale threshold.
 - Severity: critical for live-safe order submission, warning for research replay.
 - Initial threshold: 5 seconds for tick-driven live paths, strategy-specific for M1 paths.
 - Action: block new risk-increasing orders, allow reduce-only/emergency flatten when broker connectivity is healthy, and record a risk event.
+
+## Model Readiness
+
+- Signal: model readiness provider reports the model is unavailable, not loaded, missing a fresh prediction when a freshness threshold is configured, or raises an exception.
+- Severity: critical for live-safe order submission, warning for paper/research.
+- Initial threshold: strategy-specific prediction freshness window.
+- Action: keep paper logging active, stop new risk-increasing live orders, inspect model artifact loading, feature parity, and latest prediction timestamps.
+
+## Dependency Guards
+
+- Signal: volatility or news guard provider reports an active trading block, or the provider raises an exception.
+- Severity: warning when guards intentionally pause trading; critical if the provider itself cannot be evaluated.
+- Initial threshold: any active guard.
+- Action: block strategy-driven risk-increasing orders while the guard remains active, keep reconciliation and reduce-only operator workflows available.
 
 ## Reconciliation Drift
 
@@ -57,4 +71,8 @@ They are written as operator guidance first and now have local JSONL and HTTP we
 - Broker connectivity maps to `broker_disconnect`.
 - Execution reconciliation maps to `reconciliation_drift`.
 - Execution-mode downgrade maps to `execution_mode_degraded`.
+- Data freshness maps to `health_data_freshness`.
+- Model readiness maps to `health_model_readiness`.
+- Dependency guards map to `health_dependency_guards`.
+- Runtime risk guardrails map to `health_risk_guardrails`.
 - Other warning/failing health checks map to `health_<check_name>`.
