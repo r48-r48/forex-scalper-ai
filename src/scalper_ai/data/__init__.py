@@ -25,6 +25,17 @@ from scalper_ai.data.preprocessing import (
     fractional_differentiate,
     mid_price,
 )
+from scalper_ai.data.quality import (
+    DataQualityIssue,
+    DataQualityReport,
+    DataQualitySeverity,
+    TickDataQualityConfig,
+    check_tick_duplicates,
+    check_tick_price_quality,
+    check_tick_temporal_ordering,
+    check_tick_timestamp_quality,
+    validate_tick_data,
+)
 from scalper_ai.data.raw_writer import RawParquetWriter
 from scalper_ai.data.replay import ReplayBookSource, ReplayTickSource
 from scalper_ai.data.splits import (
@@ -40,6 +51,9 @@ __all__ = [
     "BaseBarBuilder",
     "BookStreamSource",
     "BufferedBatchWriter",
+    "DataQualityIssue",
+    "DataQualityReport",
+    "DataQualitySeverity",
     "DatasetConfig",
     "DatasetPartitions",
     "EventBatcher",
@@ -54,6 +68,7 @@ __all__ = [
     "SupervisedDataset",
     "TargetConfig",
     "TickBarBuilder",
+    "TickDataQualityConfig",
     "TickStreamSource",
     "TimeBarBuilder",
     "VolatilityBarBuilder",
@@ -62,11 +77,16 @@ __all__ = [
     "add_future_targets",
     "build_supervised_dataset",
     "build_bars",
+    "check_tick_duplicates",
+    "check_tick_price_quality",
+    "check_tick_temporal_ordering",
+    "check_tick_timestamp_quality",
     "feature_snapshots_to_frame",
     "fractional_differentiate",
     "fractional_diff_weights",
     "generate_walk_forward_splits",
     "materialize_walk_forward_split",
     "mid_price",
+    "validate_tick_data",
     "write_supervised_dataset",
 ]

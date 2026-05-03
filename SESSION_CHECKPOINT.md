@@ -22,6 +22,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed three parallel follow-ups from the external audit:
+  - clean release/export path: added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/create_release_archive.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_create_release_archive.py`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/release-archive.md`; the script supports dry-run/list manifests and creates clean source tarballs excluding `.git`, `.venv`, caches, generated data, local evidence, archives, secrets, and macOS metadata
+  - data QA foundation: added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/data/quality.py`, exports in `src/scalper_ai/data/__init__.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_data_quality.py`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/data-quality.md`; reports cover UTC timestamp validity, ordering, duplicate timestamps/rows, bid/ask validity, crossed quotes, large gaps, and received/event lag without trading logic or lookahead
+  - model bundle contract: added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/models/bundle.py`, exports in `src/scalper_ai/models/__init__.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_models_bundle.py`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/model-bundles.md`; metadata covers model/scaler artifacts, target spec, UTC training timestamps, training data window, metrics, JSON save/load, and deterministic ordered feature-contract hashing
+  - targeted validation passed: combined Ruff, compileall, `git diff --check`, and new unit tests passed with `20 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `89` source files, compileall green, full pytest `290 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed external audit 2026-05-03 live-safety triage:
   - reviewed `/Users/dzhabrailtalkanov/Downloads/deep-research-report (2).md` and persisted the triage as `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-05-03.md`
   - confirmed the report's main warning remains valid: the repo is a strong production scaffold and MT5 safety core, but not yet a complete autonomous real-money trading bot

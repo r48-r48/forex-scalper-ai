@@ -48,13 +48,13 @@ The report was based on a static archive review and did not see all subsequent l
    `market data -> online features -> model inference -> signal gating -> risk -> OMS -> broker submit -> reconciliation -> recovery`.
 
 2. There is no production training/model bundle pipeline:
-   missing reproducible training CLIs, model bundle save/load, scaler persistence, feature contract persistence, model registry, drift monitoring, and live inference packaging.
+   missing reproducible training CLIs, model registry, drift monitoring, and live inference packaging. The first model bundle metadata contract now exists, but training/evaluation CLIs and runtime inference wiring are still pending.
 
 3. Backtesting remains insufficient for serious FX scalping:
    the current research backtest still needs bid/ask execution, pip value, margin/leverage, swap/rollover, session spread regimes, symbol specs, and realistic stop/TP path simulation.
 
 4. Data bootstrap is incomplete:
-   the repo can ingest replay files, but it does not yet download, validate, deduplicate, gap-check, and version broker-quality Forex history from scratch.
+   the repo can ingest replay files and now has an offline data-quality validation foundation, but it does not yet download, quarantine, and version broker-quality Forex history from scratch.
 
 5. Risk budget is still incomplete:
    the project needs explicit risk-per-trade sizing, weekly loss caps, max open positions, leverage/free-margin/margin-level checks, symbol budgets, correlation caps, and strategy-level budgets.
@@ -68,7 +68,13 @@ The report was based on a static archive review and did not see all subsequent l
 2. Add production-facing CLIs for feature building, dataset building, baseline training, walk-forward validation, and backtest execution.
 3. Upgrade the FX backtest/accounting model to bid/ask and broker-symbol-aware execution before trusting M1/M5 results.
 4. Extend risk config and runtime context with risk-per-trade, max open positions, weekly loss, leverage, and margin checks.
-5. Add a clean release/export path that excludes virtualenvs, Git metadata, caches, and local evidence artifacts.
+5. Completed on `2026-05-03`: add a clean release/export path that excludes virtualenvs, Git metadata, caches, generated datasets, and local evidence artifacts.
+
+## Progress After Triage
+
+- Completed on `2026-05-03`: clean source archive tooling in `scripts/create_release_archive.py`, with manifest dry-run/list support, exclusion coverage, and `docs/release-archive.md`.
+- Completed on `2026-05-03`: offline tick/replay data-quality foundation in `src/scalper_ai/data/quality.py`, with structured reports for UTC timestamp, ordering, duplicate, bid/ask, gap, and received/event lag checks.
+- Completed on `2026-05-03`: model bundle metadata contract in `src/scalper_ai/models/bundle.py`, including deterministic feature-contract hashing, UTC metadata validation, artifact references, metrics, training window provenance, and JSON save/load helpers.
 
 ## Non-Goals
 
