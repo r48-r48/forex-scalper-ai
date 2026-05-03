@@ -325,7 +325,7 @@ Current repository status:
 - Safe Windows MT5 broker probe completed on 2026-04-28 through the normalized client with account/terminal/symbol/tick/history diagnostics, EURUSD FOK `order_check` retcode `0` / `Done`, and no `order_send`
 - MT5 Python bridge order-comment limit was validated at `29` characters; `Mt5TerminalClient` now sanitizes and clamps comments before `order_check` or `order_send`
 - Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config and was validated on Docker Desktop on 2026-05-03: `docker build`, Compose `describe`, Compose `health`, and Compose `metrics` all passed in the paper profile
-- Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `374`; mypy has `51` errors in `30` files
+- Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `72`; mypy has `51` errors in `30` files
 - Local JSONL alert transport completed on 2026-04-28: `scalper_ai.deployment.alerts` converts warning/failing health snapshots into alert events and appends them through `JsonlAlertTransport`
 - HTTP webhook alert transport completed on 2026-04-28: `WebhookAlertTransport` posts batched health-alert JSON through an explicit HTTP(S) endpoint with timeout/header controls and config/env fields
 - Logging-utils Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `434` to `433` issues
@@ -338,6 +338,7 @@ Current repository status:
 - Backtesting Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `163` to `138` issues
 - Features Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `138` to `93` issues
 - RL Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `93` to `77` issues
+- Deployment Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `77` to `72` issues
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -423,6 +424,9 @@ Current repository status:
 - RL Ruff cleanup passed on 2026-05-03: targeted Ruff is green for `src/scalper_ai/rl` plus selected RL tests; full Ruff baseline dropped from `93` to `77` issues
 - `.venv/bin/python -m pytest tests/unit/test_rl_environment.py tests/unit/test_rl_policy_training.py tests/integration/test_rl_episode_rollout.py` passed on 2026-05-03 with `5 passed` after RL cleanup
 - `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed on 2026-05-03 with `265 passed` after RL cleanup
+- Deployment Ruff cleanup passed on 2026-05-03: targeted Ruff is green for `src/scalper_ai/deployment` plus selected deployment tests; full Ruff baseline dropped from `77` to `72` issues
+- `.venv/bin/python -m pytest tests/unit/test_deployment_alerts.py tests/unit/test_deployment_health_providers.py tests/unit/test_deployment_runtime.py tests/unit/test_deployment_supervisor.py tests/integration/test_deployment_bootstrap.py` passed on 2026-05-03 with `58 passed` after deployment cleanup
+- `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed on 2026-05-03 with `265 passed` after deployment cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -455,6 +459,7 @@ Current repository status:
   - backtesting Ruff cleanup is complete: `src/scalper_ai/backtesting` and selected backtesting tests now pass targeted Ruff; selected backtesting pytest passed with `14 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `163` to `138`
   - features Ruff cleanup is complete: `src/scalper_ai/features` and selected feature tests now pass targeted Ruff; selected feature pytest passed with `9 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `138` to `93`
   - RL Ruff cleanup is complete: `src/scalper_ai/rl` and selected RL tests now pass targeted Ruff; selected RL pytest passed with `5 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `93` to `77`
+  - deployment Ruff cleanup is complete: `src/scalper_ai/deployment` and selected deployment tests now pass targeted Ruff; selected deployment pytest passed with `58 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `77` to `72`
   - Docker/Compose bounded paper supervisor validation is complete: added `make compose-supervise` for reproducible bounded supervisor runs, then ran Compose `paper-runtime supervise` for 5 paper iterations with `health_due=true`, `reconciliation_due=true`, `overall_status=pass`, rendered metrics on every iteration, `alert_count=0`, no alert errors, no runtime errors, and Compose cleanup afterward
   - Docker/Compose paper-runtime validation is complete on Docker Desktop: `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1`, `docker build -t forex-scalper-ai:local .` passed, Compose `paper-runtime describe` returned paper mode, Compose `health` returned `overall_status=pass`, Compose `metrics` emitted Prometheus-style runtime metrics, and `docker compose --profile paper down` cleaned up the test Redis container/network
   - MT5 post-send fallback fault-injection validation is complete: after a successful MT5 `order_send`, `Mt5TerminalClient` now falls back to the broker send result instead of raising if immediate order/history/deal refresh fails or the success response lacks a numeric ticket; explicit non-success `order_send` retcodes remain normalized rejected states; targeted Ruff, `25 passed` targeted MT5 client pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `265 passed`

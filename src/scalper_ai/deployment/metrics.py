@@ -76,7 +76,9 @@ class MetricsRegistry:
             if sample.name not in seen_types:
                 lines.append(f"# TYPE {sample.name} {sample.kind}")
                 seen_types.add(sample.name)
-            lines.append(f"{sample.name}{_format_labels(sample.labels)} {_format_metric_value(sample.value)}")
+            labels = _format_labels(sample.labels)
+            value = _format_metric_value(sample.value)
+            lines.append(f"{sample.name}{labels} {value}")
         return "\n".join(lines)
 
     def _metric_key(
@@ -90,7 +92,10 @@ class MetricsRegistry:
             raise ValueError("Metric name must be non-empty.")
         normalized_labels = dict(labels)
         normalized_labels["service"] = self._service_name
-        return normalized_name, kind, tuple(sorted((key, str(value).strip()) for key, value in normalized_labels.items()))
+        sorted_labels = tuple(
+            sorted((key, str(value).strip()) for key, value in normalized_labels.items())
+        )
+        return normalized_name, kind, sorted_labels
 
 
 def _format_labels(labels: tuple[tuple[str, str], ...]) -> str:

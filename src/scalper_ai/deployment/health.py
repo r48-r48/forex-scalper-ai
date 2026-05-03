@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class HealthStatus(str, Enum):
+class HealthStatus(StrEnum):
     """Ordered health severities."""
 
     PASS = "pass"
@@ -23,7 +24,7 @@ class HealthCheckResult:
     name: str
     status: HealthStatus
     summary: str
-    details: Optional[dict[str, Any]] = None
+    details: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.name.strip():
