@@ -40,7 +40,10 @@ def test_run_backtest_cli_writes_explicit_cost_baseline_report(tmp_path: Path) -
     script = _load_script_module("run_backtest")
     input_path = tmp_path / "replay.csv"
     output_path = tmp_path / "backtest.json"
-    _feature_frame(row_count=5).to_csv(input_path, index=False)
+    _feature_frame(row_count=5, include_protective_columns=True).to_csv(
+        input_path,
+        index=False,
+    )
 
     payload = script.run_backtest_cli(
         input_path=input_path,
@@ -49,9 +52,14 @@ def test_run_backtest_cli_writes_explicit_cost_baseline_report(tmp_path: Path) -
         spread_bps=0.4,
         slippage_bps=0.1,
         commission_bps=0.05,
+        high_price_column="high_price",
+        low_price_column="low_price",
         fx_pip_size=0.0001,
         fx_margin_rate=0.02,
         margin_call_level=1.0,
+        stop_loss_price_column="stop_loss_price",
+        take_profit_price_column="take_profit_price",
+        protective_exit_priority="take_profit",
         max_abs_position=0.5,
     )
 
@@ -59,6 +67,7 @@ def test_run_backtest_cli_writes_explicit_cost_baseline_report(tmp_path: Path) -
     assert payload["strategies"] == ["spread_mean_reversion"]
     assert payload["backtest_config"]["margin_call_level"] == 1.0
     assert payload["backtest_config"]["fx_symbol"]["margin_rate"] == 0.02
+    assert payload["backtest_config"]["protective_exit_priority"] == "take_profit"
     summary = payload["summary"]
     assert len(summary) == 1
     assert summary[0]["strategy_name"] == "spread_mean_reversion"
@@ -106,28 +115,41 @@ def _load_script_module(name: str) -> ModuleType:
     return module
 
 
-def _feature_frame(*, row_count: int) -> pd.DataFrame:
+def _feature_frame(
+    *,
+    row_count: int,
+    include_protective_columns: bool = False,
+) -> pd.DataFrame:
     start = datetime(2026, 5, 3, 10, 0, tzinfo=UTC)
     rows: list[dict[str, object]] = []
     returns = (-0.0004, 0.00045, -0.00035, 0.0005, -0.0003, 0.00042)
     for index in range(row_count):
         timestamp = start + timedelta(minutes=index)
-        rows.append(
-            {
-                "symbol": "EURUSD",
-                "event_timestamp": timestamp.isoformat().replace("+00:00", "Z"),
-                "available_timestamp": (
-                    timestamp + timedelta(milliseconds=50)
-                ).isoformat().replace("+00:00", "Z"),
-                "feature_set": "unit",
-                "feature_version": "1",
-                "mid_price": 1.1000 + index * 0.0001,
-                "mid_return": returns[index % len(returns)],
-                "spread_bps": 0.5,
-                "ofi": 1.5 if index % 2 else -1.5,
-                "realized_volatility": 0.00008,
-            }
-        )
+        mid_price = 1.1000 + index * 0.0001
+        row: dict[str, object] = {
+            "symbol": "EURUSD",
+            "event_timestamp": timestamp.isoformat().replace("+00:00", "Z"),
+            "available_timestamp": (
+                timestamp + timedelta(milliseconds=50)
+            ).isoformat().replace("+00:00", "Z"),
+            "feature_set": "unit",
+            "feature_version": "1",
+            "mid_price": mid_price,
+            "mid_return": returns[index % len(returns)],
+            "spread_bps": 0.5,
+            "ofi": 1.5 if index % 2 else -1.5,
+            "realized_volatility": 0.00008,
+        }
+        if include_protective_columns:
+            row.update(
+                {
+                    "high_price": mid_price + 0.001,
+                    "low_price": mid_price - 0.001,
+                    "stop_loss_price": mid_price - 0.005,
+                    "take_profit_price": mid_price + 0.005,
+                }
+            )
+        rows.append(row)
     return pd.DataFrame.from_records(rows)
 
 

@@ -57,6 +57,8 @@ class BacktestConfig:
     symbol_column: str = "symbol"
     bid_price_column: str | None = None
     ask_price_column: str | None = None
+    high_price_column: str | None = None
+    low_price_column: str | None = None
     initial_cash: float = 100_000.0
     spread_bps: float = 0.0
     slippage_bps: float = 0.0
@@ -66,6 +68,9 @@ class BacktestConfig:
     commission_bps_column: str | None = None
     fx_symbol: FxSymbolSpec | None = None
     margin_call_level: float | None = None
+    stop_loss_price_column: str | None = None
+    take_profit_price_column: str | None = None
+    protective_exit_priority: str = "stop_loss"
 
     def __post_init__(self) -> None:
         if not self.price_column.strip():
@@ -82,6 +87,10 @@ class BacktestConfig:
             raise ValueError("bid_price_column must be non-empty when provided.")
         if self.ask_price_column is not None and not self.ask_price_column.strip():
             raise ValueError("ask_price_column must be non-empty when provided.")
+        if (self.high_price_column is None) != (self.low_price_column is None):
+            raise ValueError("high_price_column and low_price_column must be configured together.")
+        _validate_optional_column_name(self.high_price_column, "high_price_column")
+        _validate_optional_column_name(self.low_price_column, "low_price_column")
         if self.initial_cash <= 0:
             raise ValueError("initial_cash must be greater than zero.")
         if self.spread_bps < 0:
@@ -95,12 +104,36 @@ class BacktestConfig:
         _validate_optional_column_name(self.commission_bps_column, "commission_bps_column")
         if self.margin_call_level is not None:
             _require_positive_finite(self.margin_call_level, "margin_call_level")
+        _validate_optional_column_name(self.stop_loss_price_column, "stop_loss_price_column")
+        _validate_optional_column_name(
+            self.take_profit_price_column,
+            "take_profit_price_column",
+        )
+        if self.uses_protective_exit_simulation and not self.uses_bar_path:
+            raise ValueError(
+                "high_price_column and low_price_column are required when "
+                "stop_loss_price_column or take_profit_price_column is configured."
+            )
+        if self.protective_exit_priority not in {"stop_loss", "take_profit"}:
+            raise ValueError("protective_exit_priority must be 'stop_loss' or 'take_profit'.")
 
     @property
     def uses_bid_ask_execution(self) -> bool:
         """Return whether market fills should use side-specific bid/ask prices."""
 
         return self.bid_price_column is not None and self.ask_price_column is not None
+
+    @property
+    def uses_bar_path(self) -> bool:
+        """Return whether high/low bar path columns are configured."""
+
+        return self.high_price_column is not None and self.low_price_column is not None
+
+    @property
+    def uses_protective_exit_simulation(self) -> bool:
+        """Return whether stop-loss or take-profit path simulation is enabled."""
+
+        return self.stop_loss_price_column is not None or self.take_profit_price_column is not None
 
 
 def _currency_code(value: str) -> str:

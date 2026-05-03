@@ -67,6 +67,14 @@ changing defaults. To model broker-style forced liquidation, pass
 `--margin-call-level` as an `equity / margin_required` threshold, for example `1.0`
 for a 100% margin level stop-out.
 
+For completed-bar stop-loss / take-profit path simulation, pass
+`--high-price-column`, `--low-price-column`, and one or both of
+`--stop-loss-price-column` / `--take-profit-price-column`. Protective prices become
+active after the current row is available, so a row never uses its own high/low range
+to trigger protection it just created. If both SL and TP are touched inside the same
+bar, `--protective-exit-priority` chooses the fill assumption and defaults to the
+conservative `stop_loss`.
+
 ## Run Walk-Forward Validation
 
 ```bash

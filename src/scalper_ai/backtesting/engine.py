@@ -71,6 +71,9 @@ class BacktestMetrics:
     max_effective_leverage: float = 0.0
     margin_call_count: int = 0
     liquidation_count: int = 0
+    protective_exit_count: int = 0
+    stop_loss_count: int = 0
+    take_profit_count: int = 0
     swap_cost: float = 0.0
 
 
@@ -109,6 +112,18 @@ class _MarketDeltaResult:
     turnover_quote: float
 
 
+@dataclass(frozen=True)
+class _ProtectiveState:
+    stop_loss_price: float | None = None
+    take_profit_price: float | None = None
+
+
+@dataclass(frozen=True)
+class _ProtectiveExit:
+    exit_type: str
+    trigger_price: float
+
+
 def run_backtest(
     frame: pd.DataFrame,
     strategy: TargetPositionStrategy,
@@ -128,11 +143,15 @@ def run_backtest(
     swap_cost = 0.0
     margin_call_count = 0
     liquidation_count = 0
+    protective_exit_count = 0
+    stop_loss_count = 0
+    take_profit_count = 0
     max_margin_required = 0.0
     max_margin_utilization = 0.0
     max_effective_leverage = 0.0
     min_margin_level: float | None = None
     position: PositionState | None = None
+    active_protection = _ProtectiveState()
     previous_timestamp: pd.Timestamp | None = None
 
     orders: list[OrderIntent] = []
@@ -179,7 +198,46 @@ def run_backtest(
 
         posttrade_position = pretrade_position
         liquidated_on_margin_call = False
-        if _should_liquidate_for_margin(
+        protective_exit_type: str | None = None
+        protective_exit = _resolve_protective_exit(
+            event,
+            position=pretrade_position,
+            protection=active_protection,
+            config=resolved_config,
+        )
+        if protective_exit is not None:
+            executed_exit = _execute_market_delta(
+                event=event,
+                symbol=symbol,
+                strategy_id="protective_exit",
+                order_index=len(orders) + 1,
+                fill_index=len(fills) + 1,
+                current_position=pretrade_position,
+                target_position=0.0,
+                delta_quantity=-float(pretrade_position.net_quantity),
+                cash_balance=cash_balance,
+                config=resolved_config,
+                execution_reference_price=protective_exit.trigger_price,
+                reason=protective_exit.exit_type,
+                metadata_extra={
+                    "protective_exit_type": protective_exit.exit_type,
+                    "trigger_price": protective_exit.trigger_price,
+                },
+            )
+            cash_balance = executed_exit.cash_balance
+            posttrade_position = executed_exit.position
+            trade_count += 1
+            turnover_quote += executed_exit.turnover_quote
+            protective_exit_count += 1
+            if protective_exit.exit_type == "stop_loss":
+                stop_loss_count += 1
+            else:
+                take_profit_count += 1
+            protective_exit_type = protective_exit.exit_type
+            active_protection = _ProtectiveState()
+            orders.append(executed_exit.order)
+            fills.append(executed_exit.fill)
+        elif _should_liquidate_for_margin(
             pretrade_position,
             margin=pretrade_margin,
             config=resolved_config,
@@ -204,10 +262,11 @@ def run_backtest(
             margin_call_count += 1
             liquidation_count += 1
             liquidated_on_margin_call = True
+            active_protection = _ProtectiveState()
             orders.append(liquidation.order)
             fills.append(liquidation.fill)
 
-        if not liquidated_on_margin_call:
+        if protective_exit_type is None and not liquidated_on_margin_call:
             strategy_state = BacktestState(
                 current_position=pretrade_position,
                 cash_balance=cash_balance,
@@ -288,8 +347,20 @@ def run_backtest(
                 margin_call_count += 1
                 liquidation_count += 1
                 liquidated_on_margin_call = True
+                active_protection = _ProtectiveState()
                 orders.append(liquidation.order)
                 fills.append(liquidation.fill)
+
+        if not liquidated_on_margin_call and protective_exit_type is None:
+            active_protection = _next_protective_state(
+                previous_position=pretrade_position,
+                current_position=posttrade_position,
+                current_protection=active_protection,
+                event=event,
+                config=resolved_config,
+            )
+        elif _is_flat_position(posttrade_position):
+            active_protection = _ProtectiveState()
 
         posttrade_equity = calculate_equity(cash_balance, posttrade_position)
         peak_equity = max(pretrade_peak_equity, posttrade_equity)
@@ -332,6 +403,12 @@ def run_backtest(
                 "margin_call_count": margin_call_count,
                 "liquidation_count": liquidation_count,
                 "liquidated_on_margin_call": liquidated_on_margin_call,
+                "protective_exit_count": protective_exit_count,
+                "stop_loss_count": stop_loss_count,
+                "take_profit_count": take_profit_count,
+                "protective_exit_type": protective_exit_type,
+                "active_stop_loss_price": active_protection.stop_loss_price,
+                "active_take_profit_price": active_protection.take_profit_price,
                 "swap_cost": swap_cost,
                 "trade_count": trade_count,
                 "turnover_quote": turnover_quote,
@@ -356,6 +433,9 @@ def run_backtest(
         max_effective_leverage=max_effective_leverage,
         margin_call_count=margin_call_count,
         liquidation_count=liquidation_count,
+        protective_exit_count=protective_exit_count,
+        stop_loss_count=stop_loss_count,
+        take_profit_count=take_profit_count,
         swap_cost=swap_cost,
     )
     return BacktestResult(
@@ -379,13 +459,19 @@ def _execute_market_delta(
     delta_quantity: float,
     cash_balance: float,
     config: BacktestConfig,
+    execution_reference_price: float | None = None,
     reason: str | None = None,
+    metadata_extra: dict[str, object] | None = None,
 ) -> _MarketDeltaResult:
     order_side = OrderSide.BUY if delta_quantity > 0 else OrderSide.SELL
-    execution_reference_price = _execution_reference_price(
-        event,
-        side=order_side,
-        config=config,
+    resolved_execution_reference_price = (
+        _execution_reference_price(
+            event,
+            side=order_side,
+            config=config,
+        )
+        if execution_reference_price is None
+        else execution_reference_price
     )
     execution_costs = _resolve_execution_costs(event, config=config)
     order = _build_market_order(
@@ -396,15 +482,16 @@ def _execute_market_delta(
         current_position=float(current_position.net_quantity),
         target_position=target_position,
         delta_quantity=delta_quantity,
-        execution_reference_price=execution_reference_price,
+        execution_reference_price=resolved_execution_reference_price,
         reason=reason,
+        metadata_extra=metadata_extra,
     )
     fill = simulate_market_fill(
         order,
         fill_id=f"bt-fill-{fill_index:06d}",
         event_timestamp=event.available_timestamp.to_pydatetime(),
         received_timestamp=event.available_timestamp.to_pydatetime(),
-        mark_price=execution_reference_price,
+        mark_price=resolved_execution_reference_price,
         spread_bps=execution_costs.spread_bps,
         slippage_bps=execution_costs.slippage_bps,
         commission_bps=execution_costs.commission_bps,
@@ -441,10 +528,19 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
                 str(config.ask_price_column),
             }
         )
+    if config.uses_bar_path:
+        required_columns.update(
+            {
+                str(config.high_price_column),
+                str(config.low_price_column),
+            }
+        )
     for column_name in (
         config.spread_bps_column,
         config.slippage_bps_column,
         config.commission_bps_column,
+        config.stop_loss_price_column,
+        config.take_profit_price_column,
     ):
         if column_name is not None:
             required_columns.add(column_name)
@@ -478,6 +574,18 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
         _validate_positive_price_column(prepared, column_name=ask_column)
         if (prepared[bid_column] > prepared[ask_column]).any():
             raise ValueError("bid_price_column must not exceed ask_price_column.")
+    if config.uses_bar_path:
+        high_column = str(config.high_price_column)
+        low_column = str(config.low_price_column)
+        _validate_positive_price_column(prepared, column_name=high_column)
+        _validate_positive_price_column(prepared, column_name=low_column)
+        if (prepared[high_column] < prepared[low_column]).any():
+            raise ValueError("high_price_column must not be below low_price_column.")
+        if (
+            (prepared[config.price_column] > prepared[high_column])
+            | (prepared[config.price_column] < prepared[low_column])
+        ).any():
+            raise ValueError("price_column must be between low_price_column and high_price_column.")
     for column_name in (
         config.spread_bps_column,
         config.slippage_bps_column,
@@ -485,6 +593,12 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
     ):
         if column_name is not None:
             _validate_non_negative_numeric_column(prepared, column_name=column_name)
+    for column_name in (
+        config.stop_loss_price_column,
+        config.take_profit_price_column,
+    ):
+        if column_name is not None:
+            _validate_optional_positive_price_column(prepared, column_name=column_name)
 
     if prepared[config.symbol_column].isna().any():
         raise ValueError(f"{config.symbol_column} must not contain null symbols.")
@@ -548,6 +662,7 @@ def _build_market_order(
     delta_quantity: float,
     execution_reference_price: float | None = None,
     reason: str | None = None,
+    metadata_extra: dict[str, object] | None = None,
 ) -> OrderIntent:
     resolved_execution_reference_price = (
         event.mark_price
@@ -562,6 +677,8 @@ def _build_market_order(
     }
     if reason is not None:
         metadata["reason"] = reason
+    if metadata_extra is not None:
+        metadata.update(metadata_extra)
     return OrderIntent(
         intent_id=f"bt-order-{order_index:06d}",
         strategy_id=strategy_id,
@@ -753,11 +870,129 @@ def _should_liquidate_for_margin(
 ) -> bool:
     if config.margin_call_level is None:
         return False
-    if math.isclose(float(position.net_quantity), 0.0, abs_tol=_ZERO_TOLERANCE):
+    if _is_flat_position(position):
         return False
     if margin.margin_required <= _ZERO_TOLERANCE:
         return False
     return margin.margin_level <= config.margin_call_level
+
+
+def _resolve_protective_exit(
+    event: BacktestEvent,
+    *,
+    position: PositionState,
+    protection: _ProtectiveState,
+    config: BacktestConfig,
+) -> _ProtectiveExit | None:
+    if not config.uses_protective_exit_simulation or not config.uses_bar_path:
+        return None
+    if _is_flat_position(position):
+        return None
+
+    high_price = float(event.row_payload[str(config.high_price_column)])
+    low_price = float(event.row_payload[str(config.low_price_column)])
+    net_quantity = float(position.net_quantity)
+    if net_quantity > 0:
+        stop_loss_hit = (
+            protection.stop_loss_price is not None
+            and low_price <= protection.stop_loss_price
+        )
+        take_profit_hit = (
+            protection.take_profit_price is not None
+            and high_price >= protection.take_profit_price
+        )
+    else:
+        stop_loss_hit = (
+            protection.stop_loss_price is not None
+            and high_price >= protection.stop_loss_price
+        )
+        take_profit_hit = (
+            protection.take_profit_price is not None
+            and low_price <= protection.take_profit_price
+        )
+
+    if stop_loss_hit and take_profit_hit:
+        exit_type = config.protective_exit_priority
+    elif stop_loss_hit:
+        exit_type = "stop_loss"
+    elif take_profit_hit:
+        exit_type = "take_profit"
+    else:
+        return None
+
+    trigger_price = (
+        protection.stop_loss_price
+        if exit_type == "stop_loss"
+        else protection.take_profit_price
+    )
+    if trigger_price is None:
+        return None
+    return _ProtectiveExit(exit_type=exit_type, trigger_price=trigger_price)
+
+
+def _next_protective_state(
+    *,
+    previous_position: PositionState,
+    current_position: PositionState,
+    current_protection: _ProtectiveState,
+    event: BacktestEvent,
+    config: BacktestConfig,
+) -> _ProtectiveState:
+    if not config.uses_protective_exit_simulation:
+        return _ProtectiveState()
+    if _is_flat_position(current_position):
+        return _ProtectiveState()
+
+    previous_direction = _position_direction(float(previous_position.net_quantity))
+    current_direction = _position_direction(float(current_position.net_quantity))
+    base_protection = (
+        current_protection
+        if previous_direction == current_direction and previous_direction != 0
+        else _ProtectiveState()
+    )
+    stop_loss_price = _resolve_optional_price(
+        event,
+        column_name=config.stop_loss_price_column,
+    )
+    take_profit_price = _resolve_optional_price(
+        event,
+        column_name=config.take_profit_price_column,
+    )
+    return _ProtectiveState(
+        stop_loss_price=(
+            base_protection.stop_loss_price
+            if stop_loss_price is None
+            else stop_loss_price
+        ),
+        take_profit_price=(
+            base_protection.take_profit_price
+            if take_profit_price is None
+            else take_profit_price
+        ),
+    )
+
+
+def _resolve_optional_price(
+    event: BacktestEvent,
+    *,
+    column_name: str | None,
+) -> float | None:
+    if column_name is None:
+        return None
+    value = event.row_payload[column_name]
+    if pd.isna(value):
+        return None
+    return float(value)
+
+
+def _is_flat_position(position: PositionState) -> bool:
+    return math.isclose(float(position.net_quantity), 0.0, abs_tol=_ZERO_TOLERANCE)
+
+
+def _position_direction(quantity: float) -> int:
+    if math.isclose(quantity, 0.0, abs_tol=_ZERO_TOLERANCE):
+        return 0
+    return 1 if quantity > 0 else -1
 
 
 def _pip_values(config: BacktestConfig) -> tuple[float, float]:
@@ -788,6 +1023,24 @@ def _validate_non_negative_numeric_column(
         raise ValueError(f"{column_name} contains non-finite values.")
     if (frame[column_name] < 0).any():
         raise ValueError(f"{column_name} must contain non-negative values.")
+
+
+def _validate_optional_positive_price_column(
+    frame: pd.DataFrame,
+    *,
+    column_name: str,
+) -> None:
+    original = frame[column_name]
+    numeric = pd.to_numeric(original, errors="coerce")
+    invalid_non_null = numeric.isna() & original.notna()
+    if invalid_non_null.any():
+        raise ValueError(f"{column_name} contains non-numeric values.")
+    non_null = numeric.notna()
+    if not np.isfinite(numeric[non_null].to_numpy(dtype=float, copy=False)).all():
+        raise ValueError(f"{column_name} contains non-finite values.")
+    if (numeric[non_null] <= 0).any():
+        raise ValueError(f"{column_name} must contain strictly positive prices.")
+    frame[column_name] = numeric
 
 
 def _safe_ratio(numerator: float, denominator: float) -> float:

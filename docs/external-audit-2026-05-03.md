@@ -51,7 +51,7 @@ The report was based on a static archive review and did not see all subsequent l
    the first supervised baseline training/export CLI and runtime inference package now exist, but a model registry, drift monitoring, transformer training/export, and end-to-end live signal loop are still pending.
 
 3. Backtesting remains insufficient for serious FX scalping:
-   the current research backtest now has bid/ask execution plus first-row-level cost, pip-value, margin, and swap/rollover metrics, but it still needs broker symbol-spec ingestion, leverage/margin-call behavior, and realistic stop/TP path simulation.
+   the current research backtest now has bid/ask execution, row-level costs, pip-value, margin/swap metrics, margin-call liquidation, and opt-in stop/TP path checks, but it still needs broker symbol-spec ingestion and deeper execution-path calibration before serious M1/M5 trust.
 
 4. Data bootstrap is incomplete:
    the repo can ingest replay files and now has an offline data-quality validation foundation, but it does not yet download, quarantine, and version broker-quality Forex history from scratch.
@@ -81,6 +81,7 @@ The report was based on a static archive review and did not see all subsequent l
 - Completed on `2026-05-03`: supervised baseline filter training/export and runtime inference packaging were added with `scripts/train_supervised_filter.py`, JSON model/scaler artifacts, SHA-verified bundle metadata, `load_baseline_filter_inference_package()`, and tests for leakage-safe training cutoff behavior plus runtime scoring; `make PYTHON=.venv/bin/python ci` passed with full pytest `317 passed`.
 - Completed on `2026-05-03`: first FX backtest realism slice added row-level execution cost regimes, `FxSymbolSpec`, pip-value metrics, margin-required/utilization metrics, and rollover swap-cost accounting without changing default mid-price behavior; `make PYTHON=.venv/bin/python ci` passed with full pytest `321 passed`.
 - Completed on `2026-05-03`: second FX backtest realism slice added opt-in broker-style margin-call liquidation to `run_backtest()`, including same-row and next-row forced flattening, margin-level/effective-leverage/liquidation metrics, `--margin-call-level` CLI wiring, and focused tests; `make PYTHON=.venv/bin/python ci` passed with full pytest `323 passed`.
+- Completed on `2026-05-03`: third FX backtest realism slice added opt-in completed-bar stop-loss / take-profit path simulation with prior-row activation semantics, conservative same-bar ambiguity priority, active protection and protective-exit counters, CLI flags, and focused tests; `make PYTHON=.venv/bin/python ci` passed with full pytest `326 passed`.
 
 ## Non-Goals
 

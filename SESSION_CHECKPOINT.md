@@ -22,6 +22,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed the third FX backtest realism slice:
+  - added opt-in completed-bar path fields to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/config.py`: `high_price_column`, `low_price_column`, `stop_loss_price_column`, `take_profit_price_column`, and `protective_exit_priority`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/engine.py` now triggers stop-loss / take-profit exits only from protection that was active before the current row, so a row cannot use its own high/low range to trigger protection it just created
+  - same-bar SL/TP ambiguity is explicit through `protective_exit_priority`, defaulting to conservative `stop_loss`
+  - equity rows and aggregate metrics now include protective-exit counts, stop-loss counts, take-profit counts, protective exit type, and active protective prices
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_backtest.py` exposes the behavior through `--high-price-column`, `--low-price-column`, `--stop-loss-price-column`, `--take-profit-price-column`, and `--protective-exit-priority`
+  - focused validation passed: targeted Ruff, strict mypy, and backtesting/script pytest with `24 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `91` source files, compileall green, full pytest `326 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed the second FX backtest realism slice:
   - added opt-in `margin_call_level` to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/config.py`; the threshold is expressed as `equity / margin_required`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/engine.py` now observes margin level and effective leverage before/after strategy decisions and can force broker-style same-row or next-row liquidation to flat when the threshold is breached
@@ -856,7 +864,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
 - use `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` for future latest-code Parallels MT5 checks
-- FX backtest realism now covers row-level costs, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, and opt-in margin-call liquidation; next continue broker symbol-spec ingestion, stop/TP path realism, concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
+- FX backtest realism now covers row-level costs, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, opt-in margin-call liquidation, and prior-row stop-loss/take-profit path simulation; next continue broker symbol-spec ingestion, concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
 
 If further MT5 validation is paused:
 - continue with FX backtest realism and network alert transport topology now that Docker/Compose validation is complete

@@ -156,6 +156,87 @@ def test_run_backtest_liquidates_same_row_when_new_position_breaches_margin_leve
     assert result.equity_curve["net_quantity"].tolist() == pytest.approx([0.0])
 
 
+def test_run_backtest_triggers_prior_stop_loss_from_bar_path() -> None:
+    result = run_backtest(
+        _market_frame(
+            timestamps=[
+                datetime(2026, 5, 3, 9, 0, tzinfo=UTC),
+                datetime(2026, 5, 3, 9, 1, tzinfo=UTC),
+                datetime(2026, 5, 3, 9, 2, tzinfo=UTC),
+            ],
+            prices=[1.0, 0.96, 0.96],
+            signals=[100_000.0, 100_000.0, 0.0],
+            high_prices=[1.0, 1.02, 0.96],
+            low_prices=[1.0, 0.94, 0.96],
+            stop_loss_prices=[0.95, None, None],
+            take_profit_prices=[1.1, None, None],
+        ),
+        _signal_strategy,
+        config=BacktestConfig(
+            initial_cash=100_000.0,
+            high_price_column="high_price",
+            low_price_column="low_price",
+            stop_loss_price_column="stop_loss_price",
+            take_profit_price_column="take_profit_price",
+        ),
+    )
+
+    assert [fill.side.value for fill in result.fills] == ["buy", "sell"]
+    assert result.fills[1].fill_price == pytest.approx(0.95)
+    assert result.orders[1].strategy_id == "protective_exit"
+    assert result.orders[1].metadata is not None
+    assert result.orders[1].metadata["reason"] == "stop_loss"
+    assert result.orders[1].metadata["trigger_price"] == pytest.approx(0.95)
+    assert result.metrics.protective_exit_count == 1
+    assert result.metrics.stop_loss_count == 1
+    assert result.metrics.take_profit_count == 0
+    assert result.metrics.final_equity == pytest.approx(95_000.0)
+    assert result.metrics.total_pnl == pytest.approx(-5_000.0)
+    assert result.equity_curve["protective_exit_type"].tolist() == [
+        None,
+        "stop_loss",
+        None,
+    ]
+    assert result.equity_curve["net_quantity"].tolist() == pytest.approx(
+        [100_000.0, 0.0, 0.0]
+    )
+
+
+def test_run_backtest_uses_configured_priority_when_stop_and_take_profit_both_hit() -> None:
+    result = run_backtest(
+        _market_frame(
+            timestamps=[
+                datetime(2026, 5, 3, 9, 0, tzinfo=UTC),
+                datetime(2026, 5, 3, 9, 1, tzinfo=UTC),
+            ],
+            prices=[1.0, 1.0],
+            signals=[100_000.0, 100_000.0],
+            high_prices=[1.0, 1.06],
+            low_prices=[1.0, 0.94],
+            stop_loss_prices=[0.95, None],
+            take_profit_prices=[1.05, None],
+        ),
+        _signal_strategy,
+        config=BacktestConfig(
+            initial_cash=100_000.0,
+            high_price_column="high_price",
+            low_price_column="low_price",
+            stop_loss_price_column="stop_loss_price",
+            take_profit_price_column="take_profit_price",
+            protective_exit_priority="take_profit",
+        ),
+    )
+
+    assert [fill.side.value for fill in result.fills] == ["buy", "sell"]
+    assert result.fills[1].fill_price == pytest.approx(1.05)
+    assert result.orders[1].metadata is not None
+    assert result.orders[1].metadata["reason"] == "take_profit"
+    assert result.metrics.protective_exit_count == 1
+    assert result.metrics.stop_loss_count == 0
+    assert result.metrics.take_profit_count == 1
+    assert result.metrics.total_pnl == pytest.approx(5_000.0)
+
+
 def test_backtest_config_rejects_invalid_fx_symbol_spec() -> None:
     with pytest.raises(ValueError, match="pip_size must be greater than zero"):
         FxSymbolSpec(
@@ -177,6 +258,20 @@ def test_backtest_config_rejects_invalid_fx_symbol_spec() -> None:
     with pytest.raises(ValueError, match="margin_call_level must be greater than zero"):
         BacktestConfig(margin_call_level=0.0)
 
+    with pytest.raises(ValueError, match="high_price_column and low_price_column"):
+        BacktestConfig(high_price_column="high_price")
+
+    with pytest.raises(ValueError, match="are required"):
+        BacktestConfig(stop_loss_price_column="stop_loss_price")
+
+    with pytest.raises(ValueError, match="protective_exit_priority"):
+        BacktestConfig(
+            high_price_column="high_price",
+            low_price_column="low_price",
+            stop_loss_price_column="stop_loss_price",
+            protective_exit_priority="unknown",
+        )
+
 
 def test_run_backtest_rejects_negative_row_level_costs() -> None:
     frame = _market_frame(
@@ -194,12 +289,38 @@ def test_run_backtest_rejects_negative_row_level_costs() -> None:
         )
 
 
+def test_run_backtest_rejects_invalid_bar_path_columns() -> None:
+    frame = _market_frame(
+        timestamps=[datetime(2026, 5, 3, 9, 0, tzinfo=UTC)],
+        prices=[1.0],
+        signals=[1.0],
+        high_prices=[0.99],
+        low_prices=[0.98],
+        stop_loss_prices=[0.95],
+    )
+
+    with pytest.raises(ValueError, match="price_column must be between"):
+        run_backtest(
+            frame,
+            _signal_strategy,
+            config=BacktestConfig(
+                high_price_column="high_price",
+                low_price_column="low_price",
+                stop_loss_price_column="stop_loss_price",
+            ),
+        )
+
+
 def _market_frame(
     *,
     timestamps: list[datetime],
     prices: list[float],
     signals: list[float],
     spread_bps: list[float] | None = None,
+    high_prices: list[float] | None = None,
+    low_prices: list[float] | None = None,
+    stop_loss_prices: list[float | None] | None = None,
+    take_profit_prices: list[float | None] | None = None,
 ) -> pd.DataFrame:
     assert len(timestamps) == len(prices) == len(signals)
     rows: list[dict[str, object]] = []
@@ -215,6 +336,14 @@ def _market_frame(
         }
         if spread_bps is not None:
             row["spread_bps"] = spread_bps[index]
+        if high_prices is not None:
+            row["high_price"] = high_prices[index]
+        if low_prices is not None:
+            row["low_price"] = low_prices[index]
+        if stop_loss_prices is not None:
+            row["stop_loss_price"] = stop_loss_prices[index]
+        if take_profit_prices is not None:
+            row["take_profit_price"] = take_profit_prices[index]
         rows.append(row)
     return pd.DataFrame.from_records(rows)
 

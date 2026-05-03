@@ -38,6 +38,8 @@ def run_backtest_cli(
     price_column: str = "mid_price",
     bid_price_column: str | None = None,
     ask_price_column: str | None = None,
+    high_price_column: str | None = None,
+    low_price_column: str | None = None,
     initial_cash: float = 100_000.0,
     spread_bps: float = 0.0,
     slippage_bps: float = 0.0,
@@ -56,6 +58,9 @@ def run_backtest_cli(
     fx_swap_short_per_lot: float = 0.0,
     fx_rollover_hour_utc: int = 21,
     margin_call_level: float | None = None,
+    stop_loss_price_column: str | None = None,
+    take_profit_price_column: str | None = None,
+    protective_exit_priority: str = "stop_loss",
     max_abs_position: float = 1.0,
     max_spread_bps: float = 2.0,
     disable_spread_filter: bool = False,
@@ -67,6 +72,8 @@ def run_backtest_cli(
         price_column=price_column,
         bid_price_column=bid_price_column,
         ask_price_column=ask_price_column,
+        high_price_column=high_price_column,
+        low_price_column=low_price_column,
         initial_cash=initial_cash,
         spread_bps=spread_bps,
         slippage_bps=slippage_bps,
@@ -87,6 +94,9 @@ def run_backtest_cli(
             rollover_hour_utc=fx_rollover_hour_utc,
         ),
         margin_call_level=margin_call_level,
+        stop_loss_price_column=stop_loss_price_column,
+        take_profit_price_column=take_profit_price_column,
+        protective_exit_priority=protective_exit_priority,
     )
     specs = _select_baseline_specs(
         strategy=strategy,
@@ -149,6 +159,8 @@ def main() -> None:
         price_column=args.price_column,
         bid_price_column=args.bid_price_column,
         ask_price_column=args.ask_price_column,
+        high_price_column=args.high_price_column,
+        low_price_column=args.low_price_column,
         initial_cash=args.initial_cash,
         spread_bps=args.spread_bps,
         slippage_bps=args.slippage_bps,
@@ -167,6 +179,9 @@ def main() -> None:
         fx_swap_short_per_lot=args.fx_swap_short_per_lot,
         fx_rollover_hour_utc=args.fx_rollover_hour_utc,
         margin_call_level=args.margin_call_level,
+        stop_loss_price_column=args.stop_loss_price_column,
+        take_profit_price_column=args.take_profit_price_column,
+        protective_exit_priority=args.protective_exit_priority,
         max_abs_position=args.max_abs_position,
         max_spread_bps=args.max_spread_bps,
         disable_spread_filter=args.disable_spread_filter,
@@ -196,6 +211,8 @@ def _add_backtest_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--price-column", default="mid_price")
     parser.add_argument("--bid-price-column", default=None)
     parser.add_argument("--ask-price-column", default=None)
+    parser.add_argument("--high-price-column", default=None)
+    parser.add_argument("--low-price-column", default=None)
     parser.add_argument("--initial-cash", type=float, default=100_000.0)
     parser.add_argument(
         "--spread-bps",
@@ -241,6 +258,14 @@ def _add_backtest_arguments(parser: argparse.ArgumentParser) -> None:
             "Optional forced-liquidation threshold expressed as "
             "equity / margin_required. Example: 1.0 means 100% margin level."
         ),
+    )
+    parser.add_argument("--stop-loss-price-column", default=None)
+    parser.add_argument("--take-profit-price-column", default=None)
+    parser.add_argument(
+        "--protective-exit-priority",
+        choices=("stop_loss", "take_profit"),
+        default="stop_loss",
+        help="Priority when a bar path touches both SL and TP.",
     )
 
 
