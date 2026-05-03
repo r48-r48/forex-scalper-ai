@@ -1,6 +1,6 @@
 # Docker Runtime
 
-Snapshot date: 2026-04-28
+Snapshot date: 2026-05-03
 
 ## Purpose
 
@@ -51,7 +51,7 @@ docker compose --profile paper run --rm paper-runtime metrics --config-name pape
 
 ## Current Validation Status
 
-Checked on 2026-04-28:
+Initial source/config check on 2026-04-28:
 
 - Local macOS Codex environment: no `docker` binary was available.
 - Parallels Windows 11 VM: no `docker` command was available.
@@ -61,7 +61,21 @@ Checked on 2026-04-28:
   - `.venv/bin/python scripts/run_runtime.py health --config-name paper`
   - `.venv/bin/python scripts/run_runtime.py metrics --config-name paper`
 
-Docker image build and Compose execution remain pending on a Docker-enabled host.
+Docker Desktop validation on 2026-05-03:
+
+- `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1` through the
+  `desktop-linux` context.
+- `docker build -t forex-scalper-ai:local .` completed successfully from
+  `python:3.12-slim` and installed the package without dev/ML extras.
+- `docker compose --profile paper run --rm paper-runtime describe --config-name paper`
+  started the runtime in paper mode and returned `effective_mode=paper`.
+- `docker compose --profile paper run --rm paper-runtime health --config-name paper`
+  returned `overall_status=pass`, including storage, execution mode, risk guardrail,
+  reconciliation, and metrics-surface checks.
+- `docker compose --profile paper run --rm paper-runtime metrics --config-name paper`
+  emitted the Prometheus-style runtime metrics surface.
+- `docker compose --profile paper down` was run afterward to stop and remove the
+  test Redis container/network.
 
 ## Safety Notes
 

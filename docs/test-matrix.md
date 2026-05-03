@@ -41,9 +41,9 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 |---|---|---|
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
-| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, `188 passed` |
+| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, full suite currently `265 passed` |
 | Real MT5 terminal smoke | partial pass | Windows notebook and same-Mac Parallels VM both connect to demo terminals without `order_send`; Windows/MetaQuotes accepted EURUSD FOK, while Parallels/Dukascopy accepted EURUSD IOC and rejected FOK |
-| Docker/Compose paper runtime | source added, Docker unavailable locally | `Dockerfile`, `.dockerignore`, `paper-runtime` Compose profile, and Makefile targets exist; local macOS Codex and Parallels Windows have no Docker command; Compose YAML parse and local paper runtime describe/health/metrics passed |
+| Docker/Compose paper runtime | passing on Docker Desktop | `docker build -t forex-scalper-ai:local .` passed on 2026-05-03; Compose `paper-runtime` describe/health/metrics passed with paper mode, health `overall_status=pass`, and Prometheus metrics output; test Redis container/network was removed with `docker compose --profile paper down` |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
 
 ## Test Risk Notes

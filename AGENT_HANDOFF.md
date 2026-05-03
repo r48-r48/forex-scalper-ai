@@ -324,7 +324,7 @@ Current repository status:
 - Windows MT5 terminal connection/order_check smoke completed on 2026-04-28 through SSH against an authorized demo terminal session, without order_send
 - Safe Windows MT5 broker probe completed on 2026-04-28 through the normalized client with account/terminal/symbol/tick/history diagnostics, EURUSD FOK `order_check` retcode `0` / `Done`, and no `order_send`
 - MT5 Python bridge order-comment limit was validated at `29` characters; `Mt5TerminalClient` now sanitizes and clamps comments before `order_check` or `order_send`
-- Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config: `Dockerfile`, `.dockerignore`, Compose `paper-runtime`, Makefile targets, and `docs/docker-runtime.md`; Docker build/run validation remains pending because this local environment has no `docker` binary
+- Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config and was validated on Docker Desktop on 2026-05-03: `docker build`, Compose `describe`, Compose `health`, and Compose `metrics` all passed in the paper profile
 - Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `374`; mypy has `51` errors in `30` files
 - Local JSONL alert transport completed on 2026-04-28: `scalper_ai.deployment.alerts` converts warning/failing health snapshots into alert events and appends them through `JsonlAlertTransport`
 - HTTP webhook alert transport completed on 2026-04-28: `WebhookAlertTransport` posts batched health-alert JSON through an explicit HTTP(S) endpoint with timeout/header controls and config/env fields
@@ -435,6 +435,7 @@ Current repository status:
 - Session updated on: 2026-05-03
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - Docker/Compose paper-runtime validation is complete on Docker Desktop: `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1`, `docker build -t forex-scalper-ai:local .` passed, Compose `paper-runtime describe` returned paper mode, Compose `health` returned `overall_status=pass`, Compose `metrics` emitted Prometheus-style runtime metrics, and `docker compose --profile paper down` cleaned up the test Redis container/network
   - MT5 post-send fallback fault-injection validation is complete: after a successful MT5 `order_send`, `Mt5TerminalClient` now falls back to the broker send result instead of raising if immediate order/history/deal refresh fails or the success response lacks a numeric ticket; explicit non-success `order_send` retcodes remain normalized rejected states; targeted Ruff, `25 passed` targeted MT5 client pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `265 passed`
   - MT5 partial-fill fault-injection validation is complete: `Mt5TerminalClient` fallback normalization now preserves `TRADE_RETCODE_DONE_PARTIAL` result volume when broker history/order refresh is temporarily unavailable, clamps impossible oversized partial result volume, and `Mt5ExecutionAdapter` tests cover incremental broker deal fills across successive `process_quote()` polls without duplicate fill creation; targeted Ruff, `42 passed` targeted MT5 client/live pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `261 passed`
   - Concrete runtime dependency provider event-loop wiring is complete: `DeploymentRuntime.submit_order()` and `process_quote()` now record execution quotes into concrete data freshness providers, optional `OnlineFeatureCalculator` output feeds data freshness and guard-state providers, runtime exposes `record_market_data_event()`, `record_feature_snapshot()`, `record_model_loaded()`, `record_model_prediction()`, and `mark_model_unavailable()` hooks for live/paper loops, `bootstrap_runtime()` passes dependency providers/calculators through, targeted Ruff and provider/runtime/bootstrap pytest passed with `45 passed`, paper runtime describe/health passed, and full `.venv/bin/python -m pytest` passed with `258 passed`
@@ -457,10 +458,10 @@ Current repository status:
   - Windows / Parallels MT5 validation is real, not simulated: demo terminal connection, account/symbol/tick polling, broker probe, controlled demo `order_send`, hedging-aware flattening, and read-only history/deal normalization have all been exercised against the Dukascopy demo account
   - Same-Mac Parallels Windows 11 MT5 validation works through `prlctl exec "Windows 11"` without SSH: Dukascopy demo account `610769553` connects, EURUSD IOC is the accepted filling mode, FOK is rejected as unsupported, and controlled demo orders must stay explicit and operator-approved
   - Parallels MT5 history/deal validation is no longer blocked: with explicit `BROKER_MT5_TERMINAL_PATH` and an `8760` hour lookback, the history probe sees 4 EURUSD historical orders / 4 trade deals plus a zero-volume deposit deal, and the normalized client safely ignores non-trade deposit deals
-  - Docker/Compose runtime build/run remains pending on a Docker-enabled host; current host and Parallels VM both lack Docker, while local paper runtime describe/health/metrics still pass
+  - Docker/Compose runtime build/run validation is complete on Docker Desktop; the image builds and Compose paper-runtime `describe`, `health`, and `metrics` pass in paper mode
   - Controlled Parallels demo-order validation is complete: use IOC for Dukascopy EURUSD, handle Dukascopy as hedging (`margin_mode=2`) rather than netting, and use position-ticket close logic for flattening
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
-  - Paper-safe Docker/Compose runtime packaging is complete as source/config; validate `make docker-build`, `make compose-paper`, `make compose-health`, and `make compose-metrics` on a Docker-enabled host
+  - Paper-safe Docker/Compose runtime packaging and Docker Desktop validation are complete; keep future runtime-platform work focused on long-running supervision and deployment topology
   - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `374` Ruff issues after scripts/config/logging/journal/OMS/validation/models/risk cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
   - Local JSONL alert transport and HTTP webhook alert transport are implemented and now wired into the supervisor/`run_runtime.py supervise` path; concrete production endpoint values still depend on deployment topology
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
@@ -491,8 +492,8 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue Docker/runtime validation where available, small-batch Ruff/mypy cleanup, and remaining MT5 fault-injection validation
-  - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue small-batch Ruff/mypy cleanup
+  - continue small-batch Ruff/mypy cleanup, remaining MT5 fault-injection validation, and long-running runtime supervision evidence
+  - if MT5 remains unavailable, continue platform cleanup and runtime supervision hardening now that Docker/Compose validation is complete
 
 ## Constraints To Preserve
 

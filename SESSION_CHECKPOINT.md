@@ -22,6 +22,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed Docker/Compose paper-runtime validation:
+  - `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1` through the `desktop-linux` context
+  - `docker build -t forex-scalper-ai:local .` completed successfully from `python:3.12-slim`
+  - `docker compose --profile paper run --rm paper-runtime describe --config-name paper` started paper mode and returned `effective_mode=paper`
+  - `docker compose --profile paper run --rm paper-runtime health --config-name paper` returned `overall_status=pass`
+  - `docker compose --profile paper run --rm paper-runtime metrics --config-name paper` emitted Prometheus-style runtime metrics
+  - `docker compose --profile paper down` stopped and removed the test Redis container/network
 - 2026-05-03 completed the MT5 post-send fallback fault-injection validation slice:
   - after a successful MT5 `order_send`, `Mt5TerminalClient` now attempts immediate broker refresh through a safe helper and falls back to the broker send result when order/history/deal refresh raises
   - success responses without a numeric broker ticket now return normalized fallback state instead of crashing while converting the fallback id to `int`
@@ -156,7 +163,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - added Compose `paper-runtime` profile to `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docker-compose.yml`
   - added Makefile targets `docker-build`, `compose-paper`, `compose-health`, and `compose-metrics`
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/docker-runtime.md`
-  - Docker build/run validation remains pending because this local environment has no `docker` binary
+  - Docker build/run validation was completed later on 2026-05-03 through Docker Desktop
 - 2026-04-28 completed full-repo Ruff/mypy cleanup baseline:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/lint-typecheck-baseline.md`
   - added Makefile targets `lint-baseline` and `typecheck-baseline`
@@ -234,6 +241,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - Parallels Windows 11 has no `docker` command
   - `docker-compose.yml` parsed successfully with PyYAML
   - local paper runtime `describe`, `health`, and `metrics` commands passed through `.venv/bin/python`
+- 2026-05-03 completed Docker Desktop runtime validation:
+  - `docker build -t forex-scalper-ai:local .` passed
+  - Compose `paper-runtime describe`, `health`, and `metrics` passed in the paper profile
+  - Compose health returned `overall_status=pass`
+  - the test Redis container/network was removed with `docker compose --profile paper down`
 - 2026-04-29 completed controlled Parallels MT5 demo-order validation after explicit operator approval:
   - fresh permissions were green: account login `610769553`, server `Dukascopy-demo-mt5-1`, account trading enabled, terminal trading enabled, `tradeapi_disabled=false`
   - `scripts\mt5_demo_order.py --config-name mt5 --symbol EURUSD --time-in-force ioc --expected-login 610769553 --expected-server Dukascopy-demo-mt5-1 --i-understand-this-sends-a-demo-order` sent a minimum-volume `0.01` lot EURUSD IOC demo order; order `156757224` filled
@@ -442,7 +454,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Stable Facts To Reuse
 
-- The system host still does not provide `python3.11`, `brew`, `pyenv`, or `docker`.
+- The system host still does not provide `python3.11`, `brew`, or `pyenv`; Docker Desktop is now reachable with escalated Docker access.
 - Target-environment validation now uses the local `.venv` built from bundled Python 3.12.13.
 - `scripts/run_runtime.py` works from the repo without editable install because it now bootstraps `src/` into `sys.path`.
 - `scripts/handoff.py status` already reflects the post-phase roadmap.
@@ -485,6 +497,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: `.venv/bin/pytest` -> `158 passed` after safe MT5 broker probe hardening
 - 2026-04-28: Windows MT5 safe broker probe through SSH -> `accepted=true`, `retcode=0`, `comment=Done`, zero open orders/positions, zero raw history counts, and `order_send_called=false`
 - 2026-04-28: `command -v docker` -> no Docker binary available in the local Codex environment, so Docker build/run validation was not executed
+- 2026-05-03: `docker version` -> Docker Desktop `4.71.0` / Engine `29.4.1` reachable with escalated Docker access
+- 2026-05-03: `docker build -t forex-scalper-ai:local .` -> passed
+- 2026-05-03: `docker compose --profile paper run --rm paper-runtime describe --config-name paper` -> paper mode returned
+- 2026-05-03: `docker compose --profile paper run --rm paper-runtime health --config-name paper` -> `overall_status=pass`
+- 2026-05-03: `docker compose --profile paper run --rm paper-runtime metrics --config-name paper` -> Prometheus-style metrics emitted
+- 2026-05-03: `docker compose --profile paper down` -> test Redis container/network removed
 - 2026-04-28: `.venv/bin/python scripts/run_runtime.py describe --config-name paper`, `health --config-name paper`, and `metrics --config-name paper` -> passed after Docker/Compose packaging
 - 2026-04-28: `docker-compose.yml` parsed successfully with PyYAML after Docker/Compose packaging
 - 2026-04-28: `.venv/bin/python -m compileall src tests scripts` -> passed after Docker/Compose packaging
@@ -546,7 +564,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force fok --include-raw-samples` -> rejected safely with `retcode=10030`, `Unsupported filling mode`, `order_send_called=false`
 - 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --include-raw-samples` -> `order_check.accepted=true`, `retcode=0`, `comment=Done`, `order_send_called=false`
 - 2026-04-28: Parallels Windows 11 `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --history-lookback-hours 8760 --include-raw-samples` -> `raw_order_count=0`, `raw_deal_count=0`, `order_check.accepted=true`, `order_send_called=false`
-- 2026-04-28: local runtime hardening fallback -> `.venv/bin/python scripts/run_runtime.py describe/health/metrics --config-name paper` passed; Docker itself is unavailable locally and in Parallels
+- 2026-04-28: local runtime hardening fallback -> `.venv/bin/python scripts/run_runtime.py describe/health/metrics --config-name paper` passed; Docker was unavailable locally and in Parallels at that time, and Docker Desktop validation was completed later on 2026-05-03
 - 2026-04-29: Parallels Windows 11 controlled MT5 demo order -> minimum EURUSD IOC order filled, initial opposite flatten created hedged positions, ticket-specific flatten closed both, final smoke had zero orders/positions
 - 2026-04-29: `.venv/bin/ruff check scripts/mt5_demo_order.py scripts/mt5_flatten_positions.py tests/unit/test_scripts_mt5_demo_order.py tests/unit/test_scripts_mt5_flatten_positions.py` -> passed
 - 2026-04-29: `.venv/bin/pytest tests/unit/test_scripts_mt5_demo_order.py tests/unit/test_scripts_mt5_flatten_positions.py` -> `5 passed`
@@ -656,10 +674,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
-- continue concrete volatility/news/model/feature provider integrations, Docker validation on a Docker-enabled host, deeper MT5 fault-injection/partial-fill validation, and small-batch Ruff/mypy cleanup
+- continue concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, long-running runtime supervision evidence, and small-batch Ruff/mypy cleanup
 
 If further MT5 validation is paused:
-- validate Docker/Compose runtime packaging on a Docker-enabled host, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
+- continue with network alert transport topology, runtime supervision hardening, and small-batch Ruff/mypy cleanup now that Docker/Compose validation is complete
 
 ## If Context Gets Compressed
 

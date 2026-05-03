@@ -66,7 +66,7 @@ Known gaps:
 - symbol-specific capability discovery and conservative quantization are still pending
 - MT5 non-empty history/deal normalization is resolved for the Dukascopy demo read-only path when using explicit `BROKER_MT5_TERMINAL_PATH` and sufficient lookback; controlled future work should focus on fault injection, partial fills, and durable attribution rather than basic visibility
 - MT5 execution/reconciliation needs hedging-aware behavior for accounts with `margin_mode=2`
-- Docker/Compose runtime image exists but still needs validation in an environment with Docker installed; Docker is absent on the current macOS Codex host and Parallels Windows VM
+- Docker/Compose runtime image has now been validated on Docker Desktop: image build passed, Compose paper-runtime `describe`, `health`, and `metrics` passed, and the test stack was cleaned up
 - HTTP webhook alert transport exists and is wired through the supervisor/`run_runtime.py supervise` path; concrete production endpoint values and OpenTelemetry trace path remain pending
 - full-repo Ruff/mypy cleanup baseline exists; cleanup is being retired in small batches
 
@@ -86,7 +86,7 @@ Known gaps:
 - P2.3 Release Runbooks: completed on 2026-04-28 as documented procedures and templates.
 - Real Windows MT5 terminal connection/order_check smoke: completed on 2026-04-28 without order_send.
 - Safe Windows MT5 broker probe and comment-limit hardening: completed on 2026-04-28 without order_send.
-- Paper-safe Docker/Compose runtime packaging: completed on 2026-04-28 as source/config; Docker build/run validation remains pending in a Docker-enabled environment.
+- Paper-safe Docker/Compose runtime packaging: completed on 2026-04-28 as source/config; Docker Desktop build/run validation completed on 2026-05-03.
 - Full-repo Ruff/mypy cleanup baseline: completed on 2026-04-28 as measurement and cleanup plan in `docs/lint-typecheck-baseline.md`.
 - Local JSONL alert transport: completed on 2026-04-28 for health snapshot alerts.
 - First scripts Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `511` to `496`.
@@ -98,7 +98,7 @@ Known gaps:
 - Validation Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `409` to `402`.
 - Models Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `402` to `392`.
 - Risk Ruff cleanup batch: completed on 2026-04-28, reducing full Ruff backlog from `392` to `374`.
-- Parallels MT5 read-only validation and runtime availability check: initial 2026-04-28 probe completed without order_send; follow-up 2026-04-30 explicit-terminal-path / 8760-hour probe sees historical fills, IOC is required for Dukascopy EURUSD, Docker is unavailable locally, and local paper runtime describe/health/metrics passed.
+- Parallels MT5 read-only validation and runtime availability check: initial 2026-04-28 probe completed without order_send; follow-up 2026-04-30 explicit-terminal-path / 8760-hour probe sees historical fills, IOC is required for Dukascopy EURUSD, local paper runtime describe/health/metrics passed, and 2026-05-03 Docker Desktop validation now confirms the Compose paper-runtime build/run path.
 - Controlled Parallels MT5 demo-order validation: completed on 2026-04-29 with explicit operator approval, minimum EURUSD IOC demo fill, ticket-specific flattening, and zero remaining open positions.
 - P0.B Durable State Store And Startup Recovery first slice: completed on 2026-04-30 with SQLite state persistence, runtime reload, duplicate-intent recovery, and open-live-order startup blocking.
 - P0.C Broker-Source-Of-Truth MT5 Position Handling first slice: completed on 2026-04-30 with broker-position refresh before sizing, hedging ticket tracking, gross exposure reconciliation, ticket-specific reduce-only close payloads, ambiguous multi-ticket close rejection, and `182 passed` full pytest validation.
@@ -108,7 +108,7 @@ Known gaps:
 - Concrete runtime dependency provider trackers: completed on 2026-05-03 with updatable data freshness, model readiness/prediction freshness, and volatility/news guard providers; targeted Ruff, compileall, `git diff --check`, targeted provider/runtime pytest, and full `.venv/bin/python -m pytest` passed with `254 passed`.
 - Concrete runtime dependency provider event-loop wiring: completed on 2026-05-03 with runtime quote-to-provider updates, optional `OnlineFeatureCalculator` updates into data/guard providers, direct market/feature/model runtime hooks, bootstrap provider passthrough, targeted Ruff, `45 passed` targeted provider/runtime/bootstrap validation, paper runtime describe/health validation, and `258 passed` full pytest validation.
 - MT5 partial-fill fault-injection validation: completed on 2026-05-03 with partial `order_send` fallback volume preservation, impossible partial-volume clamping, incremental adapter deal-fill polling coverage without duplicate deal fills, `42 passed` targeted MT5 client/live validation, and `261 passed` full pytest validation.
-- Current next task: continue with Docker host validation, remaining MT5 fault-injection validation, small-batch Ruff/mypy cleanup, and any further demo order-sending checks only as explicit controlled scenarios.
+- Current next task: continue with remaining MT5 fault-injection validation, long-running runtime supervision evidence, small-batch Ruff/mypy cleanup, and any further demo order-sending checks only as explicit controlled scenarios.
 
 ## P0 Workstream
 
@@ -500,8 +500,8 @@ Recommended next MT5 slice:
 4. Reconcile the resulting order/deal/position state back through the existing snapshot contracts.
 
 If further MT5 validation is paused, the next non-MT5 work is platform cleanup:
-1. Validate the Docker/Compose runtime image in a Docker-enabled environment.
-2. Retire the full-repo Ruff/mypy baseline in small cleanup batches.
+1. Retire the full-repo Ruff/mypy baseline in small cleanup batches.
+2. Add long-running paper-runtime supervision evidence using the existing supervisor surfaces.
 3. Wire the HTTP webhook alert transport into the concrete runtime topology when the target alert endpoint is chosen.
 
 Then run:
