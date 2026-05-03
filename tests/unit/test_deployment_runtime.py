@@ -21,6 +21,7 @@ from scalper_ai.deployment import (
 )
 from scalper_ai.domain import FeatureSnapshot, OrderIntent, OrderSide, OrderType, PositionState
 from scalper_ai.execution import (
+    BrokerAccountSnapshot,
     BrokerConnectivitySnapshot,
     BrokerOrderSnapshot,
     BrokerPositionSnapshot,
@@ -970,6 +971,119 @@ def test_runtime_risk_uses_utc_day_start_equity_for_daily_drawdown() -> None:
         ),
     )
     assert next_day_context.starting_equity == pytest.approx(97_500.0)
+
+
+def test_runtime_uses_configured_risk_per_trade_budget_with_quote_entry() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {"mode": "paper"},
+            "risk": {"max_risk_per_trade": 50.0},
+        }
+    )
+    adapter = _RejectIfSubmittedAdapter()
+    runtime = DeploymentRuntime(config, paper_adapter_factory=lambda: adapter)
+    runtime.start()
+
+    timestamp = datetime(2026, 4, 30, 10, 5, tzinfo=UTC)
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="risk-budget-block",
+            strategy_id="risk-runtime-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=10_000.0,
+            stop_loss_price=1.0900,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.1000,
+            ask=1.1002,
+            venue="paper",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "max_risk_per_trade"
+
+
+def test_live_runtime_uses_broker_account_snapshot_for_account_risk_budgets() -> None:
+    timestamp = datetime(2026, 4, 30, 10, 10, tzinfo=UTC)
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "risk": {
+                "min_margin_level_percent": 100.0,
+                "max_leverage": 10.0,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    adapter = _RejectIfSubmittedAdapter()
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: adapter,
+        broker_account_provider=_StaticBrokerAccountProvider(
+            BrokerAccountSnapshot(
+                venue="unit-broker",
+                checked_at=timestamp,
+                balance=100_000.0,
+                equity=100_000.0,
+                margin_level_percent=75.0,
+                effective_leverage=12.0,
+                leverage=100.0,
+                currency="USD",
+            )
+        ),
+        reconciliation_report_provider=lambda: ReconciliationReport(
+            checked_at=timestamp,
+            issues=(),
+        ),
+        live_confirmation_token="ENABLE_ME",
+        **_healthy_live_dependency_kwargs(),
+    )
+    runtime.start()
+
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="account-budget-block",
+            strategy_id="risk-runtime-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=1_000.0,
+            paper=False,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.10000,
+            ask=1.10005,
+            venue="broker-feed",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "min_margin_level"
 
 
 def test_live_runtime_rejects_wide_spread_before_router_submit() -> None:
@@ -2052,6 +2166,14 @@ class _StaticGuardStateProvider:
         self._snapshot = snapshot
 
     def describe_guard_state(self) -> GuardStateSnapshot:
+        return self._snapshot
+
+
+class _StaticBrokerAccountProvider:
+    def __init__(self, snapshot: BrokerAccountSnapshot) -> None:
+        self._snapshot = snapshot
+
+    def describe_broker_account(self) -> BrokerAccountSnapshot:
         return self._snapshot
 
 

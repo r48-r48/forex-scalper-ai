@@ -90,6 +90,9 @@ class Mt5AccountSnapshot:
     leverage: int | None
     company: str | None
     currency: str | None
+    margin: float | None = None
+    margin_free: float | None = None
+    margin_level: float | None = None
 
 
 @dataclass(frozen=True)
@@ -326,6 +329,9 @@ class Mt5TerminalClient(Mt5ExecutionClientProtocol):
             leverage=self._coerce_int(account.get("leverage")),
             company=self._coerce_optional_str(account.get("company")),
             currency=self._coerce_optional_str(account.get("currency")),
+            margin=self._coerce_float(account.get("margin")),
+            margin_free=self._coerce_float(account.get("margin_free")),
+            margin_level=self._coerce_float(account.get("margin_level")),
         )
 
     def submit_order(self, request: Mt5OrderRequest) -> Mt5OrderState:

@@ -25,6 +25,7 @@ from scalper_ai.domain import (
     PositionState,
     TimeInForce,
 )
+from scalper_ai.execution.account import BrokerAccountSnapshot
 from scalper_ai.execution.connectivity import BrokerConnectivitySnapshot
 from scalper_ai.execution.models import (
     ExecutionOrder,
@@ -497,6 +498,16 @@ class _Mt5ConnectionSnapshotProtocol(Protocol):
     last_error: str | None
 
 
+class _Mt5AccountSnapshotProtocol(Protocol):
+    balance: float | None
+    equity: float | None
+    margin: float | None
+    margin_free: float | None
+    margin_level: float | None
+    leverage: int | None
+    currency: str | None
+
+
 def _describe_mt5_connection(
     client: object,
 ) -> _Mt5ConnectionSnapshotProtocol | None:
@@ -504,6 +515,13 @@ def _describe_mt5_connection(
     if not callable(describe_connection):
         return None
     return cast(_Mt5ConnectionSnapshotProtocol, describe_connection())
+
+
+def _describe_mt5_account(client: object) -> _Mt5AccountSnapshotProtocol | None:
+    describe_account = getattr(client, "describe_account", None)
+    if not callable(describe_account):
+        return None
+    return cast(_Mt5AccountSnapshotProtocol, describe_account())
 
 
 class Mt5ExecutionAdapter:
@@ -531,6 +549,40 @@ class Mt5ExecutionAdapter:
         """Return the tracked synthetic cash balance for normalized updates."""
 
         return self._cash_balance
+
+    def describe_broker_account(self) -> BrokerAccountSnapshot:
+        """Return account state for live runtime risk-budget checks."""
+
+        checked_at = datetime.now(UTC)
+        account_snapshot = _describe_mt5_account(self._client)
+        broker_positions = tuple(self._client.list_positions())
+        equity = (
+            self._cash_balance
+            if account_snapshot is None or account_snapshot.equity is None
+            else float(account_snapshot.equity)
+        )
+        balance = (
+            self._cash_balance
+            if account_snapshot is None or account_snapshot.balance is None
+            else float(account_snapshot.balance)
+        )
+        return BrokerAccountSnapshot(
+            venue=self._config.default_venue,
+            checked_at=checked_at,
+            balance=balance,
+            equity=equity,
+            margin=None if account_snapshot is None else account_snapshot.margin,
+            margin_free=None if account_snapshot is None else account_snapshot.margin_free,
+            margin_level_percent=(
+                None if account_snapshot is None else account_snapshot.margin_level
+            ),
+            effective_leverage=self._effective_leverage_from_positions(
+                broker_positions,
+                equity=equity,
+            ),
+            leverage=None if account_snapshot is None else account_snapshot.leverage,
+            currency=None if account_snapshot is None else account_snapshot.currency,
+        )
 
     def submit_order(self, intent: OrderIntent, quote: ExecutionQuote) -> ExecutionUpdate:
         """Submit one live order intent through the MT5 client boundary."""
@@ -1030,6 +1082,29 @@ class Mt5ExecutionAdapter:
             ),
             last_error=None if connection_snapshot is None else connection_snapshot.last_error,
         )
+
+    def _effective_leverage_from_positions(
+        self,
+        broker_positions: Sequence[Mt5PositionState],
+        *,
+        equity: float | None,
+    ) -> float | None:
+        if equity is None or equity <= 0:
+            return None
+        gross_notional = 0.0
+        for position in broker_positions:
+            if position.average_entry_price <= 0:
+                continue
+            gross_notional += (
+                self._lots_to_base_units(
+                    position.gross_lots,
+                    broker_symbol=position.broker_symbol,
+                )
+                * position.average_entry_price
+            )
+        if gross_notional <= 0:
+            return 0.0
+        return gross_notional / equity
 
     def close(self) -> None:
         """Close the underlying broker client if it exposes a shutdown hook."""

@@ -27,6 +27,11 @@ risk:
   kill_switch_enabled: true
   max_position_size: 100000.0
   max_daily_drawdown: 0.02
+  max_weekly_loss: null
+  max_risk_per_trade: null
+  max_open_positions: null
+  min_margin_level_percent: null
+  max_leverage: null
   max_spread_pips: 1.5
   stale_quote_seconds: 2.0
   max_order_frequency_per_minute: 30

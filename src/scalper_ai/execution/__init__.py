@@ -1,5 +1,6 @@
 """Execution adapters, routing helpers, and paper trading workflow models."""
 
+from scalper_ai.execution.account import BrokerAccountProvider, BrokerAccountSnapshot
 from scalper_ai.execution.connectivity import BrokerConnectivitySnapshot
 from scalper_ai.execution.interfaces import (
     BrokerConnectivityProvider,
@@ -61,6 +62,8 @@ from scalper_ai.execution.state_store import (
 
 __all__ = [
     "BrokerOrderSnapshot",
+    "BrokerAccountProvider",
+    "BrokerAccountSnapshot",
     "BrokerPositionSnapshot",
     "BrokerConnectivityProvider",
     "BrokerConnectivitySnapshot",

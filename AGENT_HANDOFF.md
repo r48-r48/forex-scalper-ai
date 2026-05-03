@@ -463,6 +463,7 @@ Current repository status:
 - Session updated on: 2026-05-03
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - risk-budget config/runtime broker-context wiring is complete: added generic `BrokerAccountSnapshot` / `BrokerAccountProvider`, config/env fields for weekly-loss, risk-per-trade, max-open-position, margin-level, and leverage budgets, MT5 account margin fields, MT5 adapter broker account snapshots with gross-position effective leverage, and runtime `RiskContext` wiring for live broker account state, broker-source live positions, quote-based market entry estimates, and UTC day/week realized-PnL baselines; targeted validation passed, and `make PYTHON=.venv/bin/python ci` passed with full pytest `309 passed`
   - four-way parallel hardening batch is complete: added `scripts/build_features.py`, `scripts/run_supervised_filter.py`, tests for both CLIs, opt-in `RiskEngine` risk-per-trade/open-position/weekly-loss/margin/leverage guards, and optional bid/ask-aware `run_backtest()` execution while preserving default mid-price behavior; targeted validation passed with `34 passed`, and `make PYTHON=.venv/bin/python ci` passed with full pytest `306 passed`
   - production CLI first slice is complete: added `scripts/cli_utils.py`, `scripts/build_dataset.py`, `scripts/run_backtest.py`, `scripts/run_walk_forward.py`, `tests/unit/test_scripts_production_cli.py`, and `docs/production-cli.md` for UTC-safe dataset building, explicit-cost baseline backtests, and baseline walk-forward validation; targeted script tests passed with `3 passed`, and `make PYTHON=.venv/bin/python ci` passed with full pytest `293 passed`
   - wall-clock paper supervisor support is complete: `RuntimeSupervisor.run_forever()` and `scripts/run_runtime.py supervise` accept `max_runtime_seconds`, bounded supervisor JSON evidence can be persisted with `--output-path`, `make supervise-paper-wallclock` / `compose-supervise-wallclock` wrap the flow, unit tests cover runtime-second stopping and first-bound-wins behavior, a 2-second local paper run produced 11 pass iterations with zero runtime errors, alert transport errors, or alert events, and `make PYTHON=.venv/bin/python ci` passed with full pytest `268 passed` plus safe MT5 preflight diagnostics
@@ -538,8 +539,10 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue remaining MT5 fault-injection validation, longer-duration runtime supervision evidence, and promotion of the now-green Ruff/mypy checks into the normal gate
-  - if MT5 remains unavailable, continue platform cleanup and runtime supervision hardening now that Docker/Compose validation and bounded supervisor evidence are complete
+  - add remaining training/model export entrypoints and runtime inference packaging around the existing model bundle contract
+  - deepen FX backtest realism beyond the first bid/ask slice: pip value, margin/leverage, swap/rollover, broker symbol specs, session spread regimes, and stop/TP path realism
+  - extend longer paper/shadow supervision evidence with a real alert sink topology, and continue production-startup hardening
+  - keep remaining MT5 fault-injection, broker metadata, and operator recovery items in scope, especially IOC/Dukascopy hedging behavior and explicit terminal-path history checks
 
 ## Constraints To Preserve
 

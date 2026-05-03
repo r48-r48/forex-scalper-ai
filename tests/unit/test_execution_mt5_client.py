@@ -374,6 +374,9 @@ def test_mt5_terminal_client_describes_account_positions_and_closes_cleanly() ->
 
     assert account.login == 123456
     assert account.balance == 250000.0
+    assert account.margin == 100.0
+    assert account.margin_free == 249900.0
+    assert account.margin_level == 2500.0
     assert len(positions) == 1
     assert positions[0].broker_symbol == "USDJPY"
     assert positions[0].net_volume_lots == -0.5
@@ -859,6 +862,9 @@ class _FakeMetaTrader5Module:
             balance=250000.0,
             equity=250100.0,
             leverage=100,
+            margin=100.0,
+            margin_free=249900.0,
+            margin_level=2500.0,
             company="MetaQuotes",
             currency="USD",
         )

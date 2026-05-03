@@ -30,6 +30,11 @@ def test_load_app_config_applies_overlay() -> None:
     assert config.broker.live_enabled is True
     assert config.broker.live_adapter == "mt5"
     assert config.broker.mt5.require_stop_loss is True
+    assert config.risk.max_weekly_loss is None
+    assert config.risk.max_risk_per_trade is None
+    assert config.risk.max_open_positions is None
+    assert config.risk.min_margin_level_percent is None
+    assert config.risk.max_leverage is None
     assert config.deployment.fallback_to_paper_on_live_failure is False
 
 
@@ -47,12 +52,22 @@ def test_load_app_config_applies_env_override(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("SCALPER_AI_ENV", "research")
     monkeypatch.setenv("SCALPER_AI_LOG_LEVEL", "WARNING")
     monkeypatch.setenv("SCALPER_AI_MAX_POSITION_SIZE", "250000")
+    monkeypatch.setenv("SCALPER_AI_MAX_WEEKLY_LOSS", "1500")
+    monkeypatch.setenv("SCALPER_AI_MAX_RISK_PER_TRADE", "75")
+    monkeypatch.setenv("SCALPER_AI_MAX_OPEN_POSITIONS", "2")
+    monkeypatch.setenv("SCALPER_AI_MIN_MARGIN_LEVEL_PERCENT", "125")
+    monkeypatch.setenv("SCALPER_AI_MAX_LEVERAGE", "12.5")
 
     config = load_app_config(config_dir=resolve_repo_root() / "configs")
 
     assert config.environment == "research"
     assert config.logging.level == "WARNING"
     assert config.risk.max_position_size == 250000.0
+    assert config.risk.max_weekly_loss == 1500.0
+    assert config.risk.max_risk_per_trade == 75.0
+    assert config.risk.max_open_positions == 2
+    assert config.risk.min_margin_level_percent == 125.0
+    assert config.risk.max_leverage == 12.5
 
 
 def test_load_app_config_applies_mt5_env_override(monkeypatch: pytest.MonkeyPatch) -> None:

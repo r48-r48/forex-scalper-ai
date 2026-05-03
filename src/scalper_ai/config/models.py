@@ -74,6 +74,11 @@ class RiskConfig(BaseModel):
     kill_switch_enabled: bool = True
     max_position_size: float = Field(default=100000.0, gt=0)
     max_daily_drawdown: float = Field(default=0.02, gt=0)
+    max_weekly_loss: float | None = Field(default=None, gt=0)
+    max_risk_per_trade: float | None = Field(default=None, gt=0)
+    max_open_positions: int | None = Field(default=None, ge=0)
+    min_margin_level_percent: float | None = Field(default=None, gt=0)
+    max_leverage: float | None = Field(default=None, gt=0)
     max_spread_pips: float = Field(default=1.5, gt=0)
     stale_quote_seconds: float = Field(default=2.0, gt=0)
     max_order_frequency_per_minute: int = Field(default=30, gt=0)

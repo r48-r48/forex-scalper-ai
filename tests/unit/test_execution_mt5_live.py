@@ -10,6 +10,7 @@ from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionMode, T
 from scalper_ai.execution import (
     ExecutionOrderStatus,
     ExecutionQuote,
+    Mt5AccountSnapshot,
     Mt5DealState,
     Mt5ExecutionAdapter,
     Mt5ExecutionConfig,
@@ -992,11 +993,53 @@ def test_mt5_execution_adapter_rejects_paper_orders() -> None:
         )
 
 
+def test_mt5_execution_adapter_describes_broker_account_risk_state() -> None:
+    client = _ImmediateFillMt5Client()
+    timestamp = datetime(2026, 3, 28, 13, 0, tzinfo=UTC)
+    client._positions["EURUSD.a"] = Mt5PositionState(
+        broker_symbol="EURUSD.a",
+        timestamp=timestamp,
+        net_volume_lots=0.5,
+        gross_volume_lots=0.5,
+        average_entry_price=1.2,
+    )
+    adapter = Mt5ExecutionAdapter(
+        client,
+        config=Mt5ExecutionConfig(
+            initial_cash=100_000.0,
+            base_units_per_lot=100_000.0,
+            symbol_map={"EURUSD": "EURUSD.a"},
+        ),
+    )
+
+    snapshot = adapter.describe_broker_account()
+
+    assert snapshot.venue == "MT5"
+    assert snapshot.balance == pytest.approx(100_000.0)
+    assert snapshot.equity == pytest.approx(50_000.0)
+    assert snapshot.margin_level_percent == pytest.approx(250.0)
+    assert snapshot.effective_leverage == pytest.approx(1.2)
+
+
 class _ImmediateFillMt5Client:
     def __init__(self) -> None:
         self.requests: list[Mt5OrderRequest] = []
         self._orders: dict[str, Mt5OrderState] = {}
         self._positions: dict[str, Mt5PositionState] = {}
+
+    def describe_account(self) -> Mt5AccountSnapshot:
+        return Mt5AccountSnapshot(
+            login=123456,
+            server="MetaQuotes-Demo",
+            balance=100_000.0,
+            equity=50_000.0,
+            leverage=100,
+            margin=20_000.0,
+            margin_free=30_000.0,
+            margin_level=250.0,
+            company="MetaQuotes",
+            currency="USD",
+        )
 
     def submit_order(self, request: Mt5OrderRequest) -> Mt5OrderState:
         self.requests.append(request)

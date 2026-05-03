@@ -22,6 +22,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed risk-budget config/runtime broker-context wiring:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/account.py` with generic `BrokerAccountSnapshot` / `BrokerAccountProvider` contracts for account-level risk state
+  - extended `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/config/models.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/config/loader.py`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/configs/base.yaml` with opt-in risk-budget config/env fields: `max_weekly_loss`, `max_risk_per_trade`, `max_open_positions`, `min_margin_level_percent`, and `max_leverage`
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/mt5_client.py` and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/mt5_live.py` so MT5 account state exposes margin/free-margin/margin-level and the MT5 live adapter can report broker account snapshots plus gross-position effective leverage
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/runtime.py` so pre-trade `RiskContext` uses live broker account snapshots, broker-source live positions when available, quote-based estimated entry price for market-order risk-per-trade checks, and UTC day/week realized-PnL baselines
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/mt5_smoke.py` to include MT5 margin fields in account JSON output
+  - targeted validation passed: Ruff, compileall, `git diff --check`, targeted mypy, and targeted unit tests for config/runtime/MT5/risk
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `90` source files, compileall green, full pytest `309 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed a four-way parallel hardening batch:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/build_features.py` and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_build_features.py` for UTC-safe offline feature-frame creation from one tick-like symbol/venue stream
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_supervised_filter.py` and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_supervised_filter_cli.py` for leakage-safe supervised baseline filter walk-forward reporting from flat supervised datasets

@@ -37,6 +37,11 @@ _ENV_FIELD_ALIASES = {
     "redis_db": "REDIS_DB",
     "max_position_size": "MAX_POSITION_SIZE",
     "max_daily_drawdown": "MAX_DAILY_DRAWDOWN",
+    "max_weekly_loss": "MAX_WEEKLY_LOSS",
+    "max_risk_per_trade": "MAX_RISK_PER_TRADE",
+    "max_open_positions": "MAX_OPEN_POSITIONS",
+    "min_margin_level_percent": "MIN_MARGIN_LEVEL_PERCENT",
+    "max_leverage": "MAX_LEVERAGE",
     "kill_switch_enabled": "KILL_SWITCH_ENABLED",
     "data_raw_dir": "DATA_RAW_DIR",
     "data_processed_dir": "DATA_PROCESSED_DIR",
@@ -96,6 +101,14 @@ class _EnvOverridesMixin:
     redis_db: int | None = Field(default=None, alias="REDIS_DB")
     max_position_size: float | None = Field(default=None, alias="MAX_POSITION_SIZE")
     max_daily_drawdown: float | None = Field(default=None, alias="MAX_DAILY_DRAWDOWN")
+    max_weekly_loss: float | None = Field(default=None, alias="MAX_WEEKLY_LOSS")
+    max_risk_per_trade: float | None = Field(default=None, alias="MAX_RISK_PER_TRADE")
+    max_open_positions: int | None = Field(default=None, alias="MAX_OPEN_POSITIONS")
+    min_margin_level_percent: float | None = Field(
+        default=None,
+        alias="MIN_MARGIN_LEVEL_PERCENT",
+    )
+    max_leverage: float | None = Field(default=None, alias="MAX_LEVERAGE")
     kill_switch_enabled: bool | None = Field(default=None, alias="KILL_SWITCH_ENABLED")
     data_raw_dir: Path | None = Field(default=None, alias="DATA_RAW_DIR")
     data_processed_dir: Path | None = Field(default=None, alias="DATA_PROCESSED_DIR")
@@ -221,6 +234,18 @@ class _EnvOverridesMixin:
             overrides.setdefault("risk", {})["max_position_size"] = self.max_position_size
         if self.max_daily_drawdown is not None:
             overrides.setdefault("risk", {})["max_daily_drawdown"] = self.max_daily_drawdown
+        if self.max_weekly_loss is not None:
+            overrides.setdefault("risk", {})["max_weekly_loss"] = self.max_weekly_loss
+        if self.max_risk_per_trade is not None:
+            overrides.setdefault("risk", {})["max_risk_per_trade"] = self.max_risk_per_trade
+        if self.max_open_positions is not None:
+            overrides.setdefault("risk", {})["max_open_positions"] = self.max_open_positions
+        if self.min_margin_level_percent is not None:
+            overrides.setdefault("risk", {})[
+                "min_margin_level_percent"
+            ] = self.min_margin_level_percent
+        if self.max_leverage is not None:
+            overrides.setdefault("risk", {})["max_leverage"] = self.max_leverage
         if self.kill_switch_enabled is not None:
             overrides.setdefault("risk", {})["kill_switch_enabled"] = self.kill_switch_enabled
         if self.data_raw_dir is not None:

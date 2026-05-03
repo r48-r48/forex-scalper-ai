@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol, cast
@@ -38,6 +38,8 @@ from scalper_ai.domain import (
     TickEvent,
 )
 from scalper_ai.execution import (
+    BrokerAccountProvider,
+    BrokerAccountSnapshot,
     BrokerConnectivityProvider,
     BrokerConnectivitySnapshot,
     BrokerPositionSnapshot,
@@ -144,6 +146,7 @@ class DeploymentRuntime:
         *,
         paper_adapter_factory: Callable[[], ExecutionAdapter] | None = None,
         live_adapter_factory: Callable[[], ExecutionAdapter] | None = None,
+        broker_account_provider: BrokerAccountProvider | None = None,
         broker_snapshot_provider: BrokerSnapshotProvider | None = None,
         broker_connectivity_provider: BrokerConnectivityProvider | None = None,
         reconciliation_report_provider: ReconciliationReportProvider | None = None,
@@ -162,6 +165,7 @@ class DeploymentRuntime:
         self._service_name = config.monitoring.service_name or config.project_name
         self._paper_adapter_factory = paper_adapter_factory or PaperExecutionAdapter
         self._live_adapter_factory = live_adapter_factory
+        self._broker_account_provider = broker_account_provider
         self._broker_snapshot_provider = broker_snapshot_provider
         self._broker_connectivity_provider = broker_connectivity_provider
         self._reconciliation_report_provider = reconciliation_report_provider
@@ -186,6 +190,8 @@ class DeploymentRuntime:
         self._last_cash_balance_by_route: dict[bool, float] = {}
         self._last_equity_by_route: dict[bool, float] = {}
         self._day_start_equity_by_route: dict[bool, tuple[date, float]] = {}
+        self._day_start_realized_pnl_by_route: dict[bool, tuple[date, float]] = {}
+        self._week_start_realized_pnl_by_route: dict[bool, tuple[date, float]] = {}
         self._session_kill_switch_enabled = False
         self._symbol_kill_switches: set[str] = set()
         self._recovered_execution_update_count = 0
@@ -198,6 +204,8 @@ class DeploymentRuntime:
         self._startup_reason: str | None = None
         self._last_broker_connectivity_snapshot: BrokerConnectivitySnapshot | None = None
         self._last_broker_connectivity_provider_error: str | None = None
+        self._last_broker_account_snapshot: BrokerAccountSnapshot | None = None
+        self._last_broker_account_provider_error: str | None = None
         self._last_reconciliation_report: ReconciliationReport | None = None
         self._last_reconciliation_provider_error: str | None = None
         self._last_data_freshness_snapshot: DataFreshnessSnapshot | None = None
@@ -271,6 +279,8 @@ class DeploymentRuntime:
         self._started_at = datetime.now(UTC)
         self._last_broker_connectivity_snapshot = None
         self._last_broker_connectivity_provider_error = None
+        self._last_broker_account_snapshot = None
+        self._last_broker_account_provider_error = None
         self._last_reconciliation_report = None
         self._last_reconciliation_provider_error = None
         self._reset_dependency_health_state()
@@ -829,6 +839,8 @@ class DeploymentRuntime:
         self._last_cash_balance_by_route.clear()
         self._last_equity_by_route.clear()
         self._day_start_equity_by_route.clear()
+        self._day_start_realized_pnl_by_route.clear()
+        self._week_start_realized_pnl_by_route.clear()
         self._session_kill_switch_enabled = False
         self._symbol_kill_switches.clear()
         self._recovered_execution_update_count = 0
@@ -958,13 +970,19 @@ class DeploymentRuntime:
 
         checked_at = quote.received_timestamp
         route_orders = self._state_tracker.list_orders(paper=intent.paper)
-        route_positions = {
+        tracked_positions = {
             position.symbol: position
             for position in self._state_tracker.list_positions(paper=intent.paper)
         }
+        route_positions = self._route_positions_for_risk(
+            intent,
+            quote,
+            fallback_positions=tracked_positions,
+        )
         data_snapshot = self._data_freshness_snapshot_for_risk()
         model_snapshot = self._model_health_snapshot_for_risk()
         guard_snapshot = self._guard_state_snapshot_for_risk()
+        broker_account_snapshot = self._broker_account_snapshot_for_risk(intent)
         latest_market_data_at: datetime | None = quote.received_timestamp
         features_healthy = True
         model_healthy = True
@@ -988,11 +1006,19 @@ class DeploymentRuntime:
         elif self._guard_state_provider is not None:
             volatility_guard_active = self.config.risk.volatility_filter_enabled
             news_guard_active = self.config.risk.news_filter_enabled
-        current_equity = self._last_equity_by_route.get(intent.paper)
+        current_equity = (
+            broker_account_snapshot.equity
+            if broker_account_snapshot is not None
+            and broker_account_snapshot.equity is not None
+            else self._last_equity_by_route.get(intent.paper)
+        )
         starting_equity = self._resolve_day_start_equity(
             paper=intent.paper,
             checked_at=checked_at,
             current_equity=current_equity,
+        )
+        current_realized_pnl = sum(
+            float(position.realized_pnl) for position in tracked_positions.values()
         )
 
         return RiskContext(
@@ -1010,11 +1036,29 @@ class DeploymentRuntime:
             current_spread_pips=(
                 _spread_pips_for_quote(quote) if not intent.paper else None
             ),
-            realized_pnl_today=sum(
-                float(position.realized_pnl) for position in route_positions.values()
+            realized_pnl_today=self._resolve_day_realized_pnl(
+                paper=intent.paper,
+                checked_at=checked_at,
+                current_realized_pnl=current_realized_pnl,
+            ),
+            realized_pnl_this_week=self._resolve_week_realized_pnl(
+                paper=intent.paper,
+                checked_at=checked_at,
+                current_realized_pnl=current_realized_pnl,
             ),
             starting_equity=starting_equity,
             current_equity=current_equity,
+            margin_level_percent=(
+                None
+                if broker_account_snapshot is None
+                else broker_account_snapshot.margin_level_percent
+            ),
+            effective_leverage=(
+                None
+                if broker_account_snapshot is None
+                else broker_account_snapshot.effective_leverage
+            ),
+            estimated_entry_price=_estimated_entry_price_for_risk(intent, quote),
             session_kill_switch=self._session_kill_switch_enabled,
             symbol_kill_switches=frozenset(self._symbol_kill_switches),
             volatility_guard_active=volatility_guard_active,
@@ -1038,6 +1082,79 @@ class DeploymentRuntime:
             self._day_start_equity_by_route[paper] = (utc_day, current_equity)
             return current_equity
         return existing[1]
+
+    def _resolve_day_realized_pnl(
+        self,
+        *,
+        paper: bool,
+        checked_at: datetime,
+        current_realized_pnl: float,
+    ) -> float:
+        utc_day = checked_at.astimezone(UTC).date()
+        existing = self._day_start_realized_pnl_by_route.get(paper)
+        if existing is None or existing[0] != utc_day:
+            self._day_start_realized_pnl_by_route[paper] = (utc_day, current_realized_pnl)
+            return 0.0
+        return current_realized_pnl - existing[1]
+
+    def _resolve_week_realized_pnl(
+        self,
+        *,
+        paper: bool,
+        checked_at: datetime,
+        current_realized_pnl: float,
+    ) -> float:
+        utc_day = checked_at.astimezone(UTC).date()
+        week_start = utc_day - timedelta(days=utc_day.weekday())
+        existing = self._week_start_realized_pnl_by_route.get(paper)
+        if existing is None or existing[0] != week_start:
+            self._week_start_realized_pnl_by_route[paper] = (
+                week_start,
+                current_realized_pnl,
+            )
+            return 0.0
+        return current_realized_pnl - existing[1]
+
+    def _route_positions_for_risk(
+        self,
+        intent: OrderIntent,
+        quote: ExecutionQuote,
+        *,
+        fallback_positions: Mapping[str, PositionState],
+    ) -> dict[str, PositionState]:
+        if intent.paper:
+            return dict(fallback_positions)
+        snapshot_provider = self._resolved_broker_snapshot_provider()
+        if snapshot_provider is None:
+            return dict(fallback_positions)
+        try:
+            broker_positions = snapshot_provider.list_broker_positions()
+        except Exception:
+            return dict(fallback_positions)
+        if not broker_positions:
+            return {}
+        return {
+            position.symbol: _position_state_from_broker_snapshot(position, quote)
+            for position in broker_positions
+        }
+
+    def _broker_account_snapshot_for_risk(
+        self,
+        intent: OrderIntent,
+    ) -> BrokerAccountSnapshot | None:
+        if intent.paper:
+            return None
+        provider = self._resolved_broker_account_provider()
+        if provider is None:
+            return None
+        try:
+            snapshot = provider.describe_broker_account()
+        except Exception as exc:
+            self._last_broker_account_provider_error = str(exc)
+            return None
+        self._last_broker_account_snapshot = snapshot
+        self._last_broker_account_provider_error = None
+        return snapshot
 
     def _data_freshness_snapshot_for_risk(self) -> DataFreshnessSnapshot | None:
         if self._data_freshness_provider is None:
@@ -2115,6 +2232,11 @@ class DeploymentRuntime:
             return snapshot_provider
         return self._as_broker_connectivity_provider(self._live_adapter)
 
+    def _resolved_broker_account_provider(self) -> BrokerAccountProvider | None:
+        if self._broker_account_provider is not None:
+            return self._broker_account_provider
+        return self._as_broker_account_provider(self._live_adapter)
+
     def _build_snapshot_report(self) -> ReconciliationReport:
         snapshot_provider = self._resolved_broker_snapshot_provider()
         if snapshot_provider is None:
@@ -2154,6 +2276,17 @@ class DeploymentRuntime:
         if not callable(list_orders_method) or not callable(list_positions_method):
             return None
         return cast(BrokerSnapshotProvider, candidate)
+
+    def _as_broker_account_provider(
+        self,
+        candidate: object | None,
+    ) -> BrokerAccountProvider | None:
+        if candidate is None:
+            return None
+        provider_method = getattr(candidate, "describe_broker_account", None)
+        if not callable(provider_method):
+            return None
+        return cast(BrokerAccountProvider, candidate)
 
     def _activate_reconciliation_fail_safe(
         self,
@@ -2399,6 +2532,42 @@ def _quote_to_payload(quote: ExecutionQuote) -> dict[str, object]:
         "spread": quote.spread,
         "venue": quote.venue,
     }
+
+
+def _estimated_entry_price_for_risk(
+    intent: OrderIntent,
+    quote: ExecutionQuote,
+) -> float:
+    if intent.limit_price is not None:
+        return float(intent.limit_price)
+    if intent.stop_price is not None:
+        return float(intent.stop_price)
+    if intent.side is OrderSide.BUY:
+        return quote.ask
+    return quote.bid
+
+
+def _position_state_from_broker_snapshot(
+    snapshot: BrokerPositionSnapshot,
+    quote: ExecutionQuote,
+) -> PositionState:
+    if snapshot.symbol == quote.symbol:
+        mark_price = quote.mid_price
+    elif snapshot.average_entry_price > 0:
+        mark_price = snapshot.average_entry_price
+    else:
+        mark_price = quote.mid_price
+    return PositionState(
+        symbol=snapshot.symbol,
+        timestamp=snapshot.timestamp,
+        net_quantity=snapshot.net_quantity,
+        average_entry_price=snapshot.average_entry_price,
+        mark_price=mark_price,
+        realized_pnl=0.0,
+        unrealized_pnl=0.0,
+        exposure_quote=snapshot.net_quantity * mark_price,
+        position_mode=snapshot.position_mode,
+    )
 
 
 def _tick_event_from_execution_quote(
