@@ -41,6 +41,12 @@ make compose-metrics
 make compose-supervise
 ```
 
+For local non-Docker bounded supervision, use:
+
+```bash
+make supervise-paper
+```
+
 Equivalent raw commands:
 
 ```bash
@@ -84,6 +90,17 @@ Docker Desktop validation on 2026-05-03:
   `reconciliation_due=true`, rendered metrics, and zero alerts/errors.
 - `docker compose --profile paper down` was run afterward to stop and remove the
   test Redis container/network.
+
+Local 30-iteration paper supervisor validation on 2026-05-03:
+
+- `make PYTHON=.venv/bin/python SUPERVISOR_ITERATIONS=30
+  SUPERVISOR_HEALTH_INTERVAL_SECONDS=0.05
+  SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS=0.05
+  SUPERVISOR_IDLE_SLEEP_SECONDS=0.05 supervise-paper` completed successfully.
+- All 30 iterations returned `overall_status=pass`, health and reconciliation
+  were due on every iteration, metrics rendered each time, and there were zero
+  runtime errors, alert transport errors, or alert events.
+- See `docs/runtime-supervision-evidence.md` for the evidence summary.
 
 ## Safety Notes
 

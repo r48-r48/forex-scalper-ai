@@ -22,6 +22,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed longer local paper supervisor evidence:
+  - added `make supervise-paper` for bounded local supervisor cycles using the existing supervisor interval variables and a local JSONL alert path
+  - ran `make PYTHON=.venv/bin/python SUPERVISOR_ITERATIONS=30 SUPERVISOR_HEALTH_INTERVAL_SECONDS=0.05 SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS=0.05 SUPERVISOR_IDLE_SLEEP_SECONDS=0.05 LOCAL_SUPERVISOR_ALERT_JSONL_PATH=data/artifacts/paper-supervisor-30-make-alerts.jsonl supervise-paper`
+  - result: `30` iterations, `30 pass`, health/reconciliation due on every iteration, metrics rendered on every iteration, runtime errors `0`, alert transport errors `0`, alert events `0`
+  - same-Mac Parallels VM `Windows 11` was reachable; read-only MT5 smoke with explicit `BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe` connected to Dukascopy demo account `610769553`, returned zero open orders/positions, and did not call `order_send`
+  - Windows VM project folder is currently a source copy rather than a Git checkout, so future code-sensitive MT5 validation should sync or clone the current `main` first
+  - added `docs/runtime-supervision-evidence.md` and refreshed runtime supervision docs/project memory
 - 2026-05-03 completed CI/local lint/typecheck gate promotion:
   - `Makefile` now has `check` for Ruff, mypy, compileall, and full pytest
   - `Makefile` now has `ci` for the local safe CI mirror, adding MT5 preflight to `check`

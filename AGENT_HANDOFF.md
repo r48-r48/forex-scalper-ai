@@ -500,6 +500,7 @@ Current repository status:
   - Paper-safe Docker/Compose runtime packaging and Docker Desktop validation are complete; keep future runtime-platform work focused on long-running supervision and deployment topology
   - Full-repo Ruff cleanup is now complete for `src`, `tests`, and `scripts`; repository-wide mypy cleanup is also complete for `src` with `Success: no issues found in 87 source files`; full Ruff, compileall, `git diff --check`, targeted pytest (`103 passed`), and full pytest (`265 passed`) passed after the cleanup
   - CI/local gate promotion is complete: `make check` runs Ruff, mypy, compileall, and full pytest; `make ci` adds the safe MT5 preflight; GitHub Actions now runs Ruff and mypy before compile/test/preflight; `make PYTHON=.venv/bin/python ci` passed end-to-end with full pytest `265 passed`
+  - Longer local paper supervision evidence is complete: `make supervise-paper` runs bounded local supervisor cycles; a 30-iteration run passed with `30 pass`, rendered metrics on every iteration, zero runtime errors, zero alert transport errors, and zero alerts; `docs/runtime-supervision-evidence.md` also records a same-Mac Parallels MT5 read-only smoke against Dukascopy demo account `610769553` with zero open orders/positions and no `order_send`
   - Local JSONL alert transport and HTTP webhook alert transport are implemented and now wired into the supervisor/`run_runtime.py supervise` path; concrete production endpoint values still depend on deployment topology
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
@@ -548,7 +549,7 @@ Current repository status:
 
 - continue validating the MT5-backed client against the real installed Windows terminal and saved demo session, using explicit terminal path plus sufficient history lookback for history/deal checks, and keep any further order-sending scenarios strictly demo-only and operator-approved
 - refine live execution readiness beyond the current paper-safe runtime boundary and reuse the reconciliation helpers as the comparison layer
-- keep Docker/Compose runtime packaging, Ruff, mypy, compileall, pytest, and safe MT5 preflight green while continuing dependency supervision and long-running runtime hardening
+- keep Docker/Compose runtime packaging, Ruff, mypy, compileall, pytest, safe MT5 preflight, and paper supervisor evidence green while continuing dependency supervision, longer wall-clock paper/shadow hardening, and remaining MT5 fault-injection checks
 - keep the PHASE 12 deployment wrapper as the single startup and observability surface
 
 ## Suggested Next Prompt For A New Chat

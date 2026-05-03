@@ -52,6 +52,7 @@ forex-scalper-ai/
     production-checklist.md
     platform-roadmap.md
     repo-tree.md
+    runtime-supervision-evidence.md
     runbooks/
       broker-disconnect.md
       emergency-flatten.md
