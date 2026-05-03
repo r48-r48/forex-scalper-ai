@@ -162,3 +162,26 @@ a training-only slice outside this command.
 The resulting bundle can be loaded by `load_baseline_filter_inference_package()` for
 runtime scoring. The loader verifies artifact SHA-256 values, model type, and ordered
 feature columns before returning predictions.
+
+## Train And Export A Transformer Bundle
+
+```bash
+.venv/bin/python scripts/train_transformer.py \
+  --input-path data/processed/supervised-dataset.parquet \
+  --output-dir data/artifacts/models/eurusd-transformer-20260503 \
+  --model-id eurusd-transformer-20260503 \
+  --training-end 2026-05-03T12:00:00Z \
+  --dataset-id eurusd-m1-demo \
+  --target-horizon 1m \
+  --validation-fraction 0.2 \
+  --epochs 20 \
+  --batch-size 128
+```
+
+The command writes `model.pt`, `scaler.json`, `metadata.json`, and
+`training-report.json`. It uses the same cutoff posture as the supervised filter:
+provide a UTC `--training-end` unless the input is already a curated train-only slice.
+The validation split is a tail split inside the selected training window, so later
+rows are not used to fit earlier rows. The resulting bundle can be loaded by
+`load_transformer_inference_package()` for runtime scoring without touching broker or
+live execution code.

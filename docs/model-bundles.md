@@ -49,6 +49,25 @@ The training command requires either an explicit UTC `--training-end` or a decla
 `available_timestamp` and by the target end timestamp so labels cannot cross the
 training cutoff.
 
+## Transformer Bundle Layout
+
+`scripts/train_transformer.py` exports the runtime-loadable transformer bundle shape:
+
+```text
+data/artifacts/models/eurusd-transformer-20260503/
+  metadata.json
+  model.pt
+  scaler.json
+  training-report.json
+```
+
+The command trains on the selected training window only, fits feature mean/scale
+preprocessing on the fit rows, and uses a tail validation split inside the selected
+window. `model.pt` stores the transformer config plus `state_dict`; `scaler.json`
+stores ordered feature means and scales. The runtime loader verifies both artifacts by
+SHA-256 when hashes are present, then reconstructs `TransformerSignalModel`,
+`LaggedFeatureTensorizer`, and preprocessing without reaching into broker/live code.
+
 ## Validation Rules
 
 The contract rejects:
@@ -130,7 +149,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from scalper_ai.models import load_baseline_filter_inference_package
+from scalper_ai.models import (
+    load_baseline_filter_inference_package,
+    load_transformer_inference_package,
+)
 
 package = load_baseline_filter_inference_package(
     Path("data/artifacts/models/eurusd-filter-20260503"),
@@ -138,9 +160,14 @@ package = load_baseline_filter_inference_package(
 feature_frame = pd.DataFrame(...)
 predictions = package.predict_frame(feature_frame)
 latest_signal = package.predict_latest(feature_frame, symbol="EURUSD")
+
+transformer_package = load_transformer_inference_package(
+    Path("data/artifacts/models/eurusd-transformer-20260503"),
+)
+scores = transformer_package.score_frame(feature_frame)
 ```
 
 The runtime loader verifies referenced artifact existence, SHA-256 digests when
-present, `model_type`, and ordered feature columns before scoring. It does not submit
-orders and does not reach into live adapters; order routing remains the deployment
-runtime's responsibility.
+present, `model_type`, ordered feature columns, transformer dimensions, and scaler
+contract before scoring. It does not submit orders and does not reach into live
+adapters; order routing remains the deployment runtime's responsibility.

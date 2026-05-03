@@ -22,6 +22,15 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed transformer training/export and runtime inference packaging:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/train_transformer.py` for leakage-controlled transformer training from flat supervised datasets
+  - the CLI requires a UTC `training_end` unless `input_is_train_only=True`, filters by `available_timestamp`, and enforces target-end cutoff when target-end columns are present so labels cannot cross the training boundary
+  - the CLI uses a tail validation split inside the selected training window, fits feature mean/scale preprocessing on fit rows only, trains `TransformerSignalModel`, and exports `model.pt`, `scaler.json`, `metadata.json`, and `training-report.json`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/models/runtime.py` now exposes `TRANSFORMER_SIGNAL_MODEL_TYPE`, `TransformerFeatureScaler`, `TransformerInferencePackage`, `TransformerSignal`, and `load_transformer_inference_package()`
+  - runtime loading verifies metadata model type, artifact existence, SHA-256 hashes, ordered feature columns, scaler contract, and transformer input/context dimensions before scoring feature frames
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/models/__init__.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/production-cli.md`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/model-bundles.md` were updated for the new bundle path
+  - focused validation passed: targeted Ruff, strict mypy for runtime/script paths, `git diff --check`, and `tests/unit/test_scripts_train_transformer.py tests/unit/test_models_runtime.py` with `8 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `91` source files, compileall green, full pytest `334 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed the fourth FX backtest realism slice:
   - added strict `FxSymbolSpec` loader helpers in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/config.py`: `fx_symbol_spec_from_mapping()` and `load_fx_symbol_spec()`
   - loaders accept either a flat JSON object or a top-level `fx_symbol` wrapper, reject unknown fields, reject missing required fields, validate string-keyed JSON objects, and reuse the existing `FxSymbolSpec` numeric/currency validation

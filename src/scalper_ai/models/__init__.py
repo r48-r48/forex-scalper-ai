@@ -23,9 +23,14 @@ from scalper_ai.models.bundle import (
 from scalper_ai.models.config import TransformerSignalConfig
 from scalper_ai.models.runtime import (
     BASELINE_FILTER_MODEL_TYPE,
+    TRANSFORMER_SIGNAL_MODEL_TYPE,
     BaselineFilterInferencePackage,
     BaselineFilterSignal,
+    TransformerFeatureScaler,
+    TransformerInferencePackage,
+    TransformerSignal,
     load_baseline_filter_inference_package,
+    load_transformer_inference_package,
 )
 from scalper_ai.models.tensorizer import LaggedFeatureTensorizer, SignalModelBatch
 from scalper_ai.models.transformer import (
@@ -48,6 +53,10 @@ __all__ = [
     "SupervisedBaselineFilterModel",
     "SignalModelOutput",
     "TrainingDataWindow",
+    "TRANSFORMER_SIGNAL_MODEL_TYPE",
+    "TransformerFeatureScaler",
+    "TransformerInferencePackage",
+    "TransformerSignal",
     "TransformerSignalConfig",
     "TransformerSignalModel",
     "TransformerSignalPredictor",
@@ -58,6 +67,7 @@ __all__ = [
     "load_baseline_filter_inference_package",
     "load_model_bundle_metadata",
     "load_supervised_baseline_filter_model",
+    "load_transformer_inference_package",
     "save_model_bundle_metadata",
     "save_supervised_baseline_filter_model",
     "supervised_baseline_filter_model_from_dict",
