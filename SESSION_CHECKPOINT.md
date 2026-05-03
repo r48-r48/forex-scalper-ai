@@ -22,12 +22,19 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed fresh-checkout Parallels MT5 validation:
+  - cloned the current repository into `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` inside the same-Mac Windows 11 VM without touching the older source-copy folder
+  - verified fresh Windows checkout commit `86afc80`, branch state `main...origin/main`, and clean status
+  - reused the existing Windows `.venv` Python `3.12.10` to run scripts from the fresh checkout, avoiding another pip/network dependency pass
+  - ran read-only `scripts\mt5_smoke.py --config-name mt5 --include-orders --include-positions` with `BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe`: connected to Dukascopy demo account `610769553`, balance/equity `99941.09`, zero open orders, zero open positions, and no `order_send`
+  - ran safe `scripts\mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force ioc --history-lookback-hours 8760 --include-raw-samples`: IOC `order_check` accepted with `retcode=0` / `Done`, `order_send_called=false`, raw history returned 6 orders / 5 deals including the known zero-volume deposit shape, and normalized open orders/positions remained zero
+  - `docs/runtime-supervision-evidence.md`, `docs/current-state.md`, `docs/todo-next.md`, `AGENT_HANDOFF.md`, and this checkpoint were refreshed so future code-sensitive Parallels checks use the clean checkout
 - 2026-05-03 completed longer local paper supervisor evidence:
   - added `make supervise-paper` for bounded local supervisor cycles using the existing supervisor interval variables and a local JSONL alert path
   - ran `make PYTHON=.venv/bin/python SUPERVISOR_ITERATIONS=30 SUPERVISOR_HEALTH_INTERVAL_SECONDS=0.05 SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS=0.05 SUPERVISOR_IDLE_SLEEP_SECONDS=0.05 LOCAL_SUPERVISOR_ALERT_JSONL_PATH=data/artifacts/paper-supervisor-30-make-alerts.jsonl supervise-paper`
   - result: `30` iterations, `30 pass`, health/reconciliation due on every iteration, metrics rendered on every iteration, runtime errors `0`, alert transport errors `0`, alert events `0`
   - same-Mac Parallels VM `Windows 11` was reachable; read-only MT5 smoke with explicit `BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe` connected to Dukascopy demo account `610769553`, returned zero open orders/positions, and did not call `order_send`
-  - Windows VM project folder is currently a source copy rather than a Git checkout, so future code-sensitive MT5 validation should sync or clone the current `main` first
+  - the earlier Windows source-copy limitation is closed by the new `forex-scalper-ai-current` Git checkout
   - added `docs/runtime-supervision-evidence.md` and refreshed runtime supervision docs/project memory
 - 2026-05-03 completed CI/local lint/typecheck gate promotion:
   - `Makefile` now has `check` for Ruff, mypy, compileall, and full pytest
@@ -777,10 +784,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
-- continue concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and small-batch Ruff/mypy cleanup
+- use `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` for future latest-code Parallels MT5 checks
+- continue concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
 
 If further MT5 validation is paused:
-- continue with network alert transport topology, runtime supervision hardening, and small-batch Ruff/mypy cleanup now that Docker/Compose validation is complete
+- continue with network alert transport topology and runtime supervision hardening now that Docker/Compose validation is complete
 
 ## If Context Gets Compressed
 
