@@ -31,6 +31,24 @@ The `schema_hash` is computed from the ordered `feature_columns` plus `target_sp
 Feature order is part of the contract because tensorized model inputs depend on it.
 Equivalent JSON key ordering inside `target_spec.parameters` produces the same hash.
 
+## Baseline Filter Bundle Layout
+
+`scripts/train_supervised_filter.py` exports the first runtime-loadable bundle shape:
+
+```text
+data/artifacts/models/eurusd-filter-20260503/
+  metadata.json
+  model.json
+  scaler.json
+  feature_importance.csv
+  training-report.json
+```
+
+The training command requires either an explicit UTC `--training-end` or a declared
+`--input-is-train-only` source. When `--training-end` is provided, rows are filtered by
+`available_timestamp` and by the target end timestamp so labels cannot cross the
+training cutoff.
+
 ## Validation Rules
 
 The contract rejects:
@@ -104,3 +122,25 @@ restored = load_model_bundle_metadata(path)
 `save_model_bundle_metadata()` writes a temporary file in the same directory, fsyncs
 it, and replaces the destination path. This is sufficient for local repository
 artifact work; a later registry or object-store layer can wrap the same contract.
+
+## Runtime Loading
+
+```python
+from pathlib import Path
+
+import pandas as pd
+
+from scalper_ai.models import load_baseline_filter_inference_package
+
+package = load_baseline_filter_inference_package(
+    Path("data/artifacts/models/eurusd-filter-20260503"),
+)
+feature_frame = pd.DataFrame(...)
+predictions = package.predict_frame(feature_frame)
+latest_signal = package.predict_latest(feature_frame, symbol="EURUSD")
+```
+
+The runtime loader verifies referenced artifact existence, SHA-256 digests when
+present, `model_type`, and ordered feature columns before scoring. It does not submit
+orders and does not reach into live adapters; order routing remains the deployment
+runtime's responsibility.

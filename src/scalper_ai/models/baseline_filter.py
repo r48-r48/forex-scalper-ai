@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import os
+import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import cast
 
 import numpy as np
@@ -12,6 +17,7 @@ from scalper_ai.data.datasets import SupervisedDataset
 
 _DEFAULT_MIN_SCALE = 1e-12
 _ZERO_TOLERANCE = 1e-12
+_MODEL_FORMAT_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -144,6 +150,89 @@ def fit_supervised_baseline_filter(
     )
 
 
+def supervised_baseline_filter_model_to_dict(
+    model: SupervisedBaselineFilterModel,
+) -> dict[str, object]:
+    """Return a JSON-ready payload for a fitted supervised baseline filter."""
+
+    return {
+        "model_format_version": _MODEL_FORMAT_VERSION,
+        "model_type": "supervised_baseline_filter",
+        "feature_columns": list(model.feature_columns),
+        "feature_means": list(model.feature_means),
+        "feature_scales": list(model.feature_scales),
+        "weights": list(model.weights),
+        "bias": model.bias,
+        "score_threshold": model.score_threshold,
+    }
+
+
+def supervised_baseline_filter_model_from_dict(
+    payload: Mapping[str, object],
+) -> SupervisedBaselineFilterModel:
+    """Restore a fitted supervised baseline filter from a JSON mapping."""
+
+    version = payload.get("model_format_version")
+    if version != _MODEL_FORMAT_VERSION:
+        raise ValueError(f"model_format_version must be {_MODEL_FORMAT_VERSION}.")
+    model_type = payload.get("model_type")
+    if model_type != "supervised_baseline_filter":
+        raise ValueError("model_type must be supervised_baseline_filter.")
+
+    return SupervisedBaselineFilterModel(
+        feature_columns=_required_text_tuple(payload, "feature_columns"),
+        feature_means=_required_float_tuple(payload, "feature_means"),
+        feature_scales=_required_float_tuple(payload, "feature_scales"),
+        weights=_required_float_tuple(payload, "weights"),
+        bias=_required_float(payload, "bias"),
+        score_threshold=_required_float(payload, "score_threshold"),
+    )
+
+
+def save_supervised_baseline_filter_model(
+    model: SupervisedBaselineFilterModel,
+    path: Path,
+) -> Path:
+    """Persist a fitted supervised baseline filter JSON artifact atomically."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = json.dumps(
+        supervised_baseline_filter_model_to_dict(model),
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+    )
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            delete=False,
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        ) as handle:
+            temp_path = Path(handle.name)
+            handle.write(serialized)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
+    return path
+
+
+def load_supervised_baseline_filter_model(path: Path) -> SupervisedBaselineFilterModel:
+    """Load and validate a fitted supervised baseline filter JSON artifact."""
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError("Supervised baseline filter JSON must be an object.")
+    return supervised_baseline_filter_model_from_dict(cast(Mapping[str, object], payload))
+
+
 def target_directions(targets: pd.Series | np.ndarray, *, threshold: float = 0.0) -> np.ndarray:
     """Convert numeric targets to directional labels {-1, 0, 1}."""
 
@@ -185,3 +274,39 @@ def _coerce_target_array(targets: pd.Series | np.ndarray) -> np.ndarray:
 
 def _finite_sequence(values: tuple[float, ...]) -> bool:
     return bool(np.isfinite(np.asarray(values, dtype=float)).all())
+
+
+def _required_text_tuple(payload: Mapping[str, object], key: str) -> tuple[str, ...]:
+    value = payload.get(key)
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{key} must be a non-empty list of strings.")
+    normalized: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f"{key} must contain non-empty strings.")
+        normalized.append(item.strip())
+    if len(set(normalized)) != len(normalized):
+        raise ValueError(f"{key} must not contain duplicates.")
+    return tuple(normalized)
+
+
+def _required_float_tuple(payload: Mapping[str, object], key: str) -> tuple[float, ...]:
+    value = payload.get(key)
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{key} must be a non-empty list of numbers.")
+    return tuple(_coerce_json_float(item, key) for item in value)
+
+
+def _required_float(payload: Mapping[str, object], key: str) -> float:
+    if key not in payload:
+        raise ValueError(f"{key} is required.")
+    return _coerce_json_float(payload[key], key)
+
+
+def _coerce_json_float(value: object, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{field_name} must be numeric.")
+    resolved = float(value)
+    if not np.isfinite(resolved):
+        raise ValueError(f"{field_name} must be finite.")
+    return resolved

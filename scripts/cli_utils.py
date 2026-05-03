@@ -115,10 +115,10 @@ def json_ready_value(value: object) -> JsonValue:
         if pd.isna(value):
             return None
         if value.tzinfo is not None and value.utcoffset() is not None:
-            return value.tz_convert("UTC").isoformat().replace("+00:00", "Z")
-        return value.isoformat()
+            return str(value.tz_convert("UTC").isoformat()).replace("+00:00", "Z")
+        return str(value.isoformat())
     if isinstance(value, pd.Timedelta):
-        return value.total_seconds()
+        return float(value.total_seconds())
     if isinstance(value, int) and not isinstance(value, bool):
         return value
     if isinstance(value, float):

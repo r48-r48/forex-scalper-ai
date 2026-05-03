@@ -98,3 +98,26 @@ This command fits the transparent supervised baseline filter on train folds only
 evaluates directional predictions on out-of-sample test folds. Cost settings are
 recorded in the report as explicit evaluation context; this directional filter does
 not convert predictions into broker fills.
+
+## Train And Export A Supervised Filter Bundle
+
+```bash
+.venv/bin/python scripts/train_supervised_filter.py \
+  --input-path data/processed/supervised-dataset.parquet \
+  --output-dir data/artifacts/models/eurusd-filter-20260503 \
+  --model-id eurusd-filter-20260503 \
+  --training-end 2026-05-03T12:00:00Z \
+  --dataset-id eurusd-m1-demo \
+  --target-horizon 1m \
+  --target-threshold 0.0001
+```
+
+The command writes `model.json`, `scaler.json`, `metadata.json`,
+`feature_importance.csv`, and `training-report.json`. To avoid target leakage, use an
+explicit UTC `--training-end`; rows whose target end timestamp crosses that cutoff are
+excluded. Only pass `--input-is-train-only` when the input file was already curated as
+a training-only slice outside this command.
+
+The resulting bundle can be loaded by `load_baseline_filter_inference_package()` for
+runtime scoring. The loader verifies artifact SHA-256 values, model type, and ordered
+feature columns before returning predictions.

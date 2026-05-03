@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -11,6 +12,10 @@ from scalper_ai.data.datasets import SupervisedDataset
 from scalper_ai.models import (
     SupervisedBaselineFilterConfig,
     fit_supervised_baseline_filter,
+    load_supervised_baseline_filter_model,
+    save_supervised_baseline_filter_model,
+    supervised_baseline_filter_model_from_dict,
+    supervised_baseline_filter_model_to_dict,
     target_directions,
 )
 
@@ -52,6 +57,32 @@ def test_supervised_baseline_filter_requires_both_directional_classes() -> None:
 
     with pytest.raises(ValueError, match="both positive and negative"):
         fit_supervised_baseline_filter(dataset)
+
+
+def test_supervised_baseline_filter_model_serializes_roundtrip(tmp_path: Path) -> None:
+    dataset = _dataset()
+    model = fit_supervised_baseline_filter(dataset)
+    path = tmp_path / "model.json"
+
+    saved_path = save_supervised_baseline_filter_model(model, path)
+    restored = load_supervised_baseline_filter_model(saved_path)
+    restored_from_payload = supervised_baseline_filter_model_from_dict(
+        supervised_baseline_filter_model_to_dict(model)
+    )
+
+    assert saved_path == path
+    assert restored == model
+    assert restored_from_payload == model
+    assert restored.predict_frame(dataset.features).tolist() == [-1, -1, 1, 1]
+
+
+def test_supervised_baseline_filter_model_rejects_bad_payload() -> None:
+    model = fit_supervised_baseline_filter(_dataset())
+    payload = supervised_baseline_filter_model_to_dict(model)
+    payload["feature_scales"] = [0.0] * len(model.feature_columns)
+
+    with pytest.raises(ValueError, match="feature_scales must be positive"):
+        supervised_baseline_filter_model_from_dict(payload)
 
 
 def _dataset(targets=(-0.003, -0.002, 0.002, 0.003)) -> SupervisedDataset:

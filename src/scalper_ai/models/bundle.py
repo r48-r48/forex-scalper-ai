@@ -269,6 +269,16 @@ def compute_feature_contract_hash(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def hash_file_sha256(path: Path) -> str:
+    """Return the SHA-256 hex digest for an artifact file."""
+
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 def save_model_bundle_metadata(metadata: ModelBundleMetadata, path: Path) -> Path:
     """Persist model bundle metadata JSON with a same-directory atomic replace."""
 

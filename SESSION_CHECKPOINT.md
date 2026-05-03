@@ -22,6 +22,15 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed supervised baseline training/export and runtime inference packaging:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/train_supervised_filter.py` for explicit-cutoff supervised filter training and bundle export
+  - `SupervisedBaselineFilterModel` now has JSON-safe payload helpers plus atomic save/load helpers
+  - `ModelBundleArtifact` references can now be verified through `hash_file_sha256`
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/models/runtime.py` with `BaselineFilterInferencePackage`, `BaselineFilterSignal`, and `load_baseline_filter_inference_package()`
+  - runtime loading verifies artifact existence, SHA-256 digests, model type, and ordered feature columns before scoring
+  - docs were updated in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/production-cli.md` and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/model-bundles.md`
+  - targeted validation passed: Ruff for touched model/script/tests, strict mypy for touched model/script paths, compileall, and targeted pytest with `15 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `91` source files, compileall green, full pytest `317 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed risk-budget config/runtime broker-context wiring:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/execution/account.py` with generic `BrokerAccountSnapshot` / `BrokerAccountProvider` contracts for account-level risk state
   - extended `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/config/models.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/config/loader.py`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/configs/base.yaml` with opt-in risk-budget config/env fields: `max_weekly_loss`, `max_risk_per_trade`, `max_open_positions`, `min_margin_level_percent`, and `max_leverage`
@@ -832,10 +841,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
 - use `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` for future latest-code Parallels MT5 checks
-- continue concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
+- supervised baseline training/export and runtime inference packaging are complete; next deepen FX backtest realism beyond bid/ask, continue concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
 
 If further MT5 validation is paused:
-- continue with network alert transport topology and runtime supervision hardening now that Docker/Compose validation is complete
+- continue with FX backtest realism and network alert transport topology now that Docker/Compose validation is complete
 
 ## If Context Gets Compressed
 
