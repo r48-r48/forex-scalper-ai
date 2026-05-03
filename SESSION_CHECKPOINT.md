@@ -22,6 +22,26 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-04 added direct Dukascopy historical tick download and timeframe derivation:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/download_dukascopy_ticks.py`
+    for public hourly `.bi5` vendor archive download from Dukascopy, UTC bid/ask
+    tick decoding, SHA/provenance capture, failed-hour evidence, and resumable
+    multi-year execution
+  - the script reuses `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/bootstrap_history.py`
+    for QA-gated normalized tick parquet and derives `TICK`, `M1`, `M2`, `M3`,
+    `M4`, `M5`, `M6`, `M10`, `M12`, `M15`, `M20`, `M30`, `H1`, `H2`, `H3`,
+    `H4`, `H6`, `H8`, `H12`, and `D1` artifacts under ignored `data/`
+  - transient HTTP/timeout failures are retried; corrupt/closed-session hourly files
+    are deleted and recorded as failed hours; days with failed hours are not treated
+    as fully complete on rerun
+  - real EURUSD pilots passed against Dukascopy data, including a known problematic
+    Friday with partial/invalid late-session hourly archives
+  - focused validation passed: targeted Ruff, compileall, `git diff --check`, and
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_download_dukascopy_ticks.py`
+    with `4 passed`
+  - the long EURUSD range `2016-01-01` through `2026-05-04` is resumable under
+    ignored `data/`; at checkpoint time more than 100 daily tick parquet artifacts
+    had already been materialized
 - 2026-05-04 completed historical CSV/Parquet data bootstrap with QA evidence:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/bootstrap_history.py`
     for broker/vendor historical exports

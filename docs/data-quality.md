@@ -22,6 +22,10 @@ Production-facing CLI:
   the tick-like raw schema and writes a `DataQualityReport` artifact before feature
   engineering. It is offline-only and records any received-timestamp fill or
   explicit synthetic-spread assumption in its summary JSON.
+- `scripts/download_dukascopy_ticks.py` downloads Dukascopy hourly `.bi5` archives,
+  decodes them into UTC bid/ask ticks, sorts by real UTC event time before QA, reuses
+  the bootstrap gate, and derives standard intraday/D1 bar artifacts from the same
+  tick source.
 
 Focused helper checks:
 

@@ -29,6 +29,35 @@ columns or an explicit `--mid-price-column` plus `--synthetic-spread-bps`. No sp
 is synthesized by default. If `received_timestamp` is absent, it is filled from
 `event_timestamp` and this assumption is recorded in the summary.
 
+## Download Dukascopy Tick History
+
+```bash
+.venv/bin/python scripts/download_dukascopy_ticks.py \
+  --symbol EURUSD \
+  --start-date 2016-01-01 \
+  --end-date 2026-05-04 \
+  --vendor-output-dir data/raw/vendor/dukascopy \
+  --parsed-output-dir data/raw/vendor/dukascopy/parsed \
+  --bootstrap-output-dir data/raw/history/dukascopy \
+  --bars-output-dir data/processed/bars/dukascopy \
+  --summary-output-path data/artifacts/dukascopy/EURUSD/download-summary-2016-01-01-to-2026-05-04.json \
+  --day-workers 8 \
+  --hour-workers 4
+```
+
+This downloader uses Dukascopy's public historical datafeed as the vendor source.
+It saves the original hourly `.bi5` archives, decodes bid/ask ticks, runs the same
+QA-gated `bootstrap_history.py` normalization, and derives local bar files for:
+`TICK`, `M1`, `M2`, `M3`, `M4`, `M5`, `M6`, `M10`, `M12`, `M15`, `M20`, `M30`,
+`H1`, `H2`, `H3`, `H4`, `H6`, `H8`, `H12`, and `D1`.
+
+The command is resumable by default. Completed daily tick and bar outputs are skipped
+on rerun, raw hourly archives are reused when present, and days without public
+archives are recorded as `no_data_available` instead of stopping a multi-year range.
+`--day-workers` can be used for moderate parallelism across independent UTC days,
+and `--hour-workers` downloads independent hourly archives inside each day in
+parallel. All timestamps are decoded as UTC; no broker orders are submitted.
+
 ## Build Offline Features
 
 ```bash
