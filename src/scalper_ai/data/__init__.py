@@ -20,7 +20,11 @@ from scalper_ai.data.datasets import (
 from scalper_ai.data.interfaces import BatchWriter, BookStreamSource, TickStreamSource
 from scalper_ai.data.labels import TargetConfig, add_future_targets
 from scalper_ai.data.mt5 import Mt5BookIngestionAdapter, Mt5TickIngestionAdapter
-from scalper_ai.data.preprocessing import fractional_differentiate, fractional_diff_weights, mid_price
+from scalper_ai.data.preprocessing import (
+    fractional_diff_weights,
+    fractional_differentiate,
+    mid_price,
+)
 from scalper_ai.data.raw_writer import RawParquetWriter
 from scalper_ai.data.replay import ReplayBookSource, ReplayTickSource
 from scalper_ai.data.splits import (

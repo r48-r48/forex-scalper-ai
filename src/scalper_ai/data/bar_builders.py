@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from math import log
-from typing import Any, Optional
+from typing import Any
 
 from scalper_ai.data.preprocessing import mid_price, trade_proxy_price, volume_proxy
 from scalper_ai.domain import BarEvent, BarType, TickEvent
@@ -31,7 +31,7 @@ class _BarAccumulator:
     sell_volume: float
 
     @classmethod
-    def from_tick(cls, tick: TickEvent, signed_volume: float = 0.0) -> "_BarAccumulator":
+    def from_tick(cls, tick: TickEvent, signed_volume: float = 0.0) -> _BarAccumulator:
         price = trade_proxy_price(tick)
         volume = volume_proxy(tick)
         buy_volume = volume if signed_volume > 0 else 0.0
@@ -72,7 +72,7 @@ class _BarAccumulator:
         bar_type: BarType,
         *,
         imbalance: float | None = None,
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> BarEvent:
         vwap = self.notional / self.volume if self.volume > 0 else None
         return BarEvent(
@@ -132,7 +132,10 @@ class TimeBarBuilder(BaseBarBuilder):
 
         assert self._bucket_start is not None
         if bucket_start != self._bucket_start:
-            completed = self._state.to_bar(self._bar_type, metadata={"interval": str(self._interval)})
+            completed = self._state.to_bar(
+                self._bar_type,
+                metadata={"interval": str(self._interval)},
+            )
             self._bucket_start = bucket_start
             self._state = _BarAccumulator.from_tick(tick)
             self._state.start_timestamp = bucket_start
@@ -144,7 +147,10 @@ class TimeBarBuilder(BaseBarBuilder):
     def flush(self) -> list[BarEvent]:
         if self._state is None:
             return []
-        completed = self._state.to_bar(self._bar_type, metadata={"interval": str(self._interval)})
+        completed = self._state.to_bar(
+            self._bar_type,
+            metadata={"interval": str(self._interval)},
+        )
         self._state = None
         self._bucket_start = None
         return [completed]
@@ -169,14 +175,20 @@ class TickBarBuilder(BaseBarBuilder):
         if self._state.tick_count < self._ticks_per_bar:
             return []
 
-        completed = self._state.to_bar(self._bar_type, metadata={"ticks_per_bar": self._ticks_per_bar})
+        completed = self._state.to_bar(
+            self._bar_type,
+            metadata={"ticks_per_bar": self._ticks_per_bar},
+        )
         self._state = None
         return [completed]
 
     def flush(self) -> list[BarEvent]:
         if self._state is None:
             return []
-        completed = self._state.to_bar(self._bar_type, metadata={"ticks_per_bar": self._ticks_per_bar})
+        completed = self._state.to_bar(
+            self._bar_type,
+            metadata={"ticks_per_bar": self._ticks_per_bar},
+        )
         self._state = None
         return [completed]
 
@@ -256,13 +268,19 @@ class ImbalanceBarBuilder(BaseBarBuilder):
         self._previous_mid = current_mid
         self._last_direction = direction
 
-        if self._state.tick_count < 2 or abs(self._cumulative_imbalance) < self._imbalance_threshold:
+        if (
+            self._state.tick_count < 2
+            or abs(self._cumulative_imbalance) < self._imbalance_threshold
+        ):
             return []
 
         completed = self._state.to_bar(
             self._bar_type,
             imbalance=self._cumulative_imbalance,
-            metadata={"imbalance_threshold": self._imbalance_threshold, "volume_weighted": self._volume_weighted},
+            metadata={
+                "imbalance_threshold": self._imbalance_threshold,
+                "volume_weighted": self._volume_weighted,
+            },
         )
         self._state = None
         self._cumulative_imbalance = 0.0
@@ -274,7 +292,10 @@ class ImbalanceBarBuilder(BaseBarBuilder):
         completed = self._state.to_bar(
             self._bar_type,
             imbalance=self._cumulative_imbalance,
-            metadata={"imbalance_threshold": self._imbalance_threshold, "volume_weighted": self._volume_weighted},
+            metadata={
+                "imbalance_threshold": self._imbalance_threshold,
+                "volume_weighted": self._volume_weighted,
+            },
         )
         self._state = None
         self._cumulative_imbalance = 0.0
@@ -290,7 +311,12 @@ class ImbalanceBarBuilder(BaseBarBuilder):
         return self._last_direction
 
 
-def build_bars(builder: BaseBarBuilder, ticks: list[TickEvent], *, flush: bool = True) -> list[BarEvent]:
+def build_bars(
+    builder: BaseBarBuilder,
+    ticks: list[TickEvent],
+    *,
+    flush: bool = True,
+) -> list[BarEvent]:
     """Process a sequence of ticks through a bar builder."""
 
     bars: list[BarEvent] = []
@@ -306,4 +332,4 @@ def floor_timestamp(timestamp: datetime, interval: timedelta) -> datetime:
 
     total_seconds = interval.total_seconds()
     floored_seconds = int(timestamp.timestamp() // total_seconds) * total_seconds
-    return datetime.fromtimestamp(floored_seconds, tz=timezone.utc)
+    return datetime.fromtimestamp(floored_seconds, tz=UTC)

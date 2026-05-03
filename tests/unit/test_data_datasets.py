@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -46,7 +46,10 @@ def test_build_supervised_dataset_preserves_causal_target_alignment() -> None:
 
     assert len(dataset) == 1
     assert dataset.targets.iloc[0] == pytest.approx(0.15)
-    assert dataset.metadata.iloc[0]["available_timestamp"] < dataset.metadata.iloc[0]["target_end_timestamp"]
+    assert (
+        dataset.metadata.iloc[0]["available_timestamp"]
+        < dataset.metadata.iloc[0]["target_end_timestamp"]
+    )
 
 
 def _make_single_symbol_frame(*, mid_returns: list[float]) -> pd.DataFrame:
@@ -60,7 +63,7 @@ def _make_multi_symbol_frame() -> pd.DataFrame:
 
 
 def _make_frame(*, symbol: str, mid_returns: list[float], spread_base: float) -> pd.DataFrame:
-    base_time = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC)
     records: list[dict[str, object]] = []
     for index, mid_return in enumerate(mid_returns):
         timestamp = base_time + timedelta(seconds=index)

@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
-
-import pandas as pd
 
 from scalper_ai.data.datasets import SupervisedDataset
 
@@ -17,7 +14,7 @@ class WalkForwardConfig:
     train_size: int
     validation_size: int
     test_size: int
-    step_size: Optional[int] = None
+    step_size: int | None = None
     embargo_size: int = 0
 
     def __post_init__(self) -> None:
@@ -99,7 +96,9 @@ def generate_walk_forward_splits(
             test_start=test_start,
             test_end=test_end,
             train_end_timestamp=ordered_metadata.iloc[train_end - 1]["available_timestamp"],
-            validation_end_timestamp=ordered_metadata.iloc[validation_end - 1]["available_timestamp"],
+            validation_end_timestamp=ordered_metadata.iloc[validation_end - 1][
+                "available_timestamp"
+            ],
             test_end_timestamp=ordered_metadata.iloc[test_end - 1]["available_timestamp"],
         )
         splits.append(split)

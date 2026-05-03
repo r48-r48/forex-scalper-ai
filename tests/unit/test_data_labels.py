@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -41,7 +41,7 @@ def test_add_future_targets_supports_classification_mode() -> None:
 
 
 def _make_feature_frame(*, mid_returns: list[float]) -> pd.DataFrame:
-    base_time = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC)
     records: list[dict[str, object]] = []
     for index, mid_return in enumerate(mid_returns):
         timestamp = base_time + timedelta(seconds=index)

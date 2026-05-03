@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pyarrow as pa
@@ -19,7 +19,13 @@ class FakeMt5Client:
     BOOK_TYPE_BUY = 1
     BOOK_TYPE_SELL = 2
 
-    def copy_ticks_range(self, symbol: str, start_time: datetime, end_time: datetime, flags: int) -> list[dict[str, float]]:
+    def copy_ticks_range(
+        self,
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+        flags: int,
+    ) -> list[dict[str, float]]:
         return [
             {
                 "time_msc": 1774515600000,
@@ -84,8 +90,8 @@ def test_mt5_tick_adapter_normalizes_payload() -> None:
 
     events = list(
         adapter.stream(
-            start_time=datetime(2026, 3, 26, 9, 0, tzinfo=timezone.utc),
-            end_time=datetime(2026, 3, 26, 10, 0, tzinfo=timezone.utc),
+            start_time=datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
+            end_time=datetime(2026, 3, 26, 10, 0, tzinfo=UTC),
         )
     )
 

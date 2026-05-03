@@ -37,7 +37,7 @@ class ReplayCollector(Generic[EventT]):
         """Consume replay events and persist them in buffered batches."""
 
         stats = IngestionRunStats()
-        stream = getattr(self._source, "stream")
+        stream = self._source.stream
         for event in stream(limit=limit):
             stats.events_read += 1
             stats.files_written.extend(self._writer.write(event))

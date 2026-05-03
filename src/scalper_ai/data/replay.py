@@ -6,8 +6,8 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
-import pyarrow.parquet as pq
 import orjson
+import pyarrow.parquet as pq
 
 from scalper_ai.domain import BookSnapshot, DomainModel, TickEvent
 

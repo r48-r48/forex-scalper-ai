@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 import pandas as pd
 
@@ -44,7 +44,7 @@ class TargetConfig:
 def add_future_targets(
     feature_frame: pd.DataFrame,
     *,
-    config: Optional[TargetConfig] = None,
+    config: TargetConfig | None = None,
 ) -> pd.DataFrame:
     """Return a frame with leakage-safe future targets derived per symbol."""
 
@@ -70,7 +70,10 @@ def add_future_targets(
                 continue
 
             future_values = values[index + 1 : end_index + 1]
-            target_value = _aggregate_future_values(future_values, aggregation=resolved_config.aggregation)
+            target_value = _aggregate_future_values(
+                future_values,
+                aggregation=resolved_config.aggregation,
+            )
             if resolved_config.mode == "classification":
                 target_value = float(
                     _classify_target(

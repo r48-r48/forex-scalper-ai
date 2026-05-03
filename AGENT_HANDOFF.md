@@ -334,6 +334,7 @@ Current repository status:
 - Validation Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `409` to `402` issues
 - Models Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `402` to `392` issues
 - Risk Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `392` to `374` issues
+- Data-layer Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `374` to `163` issues
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -407,6 +408,9 @@ Current repository status:
 - `.venv/bin/pytest tests/unit/test_risk_engine.py` passed on 2026-04-28 with `12 passed` after risk cleanup
 - `.venv/bin/python -m compileall src tests scripts` passed on 2026-04-28 after risk cleanup
 - `.venv/bin/pytest` passed on 2026-04-28 with `165 passed` after risk cleanup
+- Data-layer Ruff cleanup passed on 2026-05-03: targeted Ruff is green for `src/scalper_ai/data` plus selected data unit/integration tests; full Ruff baseline dropped from `374` to `163` issues
+- `.venv/bin/python -m pytest tests/unit/test_data_bar_builders.py tests/unit/test_data_buffering.py tests/unit/test_data_datasets.py tests/unit/test_data_labels.py tests/unit/test_data_preprocessing.py tests/unit/test_data_replay.py tests/integration/test_raw_parquet_ingestion.py tests/integration/test_walk_forward_splits.py tests/integration/test_model_dataset_bridge.py` passed on 2026-05-03 with `20 passed` after data-layer cleanup
+- `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed on 2026-05-03 with `265 passed` after data-layer cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -435,6 +439,7 @@ Current repository status:
 - Session updated on: 2026-05-03
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - data-layer Ruff cleanup is complete: `src/scalper_ai/data` and selected data tests now pass targeted Ruff; selected data pytest passed with `20 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `374` to `163`
   - Docker/Compose bounded paper supervisor validation is complete: added `make compose-supervise` for reproducible bounded supervisor runs, then ran Compose `paper-runtime supervise` for 5 paper iterations with `health_due=true`, `reconciliation_due=true`, `overall_status=pass`, rendered metrics on every iteration, `alert_count=0`, no alert errors, no runtime errors, and Compose cleanup afterward
   - Docker/Compose paper-runtime validation is complete on Docker Desktop: `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1`, `docker build -t forex-scalper-ai:local .` passed, Compose `paper-runtime describe` returned paper mode, Compose `health` returned `overall_status=pass`, Compose `metrics` emitted Prometheus-style runtime metrics, and `docker compose --profile paper down` cleaned up the test Redis container/network
   - MT5 post-send fallback fault-injection validation is complete: after a successful MT5 `order_send`, `Mt5TerminalClient` now falls back to the broker send result instead of raising if immediate order/history/deal refresh fails or the success response lacks a numeric ticket; explicit non-success `order_send` retcodes remain normalized rejected states; targeted Ruff, `25 passed` targeted MT5 client pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `265 passed`

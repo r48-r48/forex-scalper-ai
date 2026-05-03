@@ -6,7 +6,7 @@ import math
 
 import numpy as np
 
-from scalper_ai.data.preprocessing import fractional_differentiate, fractional_diff_weights
+from scalper_ai.data.preprocessing import fractional_diff_weights, fractional_differentiate
 
 
 def test_fractional_diff_weights_start_with_one_and_truncate() -> None:

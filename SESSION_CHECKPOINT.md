@@ -22,6 +22,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed data-layer Ruff cleanup:
+  - `src/scalper_ai/data` and selected data tests now pass targeted Ruff
+  - cleanup modernized optional annotations, moved `Sequence` imports to `collections.abc`, switched UTC usage to `datetime.UTC`, sorted imports, removed a constant `getattr`, and wrapped long expressions without changing data/ingestion behavior
+  - selected data-layer pytest passed with `20 passed`
+  - compileall, `git diff --check`, and full pytest passed with `265 passed`
+  - full-repository Ruff baseline dropped from `374` to `163` historical issues
 - 2026-05-03 completed Docker/Compose bounded paper supervisor validation:
   - added `make compose-supervise` for reproducible bounded supervisor checks with configurable iteration and interval variables
   - `docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-iterations 5 --health-interval-seconds 0.1 --reconciliation-interval-seconds 0.1 --idle-sleep-seconds 0.2 --alert-jsonl-path /app/data/artifacts/paper-supervisor-alerts.jsonl` completed successfully
@@ -227,6 +233,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated risk tests to use `datetime.UTC`
   - targeted Ruff is now green for `src/scalper_ai/risk` and `tests/unit/test_risk_engine.py`
   - full Ruff baseline dropped from `392` to `374` issues
+- 2026-05-03 completed data-layer Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/data`
+  - updated selected data unit/integration tests to use modern imports and `datetime.UTC`
+  - targeted Ruff is now green for `src/scalper_ai/data` and selected data tests
+  - full Ruff baseline dropped from `374` to `163` issues
 - 2026-04-28 completed same-Mac Parallels Windows 11 MT5 setup and safe demo validation:
   - VM: `Windows 11`, accessed directly with `prlctl exec --current-user`; SSH is not required for this VM
   - Windows project copy: `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai`

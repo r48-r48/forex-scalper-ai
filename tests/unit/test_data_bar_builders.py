@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from scalper_ai.data.bar_builders import (
     ImbalanceBarBuilder,
@@ -22,7 +22,7 @@ def make_tick(
     last_price: float | None = None,
     last_size: float | None = None,
 ) -> TickEvent:
-    timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc) + timedelta(seconds=second)
+    timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC) + timedelta(seconds=second)
     return TickEvent(
         symbol="EURUSD",
         venue="REPLAY",
@@ -47,8 +47,8 @@ def test_time_bar_builder_groups_ticks_by_interval() -> None:
     assert len(bars) == 2
     assert bars[0].bar_type == BarType.TIME
     assert bars[0].tick_count == 2
-    assert bars[0].start_timestamp == datetime(2026, 3, 26, 9, 0, tzinfo=timezone.utc)
-    assert bars[1].start_timestamp == datetime(2026, 3, 26, 9, 1, tzinfo=timezone.utc)
+    assert bars[0].start_timestamp == datetime(2026, 3, 26, 9, 0, tzinfo=UTC)
+    assert bars[1].start_timestamp == datetime(2026, 3, 26, 9, 1, tzinfo=UTC)
 
 
 def test_tick_bar_builder_emits_fixed_size_bars() -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypeVar
 from uuid import uuid4
@@ -52,12 +52,17 @@ class RawParquetWriter:
             record.pop("symbol", None)
             record["dataset"] = self._dataset_name
             record["event_type"] = type(event).__name__
-            record["ingested_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            record["ingested_at"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
             grouped_records[(symbol, event_date)].append(record)
 
         output_paths: list[Path] = []
         for (symbol, event_date), records in grouped_records.items():
-            partition_dir = self._root_dir / self._dataset_name / f"symbol={symbol}" / f"event_date={event_date}"
+            partition_dir = (
+                self._root_dir
+                / self._dataset_name
+                / f"symbol={symbol}"
+                / f"event_date={event_date}"
+            )
             partition_dir.mkdir(parents=True, exist_ok=True)
             output_path = partition_dir / f"{self._dataset_name}-{uuid4().hex}.parquet"
             table = pa.Table.from_pylist(records)
@@ -76,5 +81,5 @@ class RawParquetWriter:
         for field_name in TIMESTAMP_FIELD_PRIORITY:
             timestamp = getattr(event, field_name, None)
             if isinstance(timestamp, datetime):
-                return timestamp.astimezone(timezone.utc).date().isoformat()
+                return timestamp.astimezone(UTC).date().isoformat()
         raise ValueError(f"Unable to determine event date for {type(event).__name__}.")

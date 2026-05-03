@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from scalper_ai.domain import BookLevel, BookSide, BookSnapshot, EventSource, TickEvent
@@ -12,7 +12,13 @@ from scalper_ai.domain import BookLevel, BookSide, BookSnapshot, EventSource, Ti
 class Mt5ClientProtocol(Protocol):
     """Minimal MT5 client surface required by the ingestion adapters."""
 
-    def copy_ticks_range(self, symbol: str, start_time: datetime, end_time: datetime, flags: int) -> Sequence[Any]:
+    def copy_ticks_range(
+        self,
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+        flags: int,
+    ) -> Sequence[Any]:
         """Return a sequence of tick payloads."""
 
     def market_book_get(self, symbol: str) -> Sequence[Any] | None:
@@ -62,7 +68,10 @@ class Mt5TickIngestionAdapter:
             bid_size=self._optional_float(payload, "bid_volume"),
             ask_size=self._optional_float(payload, "ask_volume"),
             last_price=self._optional_float(payload, "last"),
-            last_size=self._optional_float(payload, "volume_real") or self._optional_float(payload, "volume"),
+            last_size=(
+                self._optional_float(payload, "volume_real")
+                or self._optional_float(payload, "volume")
+            ),
             sequence=self._optional_int(payload, "flags"),
             source=EventSource.LIVE,
         )
@@ -80,9 +89,9 @@ class Mt5TickIngestionAdapter:
     @staticmethod
     def _extract_timestamp(payload: Mapping[str, Any], primary: str, fallback: str) -> datetime:
         if primary in payload and payload[primary] is not None:
-            return datetime.fromtimestamp(float(payload[primary]) / 1000.0, tz=timezone.utc)
+            return datetime.fromtimestamp(float(payload[primary]) / 1000.0, tz=UTC)
         if fallback in payload and payload[fallback] is not None:
-            return datetime.fromtimestamp(float(payload[fallback]), tz=timezone.utc)
+            return datetime.fromtimestamp(float(payload[fallback]), tz=UTC)
         raise ValueError("MT5 payload does not contain a usable timestamp field.")
 
     @staticmethod
@@ -127,7 +136,7 @@ class Mt5BookIngestionAdapter:
             emitted += 1
 
     def _normalize_book(self, raw_book: Sequence[Any]) -> BookSnapshot:
-        snapshot_time = datetime.now(timezone.utc)
+        snapshot_time = datetime.now(UTC)
         bids: list[BookLevel] = []
         asks: list[BookLevel] = []
 

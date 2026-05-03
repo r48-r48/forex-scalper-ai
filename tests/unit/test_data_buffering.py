@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from scalper_ai.data.buffering import BufferedBatchWriter, EventBatcher
@@ -24,8 +24,8 @@ def make_tick(index: int) -> TickEvent:
     return TickEvent(
         symbol="EURUSD",
         venue="REPLAY",
-        event_timestamp=datetime(2026, 3, 26, 9, 0, index, tzinfo=timezone.utc),
-        received_timestamp=datetime(2026, 3, 26, 9, 0, index, tzinfo=timezone.utc),
+        event_timestamp=datetime(2026, 3, 26, 9, 0, index, tzinfo=UTC),
+        received_timestamp=datetime(2026, 3, 26, 9, 0, index, tzinfo=UTC),
         bid=1.0812 + (index * 0.00001),
         ask=1.0813 + (index * 0.00001),
     )

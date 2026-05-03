@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -93,7 +93,7 @@ class SupervisedDataset:
         frame[TARGET_COLUMN] = self.targets.reset_index(drop=True)
         return frame
 
-    def take(self, rows: slice | Sequence[int]) -> "SupervisedDataset":
+    def take(self, rows: slice | Sequence[int]) -> SupervisedDataset:
         """Return a row subset while preserving metadata alignment."""
 
         return SupervisedDataset(
@@ -113,9 +113,9 @@ class SupervisedDataset:
 
 def build_supervised_dataset(
     *,
-    feature_frame: Optional[pd.DataFrame] = None,
+    feature_frame: pd.DataFrame | None = None,
     snapshots: Sequence[FeatureSnapshot] = (),
-    config: Optional[DatasetConfig] = None,
+    config: DatasetConfig | None = None,
 ) -> SupervisedDataset:
     """Build a leakage-safe supervised dataset from features ordered by availability."""
 
@@ -130,7 +130,11 @@ def build_supervised_dataset(
 
     for _, group in targeted_frame.groupby("symbol", sort=False):
         group = group.reset_index(drop=True)
-        for anchor_index in range(resolved_config.history_length - 1, len(group), resolved_config.stride):
+        for anchor_index in range(
+            resolved_config.history_length - 1,
+            len(group),
+            resolved_config.stride,
+        ):
             target_value = group.at[anchor_index, TARGET_COLUMN]
             if pd.isna(target_value):
                 continue
@@ -139,7 +143,11 @@ def build_supervised_dataset(
             for lag in range(resolved_config.history_length):
                 source_row = group.iloc[anchor_index - lag]
                 for column in feature_columns:
-                    feature_row[_lagged_feature_name(lag=lag, feature_name=column)] = float(source_row[column])
+                    lagged_name = _lagged_feature_name(
+                        lag=lag,
+                        feature_name=column,
+                    )
+                    feature_row[lagged_name] = float(source_row[column])
 
             anchor_row = group.iloc[anchor_index]
             rows_features.append(feature_row)
@@ -152,7 +160,9 @@ def build_supervised_dataset(
                     "feature_set": anchor_row.get("feature_set", "unknown"),
                     "feature_version": anchor_row.get("feature_version", "unknown"),
                     TARGET_END_TIMESTAMP_COLUMN: anchor_row[TARGET_END_TIMESTAMP_COLUMN],
-                    TARGET_END_EVENT_TIMESTAMP_COLUMN: anchor_row[TARGET_END_EVENT_TIMESTAMP_COLUMN],
+                    TARGET_END_EVENT_TIMESTAMP_COLUMN: anchor_row[
+                        TARGET_END_EVENT_TIMESTAMP_COLUMN
+                    ],
                 }
             )
 
@@ -198,7 +208,7 @@ def write_supervised_dataset(
 
 def _coerce_feature_frame(
     *,
-    feature_frame: Optional[pd.DataFrame],
+    feature_frame: pd.DataFrame | None,
     snapshots: Sequence[FeatureSnapshot],
 ) -> pd.DataFrame:
     if feature_frame is None:

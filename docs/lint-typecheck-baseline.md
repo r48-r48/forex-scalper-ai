@@ -17,28 +17,27 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result after scripts, config, logging, journal, OMS, validation, models, and risk cleanup batches:
+Current result after scripts, config, logging, journal, OMS, validation, models, risk, and data-layer cleanup batches:
 
 ```text
-Found 374 errors.
-228 fixable with --fix.
+Found 163 errors.
+93 fixable with --fix.
 ```
 
 Statistics:
 
 ```text
-125 E501  line-too-long
- 93 UP017 datetime-timezone-utc
- 87 UP045 non-pep604-annotation-optional
- 21 I001  unsorted-imports
- 16 UP035 deprecated-import
- 12 UP042 replace-str-enum
-  8 UP037 quoted-annotation
+ 52 E501  line-too-long
+ 42 UP017 datetime-timezone-utc
+ 28 UP045 non-pep604-annotation-optional
+ 10 I001  unsorted-imports
+  9 UP042 replace-str-enum
+  8 UP035 deprecated-import
   6 B905  zip-without-explicit-strict
-  2 F401  unused-import
+  4 UP037 quoted-annotation
   2 UP007 non-pep604-annotation-union
   1 B007  unused-loop-control-variable
-  1 B009  get-attr-with-constant
+  1 F401  unused-import
 ```
 
 Completed cleanup batches:
@@ -51,6 +50,7 @@ Completed cleanup batches:
 - 2026-04-28: validation cleanup sorted imports, moved `Sequence` to `collections.abc`, wrapped long walk-forward expressions, and switched validation tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/validation` and selected validation tests.
 - 2026-04-28: models cleanup modernized tensorizer/transformer annotations, moved `Sequence` to `collections.abc`, and wrapped long tensorizer/transformer expressions. Targeted Ruff is green for `src/scalper_ai/models` and selected model tests.
 - 2026-04-28: risk cleanup converted risk enums to `StrEnum`, added a narrow `RiskConfigLike` protocol for typed config-derived limits, modernized optional annotations, and switched tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/risk` and risk tests.
+- 2026-05-03: data-layer cleanup modernized optional annotations, switched UTC usage to `datetime.UTC`, sorted imports, removed a constant `getattr`, and wrapped remaining long expressions across `src/scalper_ai/data` and selected data tests. Targeted Ruff is green for the data package and selected data/integration tests.
 
 Recommended cleanup order:
 
