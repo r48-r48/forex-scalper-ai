@@ -7,7 +7,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from scalper_ai.deployment import HealthStatus, bootstrap_runtime
+from scalper_ai.deployment import (
+    DataFreshnessSnapshot,
+    GuardStateSnapshot,
+    HealthStatus,
+    ModelHealthSnapshot,
+    bootstrap_runtime,
+)
 from scalper_ai.domain import OrderIntent, OrderSide, OrderType
 from scalper_ai.execution import ExecutionOrderStatus, ExecutionQuote
 from scalper_ai.utils import resolve_repo_root
@@ -65,10 +71,14 @@ def test_bootstrap_runtime_can_auto_build_mt5_live_adapter(monkeypatch: pytest.M
 
     fake_module = _BootstrapFakeMetaTrader5Module()
     monkeypatch.setattr(mt5_client_module, "load_metatrader5_module", lambda: fake_module)
+    dependency_provider = _BootstrapHealthyDependencyProvider()
 
     runtime = bootstrap_runtime(
         config_name="mt5",
         config_dir=resolve_repo_root() / "configs",
+        data_freshness_provider=dependency_provider,
+        model_health_provider=dependency_provider,
+        guard_state_provider=dependency_provider,
         live_confirmation_token="ENABLE_LIVE_TRADING",
     )
 
@@ -102,21 +112,18 @@ def test_bootstrap_runtime_can_auto_build_mt5_live_adapter(monkeypatch: pytest.M
 
         assert update.order.status is ExecutionOrderStatus.FILLED
         snapshot = runtime.health_snapshot()
-        assert snapshot.overall_status is HealthStatus.WARN
-        missing_dependency_checks = {
+        assert snapshot.overall_status is HealthStatus.PASS
+        dependency_checks = {
             check.name: check
             for check in snapshot.checks
             if check.name in {"data_freshness", "model_readiness", "dependency_guards"}
         }
-        assert set(missing_dependency_checks) == {
+        assert set(dependency_checks) == {
             "data_freshness",
             "model_readiness",
             "dependency_guards",
         }
-        assert all(
-            check.status is HealthStatus.WARN
-            for check in missing_dependency_checks.values()
-        )
+        assert all(check.status is HealthStatus.PASS for check in dependency_checks.values())
         assert any(
             check.name == "broker_connectivity" and check.status is HealthStatus.PASS
             for check in snapshot.checks
@@ -125,6 +132,39 @@ def test_bootstrap_runtime_can_auto_build_mt5_live_adapter(monkeypatch: pytest.M
         runtime.stop()
 
     assert fake_module.shutdown_called is True
+
+
+class _BootstrapHealthyDependencyProvider:
+    def describe_data_freshness(self) -> DataFreshnessSnapshot:
+        timestamp = datetime.now(UTC)
+        return DataFreshnessSnapshot(
+            checked_at=timestamp,
+            latest_market_data_at=timestamp,
+            latest_features_at=timestamp,
+            market_data_stale_after_seconds=30.0,
+            features_stale_after_seconds=30.0,
+            source="integration-test",
+        )
+
+    def describe_model_health(self) -> ModelHealthSnapshot:
+        timestamp = datetime.now(UTC)
+        return ModelHealthSnapshot(
+            checked_at=timestamp,
+            ready=True,
+            model_id="bootstrap-test-model",
+            last_loaded_at=timestamp,
+            last_prediction_at=timestamp,
+            last_prediction_stale_after_seconds=30.0,
+            source="integration-test",
+        )
+
+    def describe_guard_state(self) -> GuardStateSnapshot:
+        return GuardStateSnapshot(
+            checked_at=datetime.now(UTC),
+            volatility_guard_active=False,
+            news_guard_active=False,
+            source="integration-test",
+        )
 
 
 class _BootstrapFakeMetaTrader5Module:

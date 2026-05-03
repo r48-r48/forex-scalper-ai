@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol, cast
@@ -185,6 +185,7 @@ class DeploymentRuntime:
         self._journal_events: list[JournalEvent] = []
         self._last_cash_balance_by_route: dict[bool, float] = {}
         self._last_equity_by_route: dict[bool, float] = {}
+        self._day_start_equity_by_route: dict[bool, tuple[date, float]] = {}
         self._session_kill_switch_enabled = False
         self._symbol_kill_switches: set[str] = set()
         self._recovered_execution_update_count = 0
@@ -827,6 +828,7 @@ class DeploymentRuntime:
         self._oms_records.clear()
         self._last_cash_balance_by_route.clear()
         self._last_equity_by_route.clear()
+        self._day_start_equity_by_route.clear()
         self._session_kill_switch_enabled = False
         self._symbol_kill_switches.clear()
         self._recovered_execution_update_count = 0
@@ -986,6 +988,12 @@ class DeploymentRuntime:
         elif self._guard_state_provider is not None:
             volatility_guard_active = self.config.risk.volatility_filter_enabled
             news_guard_active = self.config.risk.news_filter_enabled
+        current_equity = self._last_equity_by_route.get(intent.paper)
+        starting_equity = self._resolve_day_start_equity(
+            paper=intent.paper,
+            checked_at=checked_at,
+            current_equity=current_equity,
+        )
 
         return RiskContext(
             checked_at=checked_at,
@@ -1005,8 +1013,8 @@ class DeploymentRuntime:
             realized_pnl_today=sum(
                 float(position.realized_pnl) for position in route_positions.values()
             ),
-            starting_equity=self._last_equity_by_route.get(intent.paper),
-            current_equity=self._last_equity_by_route.get(intent.paper),
+            starting_equity=starting_equity,
+            current_equity=current_equity,
             session_kill_switch=self._session_kill_switch_enabled,
             symbol_kill_switches=frozenset(self._symbol_kill_switches),
             volatility_guard_active=volatility_guard_active,
@@ -1014,6 +1022,22 @@ class DeploymentRuntime:
             features_healthy=features_healthy,
             model_healthy=model_healthy,
         )
+
+    def _resolve_day_start_equity(
+        self,
+        *,
+        paper: bool,
+        checked_at: datetime,
+        current_equity: float | None,
+    ) -> float | None:
+        if current_equity is None:
+            return None
+        utc_day = checked_at.astimezone(UTC).date()
+        existing = self._day_start_equity_by_route.get(paper)
+        if existing is None or existing[0] != utc_day:
+            self._day_start_equity_by_route[paper] = (utc_day, current_equity)
+            return current_equity
+        return existing[1]
 
     def _data_freshness_snapshot_for_risk(self) -> DataFreshnessSnapshot | None:
         if self._data_freshness_provider is None:
@@ -1440,6 +1464,21 @@ class DeploymentRuntime:
             and not self.config.broker.allow_live_without_kill_switch
         ):
             return "Live runtime requires risk.kill_switch_enabled=true."
+        if self._data_freshness_provider is None:
+            return "Live runtime requires a data_freshness_provider."
+        if self._model_health_provider is None:
+            return "Live runtime requires a model_health_provider."
+        if (
+            self._guard_state_provider is None
+            and (
+                self.config.risk.volatility_filter_enabled
+                or self.config.risk.news_filter_enabled
+            )
+        ):
+            return (
+                "Live runtime requires a guard_state_provider when news or "
+                "volatility guards are enabled."
+            )
         return None
 
     def _register_default_health_checks(self) -> None:

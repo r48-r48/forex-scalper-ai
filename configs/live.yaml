@@ -16,11 +16,13 @@ risk:
 
 broker:
   live_enabled: true
-  live_adapter: external
+  live_adapter: mt5
+  mt5:
+    require_stop_loss: true
 
 monitoring:
   service_name: scalper_ai_live_runtime
 
 deployment:
-  fallback_to_paper_on_live_failure: true
+  fallback_to_paper_on_live_failure: false
   require_live_confirmation: true

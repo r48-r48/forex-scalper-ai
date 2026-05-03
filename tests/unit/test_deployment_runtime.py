@@ -225,6 +225,7 @@ def test_health_snapshot_fails_when_broker_connectivity_provider_raises() -> Non
             issues=(),
         ),
         live_confirmation_token="ENABLE_ME",
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
 
@@ -277,6 +278,7 @@ def test_health_snapshot_warns_on_stale_broker_snapshot_and_exports_metrics() ->
             issues=(),
         ),
         live_confirmation_token="ENABLE_ME",
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
 
@@ -293,7 +295,7 @@ def test_health_snapshot_warns_on_stale_broker_snapshot_and_exports_metrics() ->
     assert "scalper_ai_broker_ping_latency_ms" in metrics_text
 
 
-def test_live_health_snapshot_warns_when_dependency_providers_are_missing() -> None:
+def test_live_runtime_blocks_when_dependency_providers_are_missing() -> None:
     config = AppConfig.model_validate(
         {
             "runtime": {
@@ -318,22 +320,41 @@ def test_live_health_snapshot_warns_when_dependency_providers_are_missing() -> N
         broker_snapshot_provider=live_adapter,
         live_confirmation_token="ENABLE_ME",
     )
-    runtime.start()
+    with pytest.raises(RuntimeError, match="data_freshness_provider"):
+        runtime.start()
 
-    snapshot = runtime.health_snapshot()
 
-    assert snapshot.overall_status is HealthStatus.WARN
-    missing_checks = {
-        check.name: check
-        for check in snapshot.checks
-        if check.name in {"data_freshness", "model_readiness", "dependency_guards"}
-    }
-    assert set(missing_checks) == {
-        "data_freshness",
-        "model_readiness",
-        "dependency_guards",
-    }
-    assert all(check.status is HealthStatus.WARN for check in missing_checks.values())
+def test_live_runtime_blocks_when_model_provider_is_missing() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {
+                "mode": "live",
+                "paper_trading_default": False,
+            },
+            "broker": {
+                "live_enabled": True,
+                "live_adapter": "stub",
+            },
+            "deployment": {
+                "fallback_to_paper_on_live_failure": False,
+                "require_live_confirmation": True,
+                "live_confirmation_phrase": "ENABLE_ME",
+            },
+        }
+    )
+    live_adapter = LiveExecutionStubAdapter()
+    dependency_provider = _HealthyRuntimeDependencyProvider()
+    runtime = DeploymentRuntime(
+        config,
+        live_adapter_factory=lambda: live_adapter,
+        broker_snapshot_provider=live_adapter,
+        data_freshness_provider=dependency_provider,
+        guard_state_provider=dependency_provider,
+        live_confirmation_token="ENABLE_ME",
+    )
+
+    with pytest.raises(RuntimeError, match="model_health_provider"):
+        runtime.start()
 
 
 def test_health_snapshot_warns_on_stale_data_freshness_provider_and_exports_metrics() -> None:
@@ -885,6 +906,72 @@ def test_runtime_risk_rejects_before_router_submit_and_records_oms() -> None:
     assert "scalper_ai_execution_orders_rejected_total" in runtime.metrics_text()
 
 
+def test_runtime_risk_uses_utc_day_start_equity_for_daily_drawdown() -> None:
+    config = AppConfig.model_validate(
+        {
+            "runtime": {"mode": "paper"},
+            "risk": {"max_daily_drawdown": 0.02},
+        }
+    )
+    adapter = _RejectIfSubmittedAdapter()
+    runtime = DeploymentRuntime(config, paper_adapter_factory=lambda: adapter)
+    runtime.start()
+
+    timestamp = datetime(2026, 4, 30, 10, 0, tzinfo=UTC)
+    intent = OrderIntent(
+        intent_id="daily-drawdown-block",
+        strategy_id="risk-runtime-test",
+        symbol="EURUSD",
+        created_at=timestamp,
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        quantity=1.0,
+        paper=True,
+    )
+    quote = ExecutionQuote(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        received_timestamp=timestamp,
+        bid=1.0999,
+        ask=1.1001,
+        venue="paper",
+    )
+    runtime._last_equity_by_route[True] = 100_000.0
+    first_context = runtime._build_risk_context(intent, quote)
+
+    assert first_context.starting_equity == pytest.approx(100_000.0)
+    assert first_context.current_equity == pytest.approx(100_000.0)
+
+    runtime._last_equity_by_route[True] = 97_500.0
+    update = runtime.submit_order(intent, quote)
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "max_daily_drawdown"
+
+    next_day_context = runtime._build_risk_context(
+        OrderIntent(
+            intent_id="next-day-equity-baseline",
+            strategy_id="risk-runtime-test",
+            symbol="EURUSD",
+            created_at=timestamp + timedelta(days=1),
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=1.0,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp + timedelta(days=1),
+            received_timestamp=timestamp + timedelta(days=1),
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        ),
+    )
+    assert next_day_context.starting_equity == pytest.approx(97_500.0)
+
+
 def test_live_runtime_rejects_wide_spread_before_router_submit() -> None:
     config = AppConfig.model_validate(
         {
@@ -913,6 +1000,7 @@ def test_live_runtime_rejects_wide_spread_before_router_submit() -> None:
             issues=(),
         ),
         live_confirmation_token="ENABLE_ME",
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
 
@@ -1196,6 +1284,7 @@ def test_live_runtime_fail_safe_blocks_after_unprotected_position_reconciliation
         broker_snapshot_provider=UnprotectedPositionProvider(),
         live_confirmation_token="ENABLE_ME",
         state_store=store,
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
 
@@ -1288,6 +1377,7 @@ def test_live_runtime_approved_flatten_closes_unprotected_position_after_fail_sa
         broker_snapshot_provider=UnprotectedPositionProvider(),
         live_confirmation_token="ENABLE_ME",
         state_store=store,
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
     runtime.health_snapshot()
@@ -1394,6 +1484,7 @@ def test_live_runtime_approved_repair_updates_position_protection_from_reconcili
         reconciliation_report_provider=lambda: report,
         live_confirmation_token="ENABLE_ME",
         state_store=store,
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
     quote = ExecutionQuote(
@@ -1467,6 +1558,7 @@ def test_live_runtime_resets_session_kill_switch_after_clean_reconciliation(
         reconciliation_report_provider=lambda: clean_report,
         live_confirmation_token="ENABLE_ME",
         state_store=store,
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
 
@@ -1562,6 +1654,7 @@ def test_live_runtime_refuses_kill_switch_reset_when_reconciliation_has_errors(
         reconciliation_report_provider=lambda: reports.pop(0),
         live_confirmation_token="ENABLE_ME",
         state_store=store,
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
 
@@ -1605,6 +1698,7 @@ def test_live_runtime_approved_flatten_requires_confirmation_phrase(tmp_path) ->
         broker_snapshot_provider=_EmptyBrokerSnapshotProvider(),
         live_confirmation_token="ENABLE_ME",
         state_store=SqliteExecutionStateStore(tmp_path / "runtime-state.sqlite"),
+        **_healthy_live_dependency_kwargs(),
     )
     runtime.start()
 
@@ -1731,6 +1825,7 @@ def test_live_startup_reconciliation_kill_switches_broker_only_position(tmp_path
         broker_snapshot_provider=BrokerOnlyPositionProvider(),
         live_confirmation_token="ENABLE_ME",
         state_store=store,
+        **_healthy_live_dependency_kwargs(),
     )
 
     summary = runtime.start()
@@ -1799,6 +1894,7 @@ def test_live_startup_reconciliation_provider_failure_blocks_start() -> None:
         live_adapter_factory=LiveExecutionStubAdapter,
         reconciliation_report_provider=broken_report_provider,
         live_confirmation_token="ENABLE_ME",
+        **_healthy_live_dependency_kwargs(),
     )
 
     with pytest.raises(RuntimeError, match="Live startup reconciliation failed"):
@@ -1828,6 +1924,7 @@ def test_live_startup_reconciliation_missing_report_blocks_start() -> None:
         live_adapter_factory=LiveExecutionStubAdapter,
         reconciliation_report_provider=lambda: None,
         live_confirmation_token="ENABLE_ME",
+        **_healthy_live_dependency_kwargs(),
     )
 
     with pytest.raises(RuntimeError, match="startup reconciliation returned no report"):
@@ -1989,6 +2086,15 @@ class _HealthyRuntimeDependencyProvider:
             news_guard_active=False,
             source="unit-test",
         )
+
+
+def _healthy_live_dependency_kwargs() -> dict[str, object]:
+    dependency_provider = _HealthyRuntimeDependencyProvider()
+    return {
+        "data_freshness_provider": dependency_provider,
+        "model_health_provider": dependency_provider,
+        "guard_state_provider": dependency_provider,
+    }
 
 
 class _RecordingFlattenAdapter:

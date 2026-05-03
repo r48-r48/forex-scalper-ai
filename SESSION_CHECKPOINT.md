@@ -22,6 +22,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed external audit 2026-05-03 live-safety triage:
+  - reviewed `/Users/dzhabrailtalkanov/Downloads/deep-research-report (2).md` and persisted the triage as `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-05-03.md`
+  - confirmed the report's main warning remains valid: the repo is a strong production scaffold and MT5 safety core, but not yet a complete autonomous real-money trading bot
+  - fixed the confirmed `configs/live.yaml` mismatch: the live overlay now uses the implemented `mt5` adapter, disables paper fallback on live startup failure, and requires MT5 stop-loss protection
+  - fixed live startup dependency safety: `DeploymentRuntime` now fails closed without data freshness, model health, and guard-state providers when live mode is requested and news/volatility guards are enabled
+  - fixed runtime daily drawdown context: `DeploymentRuntime` now tracks a separate UTC day-start equity baseline per paper/live route instead of reusing current equity as starting equity
+  - targeted validation passed: `tests/unit/test_config_loader.py`, `tests/unit/test_deployment_runtime.py`, and `tests/integration/test_deployment_bootstrap.py` passed with `50 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green, compileall green, full pytest `270 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed wall-clock-bounded paper supervisor support and evidence:
   - `RuntimeSupervisor.run_forever()` now accepts `max_runtime_seconds` and stops on whichever bound is reached first when combined with `max_iterations`
   - `scripts/run_runtime.py supervise` now accepts `--max-runtime-seconds` plus `--output-path` for bounded JSON evidence persistence

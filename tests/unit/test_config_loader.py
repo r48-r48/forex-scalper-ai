@@ -28,6 +28,9 @@ def test_load_app_config_applies_overlay() -> None:
     assert config.runtime.paper_trading_default is False
     assert config.logging.json_enabled is True
     assert config.broker.live_enabled is True
+    assert config.broker.live_adapter == "mt5"
+    assert config.broker.mt5.require_stop_loss is True
+    assert config.deployment.fallback_to_paper_on_live_failure is False
 
 
 def test_load_app_config_supports_mt5_overlay() -> None:
