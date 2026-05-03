@@ -189,7 +189,7 @@
 
 - PHASE 1-12 are now implemented.
 - The repository now has research, validation, baseline strategies, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, OMS/RiskEngine layers, validation gates, shadow reports, supervised baseline filtering, and operational runbooks.
-- The next work should continue from the completed runtime Risk/OMS gate, durable recovery, broker-source MT5 hedging, deal-accounting/per-deal attribution slices, protective-order slices, position-protection fail-safe, first risk-config guard slice, first MT5 symbol-spec quantization/enforcement slices, first MT5 reconnect supervision slice, approved protection-flatten workflow, first broker-side startup recovery/fault-injection slice, first MT5 protective repair/modify slice, real history/deal validation, supervisor alert routing, controlled pending-order modify validation, richer runtime health provider contracts, concrete provider trackers, provider event-loop wiring, MT5 partial-fill and post-send fallback fault-injection coverage, Docker/Compose paper-runtime validation, bounded, 30-iteration, and wall-clock local paper supervisor validation, fresh-checkout Parallels MT5 validation, full Ruff cleanup, full mypy cleanup, and CI/local gate promotion.
+- The next work should continue from the completed runtime Risk/OMS gate, durable recovery, broker-source MT5 hedging, deal-accounting/per-deal attribution slices, protective-order slices, position-protection fail-safe, first risk-config guard slice, first MT5 symbol-spec quantization/enforcement slices, first MT5 reconnect supervision slice, approved protection-flatten workflow, first broker-side startup recovery/fault-injection slice, first MT5 protective repair/modify slice, real history/deal validation, supervisor alert routing, controlled pending-order modify validation, richer runtime health provider contracts, concrete provider trackers, provider event-loop wiring, MT5 partial-fill and post-send fallback fault-injection coverage, Docker/Compose paper-runtime validation, bounded, 30-iteration, and wall-clock local paper supervisor validation, fresh-checkout Parallels MT5 validation, full Ruff cleanup, full mypy cleanup, CI/local gate promotion, and historical CSV/Parquet data bootstrap with QA evidence.
 
 ## Important Constraints
 
@@ -359,6 +359,7 @@
 - `python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only` passed and auto-discovered the local MT5 terminal bundle path.
 - `python3 scripts/mt5_smoke.py --config-name mt5` now exits with structured JSON preflight diagnostics instead of a raw traceback when dependencies are missing.
 - Full repository-wide `pytest` now passes in the Python 3.12.13 target-validation `.venv` with `165 passed`.
+- Historical data bootstrap validation passed on 2026-05-04: targeted Ruff, targeted mypy for `scripts/bootstrap_history.py`, focused pytest with `4 passed`, compileall, `git diff --check`, and full `make PYTHON=.venv/bin/python ci` with pytest `337 passed` plus safe MT5 preflight diagnostics.
 
 ## Exact Next Step
 
@@ -366,6 +367,7 @@ Move to post-phase hardening:
 - keep the real MT5 history/deal finding in scope: use explicit `BROKER_MT5_TERMINAL_PATH` plus a sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS`/probe lookback for Dukascopy history validation, and keep IOC execution settings for Dukascopy EURUSD unless broker metadata changes
 - use `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` for future latest-code Parallels MT5 checks
 - supervised baseline and transformer training/export plus runtime inference packaging are complete; model registry, drift monitoring, and end-to-end live signal-loop packaging remain pending
-- FX backtest realism now covers row-level cost regimes, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, opt-in broker-style forced liquidation, and prior-row stop-loss/take-profit path simulation; next deepen it toward broker symbol-spec ingestion and broader strategy promotion evidence
+- historical CSV/Parquet bootstrap now writes feature-ready raw data plus QA/provenance evidence; next data-provenance slice is direct MT5 historical market-data download/quarantine/versioning
+- FX backtest realism now covers row-level cost regimes, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, opt-in broker-style forced liquidation, prior-row stop-loss/take-profit path simulation, and strict symbol-spec ingestion; next deepen it toward execution-path calibration and broader strategy promotion evidence
 - extend longer paper/shadow supervision evidence with a real alert sink topology, and continue production-startup hardening
 - keep freeze/order-mode metadata follow-up, daemon-level reconnect orchestration/operator circuit reset, and richer protective-order repair/modify support in the MT5 backlog

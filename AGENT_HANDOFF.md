@@ -6,7 +6,7 @@
 - Root path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
 - Goal: production-grade AI Forex scalping agent with tick/M1/L2 support, Transformer forecasting, DRL policy layer, execution adapters, validation, and deployment.
 - Persistent same-window checkpoint: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/SESSION_CHECKPOINT.md`
-- Latest external audit triage: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-04-30.md`
+- Latest external audit triage: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-05-03.md`
 
 ## Completed Phases
 
@@ -544,6 +544,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
   - supervised baseline and transformer training/export plus runtime inference packaging are complete; continue with model registry/drift monitoring and end-to-end paper signal-loop packaging
+  - historical CSV/Parquet bootstrap now writes feature-ready raw history with QA and provenance evidence; direct MT5 historical market-data download/quarantine/versioning remains the next data-provenance slice
   - FX backtest realism now covers row-level costs, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, opt-in margin-call liquidation, prior-row stop-loss/take-profit path simulation, and strict broker symbol-spec JSON ingestion; continue with deeper execution-path calibration and broker-data provenance
   - extend longer paper/shadow supervision evidence with a real alert sink topology, and continue production-startup hardening
   - keep remaining MT5 fault-injection, broker metadata, and operator recovery items in scope, especially IOC/Dukascopy hedging behavior and explicit terminal-path history checks

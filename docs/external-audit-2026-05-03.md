@@ -54,7 +54,9 @@ The report was based on a static archive review and did not see all subsequent l
    the current research backtest now has bid/ask execution, row-level costs, pip-value, margin/swap metrics, margin-call liquidation, opt-in stop/TP path checks, and strict broker symbol-spec JSON ingestion, but it still needs deeper execution-path calibration and broker-data provenance before serious M1/M5 trust.
 
 4. Data bootstrap is incomplete:
-   the repo can ingest replay files and now has an offline data-quality validation foundation, but it does not yet download, quarantine, and version broker-quality Forex history from scratch.
+   the repo can now normalize broker/vendor CSV or Parquet exports into QA-gated raw
+   history artifacts, but direct MT5 historical market-data download, quarantine, and
+   versioning are still pending.
 
 5. Risk budget is still incomplete:
    the project needs explicit risk-per-trade sizing, weekly loss caps, max open positions, leverage/free-margin/margin-level checks, symbol budgets, correlation caps, and strategy-level budgets.
@@ -84,6 +86,11 @@ The report was based on a static archive review and did not see all subsequent l
 - Completed on `2026-05-03`: second FX backtest realism slice added opt-in broker-style margin-call liquidation to `run_backtest()`, including same-row and next-row forced flattening, margin-level/effective-leverage/liquidation metrics, `--margin-call-level` CLI wiring, and focused tests; `make PYTHON=.venv/bin/python ci` passed with full pytest `323 passed`.
 - Completed on `2026-05-03`: third FX backtest realism slice added opt-in completed-bar stop-loss / take-profit path simulation with prior-row activation semantics, conservative same-bar ambiguity priority, active protection and protective-exit counters, CLI flags, and focused tests; `make PYTHON=.venv/bin/python ci` passed with full pytest `326 passed`.
 - Completed on `2026-05-03`: fourth FX backtest realism slice added strict broker/curated symbol-spec JSON ingestion for `FxSymbolSpec`, CLI wiring through `--fx-symbol-spec-path`, schema documentation, and focused tests for wrapped/flat specs plus unknown/missing-field rejection; `make PYTHON=.venv/bin/python ci` passed with full pytest `329 passed`.
+- Completed on `2026-05-04`: historical data bootstrap CLI added
+  `scripts/bootstrap_history.py` for broker/vendor CSV or Parquet exports, UTC timestamp
+  normalization, explicit bid/ask or synthetic-spread assumptions, QA report gating,
+  provenance summary JSON, and unit coverage; `make PYTHON=.venv/bin/python ci` passed
+  with full pytest `337 passed`.
 
 ## Non-Goals
 

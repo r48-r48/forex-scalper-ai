@@ -16,6 +16,13 @@ Primary entrypoint:
 
 - `validate_tick_data(records, config=None, dataset_name=None)` returns a `DataQualityReport`.
 
+Production-facing CLI:
+
+- `scripts/bootstrap_history.py` normalizes broker/vendor CSV or Parquet history into
+  the tick-like raw schema and writes a `DataQualityReport` artifact before feature
+  engineering. It is offline-only and records any received-timestamp fill or
+  explicit synthetic-spread assumption in its summary JSON.
+
 Focused helper checks:
 
 - `check_tick_timestamp_quality(records, config=None)`

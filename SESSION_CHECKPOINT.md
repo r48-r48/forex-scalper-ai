@@ -14,7 +14,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Current Snapshot
 
-- Date: `2026-05-03`
+- Date: `2026-05-04`
 - Repo phase status: `PHASE 1-12 complete`
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
@@ -22,6 +22,29 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-04 completed historical CSV/Parquet data bootstrap with QA evidence:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/bootstrap_history.py`
+    for broker/vendor historical exports
+  - the CLI normalizes timezone-aware UTC event/received timestamps, maps/fills
+    symbol and venue, writes a feature-ready tick-like raw frame, and persists both a
+    summary JSON and `DataQualityReport` JSON
+  - output is blocked on error-level QA issues unless `--allow-quality-errors` is
+    explicitly passed, so bad data can be inspected without silently entering feature
+    engineering
+  - bid/ask must come from real columns unless `--mid-price-column` and an explicit
+    `--synthetic-spread-bps` are provided; no spread is synthesized by default
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_bootstrap_history.py`
+    for normal import, explicit synthetic-spread mapping, and crossed-quote
+    quality-gate behavior
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/production-cli.md`,
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/data-quality.md`, and
+    external-audit/project-memory docs
+  - focused validation passed: targeted Ruff, compileall, and
+    `.venv/bin/python -m pytest tests/unit/test_scripts_bootstrap_history.py` with
+    `3 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green,
+    mypy green with `91` source files, compileall green, full pytest `337 passed`,
+    and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed transformer training/export and runtime inference packaging:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/train_transformer.py` for leakage-controlled transformer training from flat supervised datasets
   - the CLI requires a UTC `training_end` unless `input_is_train_only=True`, filters by `available_timestamp`, and enforces target-end cutoff when target-end columns are present so labels cannot cross the training boundary
@@ -881,7 +904,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
 - use `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` for future latest-code Parallels MT5 checks
-- FX backtest realism now covers row-level costs, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, opt-in margin-call liquidation, and prior-row stop-loss/take-profit path simulation; next continue broker symbol-spec ingestion, concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
+- historical CSV/Parquet bootstrap now writes feature-ready raw history plus QA/provenance evidence; next data-provenance slice is direct MT5 historical market-data download/quarantine/versioning
+- FX backtest realism now covers row-level costs, pip value, margin-rate/swap metrics, margin-level/effective-leverage metrics, opt-in margin-call liquidation, prior-row stop-loss/take-profit path simulation, and strict symbol-spec ingestion; next continue execution-path calibration, concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and keep the now-green Ruff/mypy gates green
 
 If further MT5 validation is paused:
 - continue with FX backtest realism and network alert transport topology now that Docker/Compose validation is complete

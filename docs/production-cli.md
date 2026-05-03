@@ -4,6 +4,31 @@ This project keeps trading and validation logic in library modules. The scripts 
 document are thin reproducible entrypoints for local research, paper promotion checks,
 and release evidence. They do not submit broker orders.
 
+## Bootstrap Historical Data
+
+```bash
+.venv/bin/python scripts/bootstrap_history.py \
+  --input-path data/vendor/eurusd-m1-export.csv \
+  --output-path data/raw/history/eurusd-m1.parquet \
+  --dataset-id eurusd-m1-demo-20260504 \
+  --summary-output-path data/artifacts/eurusd-m1-history-summary.json \
+  --quality-report-path data/artifacts/eurusd-m1-history-quality.json \
+  --symbol EURUSD \
+  --venue MT5 \
+  --timeframe M1 \
+  --max-event-gap-seconds 120
+```
+
+The command normalizes broker/vendor CSV or Parquet exports into the tick-like raw
+schema consumed by `scripts/build_features.py`. It writes a data-quality report next
+to the output evidence and refuses to write the raw artifact when error-level QA
+issues are found, unless `--allow-quality-errors` is explicitly provided.
+
+Input rows must provide timezone-aware UTC timestamps and either real `bid` / `ask`
+columns or an explicit `--mid-price-column` plus `--synthetic-spread-bps`. No spread
+is synthesized by default. If `received_timestamp` is absent, it is filled from
+`event_timestamp` and this assumption is recorded in the summary.
+
 ## Build Offline Features
 
 ```bash
