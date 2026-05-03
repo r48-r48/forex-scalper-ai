@@ -22,6 +22,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed domain and final UTC Ruff cleanup:
+  - full `.venv/bin/python -m ruff check src tests scripts` now passes with `All checks passed`
+  - cleanup modernized canonical domain annotations/imports, converted domain enums to `StrEnum`, and switched the remaining validation UTC test to `datetime.UTC`
+  - selected domain/validation pytest passed with `18 passed`
+  - compileall, `git diff --check`, and full pytest passed with `265 passed`
+  - full-repository Ruff baseline dropped from `50` to `0` historical issues
 - 2026-05-03 completed execution Ruff cleanup:
   - `src/scalper_ai/execution` and selected execution tests now pass targeted Ruff
   - cleanup switched selected tests/live stub UTC usage to `datetime.UTC`, sorted imports, wrapped protocol/router signatures, and wrapped paper execution cost/order-trigger expressions without changing order lifecycle or fill math
@@ -293,6 +299,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated selected execution unit/integration tests to use modern imports and `datetime.UTC`
   - targeted Ruff is now green for `src/scalper_ai/execution` and selected execution tests
   - full Ruff baseline dropped from `72` to `50` issues
+- 2026-05-03 completed domain and final UTC Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/domain`
+  - updated selected domain and validation tests to use modern imports and `datetime.UTC`
+  - full Ruff is now green for `src`, `tests`, and `scripts`
+  - full Ruff baseline dropped from `50` to `0` issues
 - 2026-04-28 completed same-Mac Parallels Windows 11 MT5 setup and safe demo validation:
   - VM: `Windows 11`, accessed directly with `prlctl exec --current-user`; SSH is not required for this VM
   - Windows project copy: `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai`

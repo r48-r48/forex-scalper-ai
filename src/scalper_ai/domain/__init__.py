@@ -1,7 +1,7 @@
 """Public domain contracts for market data, features, and trading state."""
 
-from scalper_ai.domain.base import DomainModel
 from scalper_ai.domain.bars import BarEvent
+from scalper_ai.domain.base import DomainModel
 from scalper_ai.domain.enums import (
     BarType,
     BookSide,

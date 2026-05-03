@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import Field, model_validator
 
 from scalper_ai.domain.base import DomainModel
@@ -27,15 +25,15 @@ class TickEvent(DomainModel):
     received_timestamp: UtcDatetime
     bid: PositiveFiniteFloat
     ask: PositiveFiniteFloat
-    bid_size: Optional[NonNegativeFiniteFloat] = None
-    ask_size: Optional[NonNegativeFiniteFloat] = None
-    last_price: Optional[PositiveFiniteFloat] = None
-    last_size: Optional[NonNegativeFiniteFloat] = None
-    sequence: Optional[NonNegativeInt] = None
-    source: Optional[EventSource] = None
+    bid_size: NonNegativeFiniteFloat | None = None
+    ask_size: NonNegativeFiniteFloat | None = None
+    last_price: PositiveFiniteFloat | None = None
+    last_size: NonNegativeFiniteFloat | None = None
+    sequence: NonNegativeInt | None = None
+    source: EventSource | None = None
 
     @model_validator(mode="after")
-    def validate_spread(self) -> "TickEvent":
+    def validate_spread(self) -> TickEvent:
         if self.ask < self.bid:
             raise ValueError("TickEvent ask must be greater than or equal to bid.")
         return self
@@ -48,7 +46,7 @@ class BookLevel(DomainModel):
     level: PositiveInt
     price: PositiveFiniteFloat
     size: PositiveFiniteFloat
-    order_count: Optional[NonNegativeInt] = None
+    order_count: NonNegativeInt | None = None
 
 
 class BookSnapshot(DomainModel):
@@ -58,14 +56,14 @@ class BookSnapshot(DomainModel):
     venue: NonEmptyStr
     event_timestamp: UtcDatetime
     received_timestamp: UtcDatetime
-    sequence: Optional[NonNegativeInt] = None
+    sequence: NonNegativeInt | None = None
     bids: list[BookLevel] = Field(min_length=1)
     asks: list[BookLevel] = Field(min_length=1)
-    checksum: Optional[NonEmptyStr] = None
+    checksum: NonEmptyStr | None = None
     is_full_snapshot: bool = True
 
     @model_validator(mode="after")
-    def validate_book_structure(self) -> "BookSnapshot":
+    def validate_book_structure(self) -> BookSnapshot:
         if any(level.side != BookSide.BID for level in self.bids):
             raise ValueError("All bid levels must use BookSide.BID.")
         if any(level.side != BookSide.ASK for level in self.asks):

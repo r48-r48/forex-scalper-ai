@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import FiniteFloat, model_validator
 
@@ -32,14 +32,14 @@ class BarEvent(DomainModel):
     volume: NonNegativeFiniteFloat = 0.0
     tick_count: PositiveInt
     notional: NonNegativeFiniteFloat = 0.0
-    vwap: Optional[PositiveFiniteFloat] = None
+    vwap: PositiveFiniteFloat | None = None
     buy_volume: NonNegativeFiniteFloat = 0.0
     sell_volume: NonNegativeFiniteFloat = 0.0
-    imbalance: Optional[FiniteFloat] = None
-    metadata: Optional[dict[NonEmptyStr, Any]] = None
+    imbalance: FiniteFloat | None = None
+    metadata: dict[NonEmptyStr, Any] | None = None
 
     @model_validator(mode="after")
-    def validate_ohlcv(self) -> "BarEvent":
+    def validate_ohlcv(self) -> BarEvent:
         if self.end_timestamp < self.start_timestamp:
             raise ValueError("Bar end_timestamp must be greater than or equal to start_timestamp.")
         if self.high < max(self.open, self.close):

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from scalper_ai.domain import (
     BookLevel,
@@ -25,8 +25,8 @@ def test_domain_event_chain_round_trip_serialization() -> None:
     tick = TickEvent(
         symbol="EURUSD",
         venue="MT5",
-        event_timestamp=datetime(2026, 3, 26, 9, 0, tzinfo=timezone.utc),
-        received_timestamp=datetime(2026, 3, 26, 9, 0, 0, 100000, tzinfo=timezone.utc),
+        event_timestamp=datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
+        received_timestamp=datetime(2026, 3, 26, 9, 0, 0, 100000, tzinfo=UTC),
         bid=1.0812,
         ask=1.0813,
         bid_size=2.0,
@@ -53,7 +53,7 @@ def test_domain_event_chain_round_trip_serialization() -> None:
     features = FeatureSnapshot(
         symbol="EURUSD",
         event_timestamp=tick.event_timestamp,
-        available_timestamp=datetime(2026, 3, 26, 9, 0, 1, tzinfo=timezone.utc),
+        available_timestamp=datetime(2026, 3, 26, 9, 0, 1, tzinfo=UTC),
         feature_set="microstructure",
         feature_version="v1",
         values={
@@ -81,8 +81,8 @@ def test_domain_event_chain_round_trip_serialization() -> None:
         intent_id=intent.intent_id,
         broker_order_id="broker-42",
         symbol="EURUSD",
-        event_timestamp=datetime(2026, 3, 26, 9, 0, 2, tzinfo=timezone.utc),
-        received_timestamp=datetime(2026, 3, 26, 9, 0, 2, 50000, tzinfo=timezone.utc),
+        event_timestamp=datetime(2026, 3, 26, 9, 0, 2, tzinfo=UTC),
+        received_timestamp=datetime(2026, 3, 26, 9, 0, 2, 50000, tzinfo=UTC),
         side=OrderSide.BUY,
         fill_price=1.08125,
         fill_quantity=25000.0,

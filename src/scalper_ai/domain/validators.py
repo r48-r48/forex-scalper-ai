@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from pydantic import AfterValidator, Field, FiniteFloat, StringConstraints
@@ -13,7 +13,7 @@ def ensure_utc_datetime(value: datetime) -> datetime:
 
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("Timestamp must be timezone-aware.")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def serialize_utc_datetime(value: datetime) -> str:

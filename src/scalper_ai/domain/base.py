@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from enum import Enum
-from typing import Any, Mapping, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import orjson
 from pydantic import BaseModel, ConfigDict

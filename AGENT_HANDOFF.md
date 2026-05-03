@@ -325,7 +325,7 @@ Current repository status:
 - Safe Windows MT5 broker probe completed on 2026-04-28 through the normalized client with account/terminal/symbol/tick/history diagnostics, EURUSD FOK `order_check` retcode `0` / `Done`, and no `order_send`
 - MT5 Python bridge order-comment limit was validated at `29` characters; `Mt5TerminalClient` now sanitizes and clamps comments before `order_check` or `order_send`
 - Paper-safe Docker/Compose runtime packaging completed on 2026-04-28 as source/config and was validated on Docker Desktop on 2026-05-03: `docker build`, Compose `describe`, Compose `health`, and Compose `metrics` all passed in the paper profile
-- Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now down to `50`; mypy has `51` errors in `30` files
+- Full-repo Ruff/mypy cleanup baseline completed on 2026-04-28 as `docs/lint-typecheck-baseline.md`: Ruff initially had `511` historical issues and is now fully green; mypy has `51` errors in `30` files
 - Local JSONL alert transport completed on 2026-04-28: `scalper_ai.deployment.alerts` converts warning/failing health snapshots into alert events and appends them through `JsonlAlertTransport`
 - HTTP webhook alert transport completed on 2026-04-28: `WebhookAlertTransport` posts batched health-alert JSON through an explicit HTTP(S) endpoint with timeout/header controls and config/env fields
 - Logging-utils Ruff cleanup completed on 2026-04-28: full Ruff baseline dropped from `434` to `433` issues
@@ -340,6 +340,7 @@ Current repository status:
 - RL Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `93` to `77` issues
 - Deployment Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `77` to `72` issues
 - Execution Ruff cleanup completed on 2026-05-03: full Ruff baseline dropped from `72` to `50` issues
+- Domain and final UTC Ruff cleanup completed on 2026-05-03: full Ruff is now green for `src`, `tests`, and `scripts`
 - `python3 -m pytest` passed on 2026-03-28 with `109 passed`
 - `python3 -m pytest` passed on 2026-04-27 with `109 passed` and no Pydantic warnings after logging/domain config cleanup
 - `python3 -m pytest` passed on 2026-04-27 with `113 passed` after MT5 safe-submit hardening
@@ -431,6 +432,9 @@ Current repository status:
 - Execution Ruff cleanup passed on 2026-05-03: targeted Ruff is green for `src/scalper_ai/execution` plus selected execution tests; full Ruff baseline dropped from `72` to `50` issues
 - `.venv/bin/python -m pytest tests/unit/test_execution_paper.py tests/unit/test_execution_live_stub.py tests/unit/test_execution_reconciliation.py tests/unit/test_execution_state_store.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_execution_workflow.py` passed on 2026-05-03 with `67 passed` after execution cleanup
 - `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed on 2026-05-03 with `265 passed` after execution cleanup
+- Domain and final UTC Ruff cleanup passed on 2026-05-03: full `.venv/bin/python -m ruff check src tests scripts` now returns `All checks passed`
+- `.venv/bin/python -m pytest tests/unit/test_domain_market.py tests/unit/test_domain_features.py tests/unit/test_domain_trading.py tests/integration/test_domain_roundtrip.py tests/integration/test_validation_walk_forward.py` passed on 2026-05-03 with `18 passed` after final Ruff cleanup
+- `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed on 2026-05-03 with `265 passed` after final Ruff cleanup
 - `python3 -m compileall src tests scripts` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_config_loader.py tests/unit/test_execution_mt5_client.py tests/unit/test_execution_mt5_live.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
 - `python3 -m pytest tests/unit/test_execution_mt5_client.py tests/unit/test_deployment_mt5_preflight.py tests/unit/test_config_loader.py tests/integration/test_deployment_bootstrap.py` passed on 2026-03-28
@@ -465,6 +469,7 @@ Current repository status:
   - RL Ruff cleanup is complete: `src/scalper_ai/rl` and selected RL tests now pass targeted Ruff; selected RL pytest passed with `5 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `93` to `77`
   - deployment Ruff cleanup is complete: `src/scalper_ai/deployment` and selected deployment tests now pass targeted Ruff; selected deployment pytest passed with `58 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `77` to `72`
   - execution Ruff cleanup is complete: `src/scalper_ai/execution` and selected execution tests now pass targeted Ruff; selected execution pytest passed with `67 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `72` to `50`
+  - domain and final UTC Ruff cleanup is complete: full Ruff is now green for `src`, `tests`, and `scripts`; selected domain/validation pytest passed with `18 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog dropped from `50` to `0`
   - Docker/Compose bounded paper supervisor validation is complete: added `make compose-supervise` for reproducible bounded supervisor runs, then ran Compose `paper-runtime supervise` for 5 paper iterations with `health_due=true`, `reconciliation_due=true`, `overall_status=pass`, rendered metrics on every iteration, `alert_count=0`, no alert errors, no runtime errors, and Compose cleanup afterward
   - Docker/Compose paper-runtime validation is complete on Docker Desktop: `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1`, `docker build -t forex-scalper-ai:local .` passed, Compose `paper-runtime describe` returned paper mode, Compose `health` returned `overall_status=pass`, Compose `metrics` emitted Prometheus-style runtime metrics, and `docker compose --profile paper down` cleaned up the test Redis container/network
   - MT5 post-send fallback fault-injection validation is complete: after a successful MT5 `order_send`, `Mt5TerminalClient` now falls back to the broker send result instead of raising if immediate order/history/deal refresh fails or the success response lacks a numeric ticket; explicit non-success `order_send` retcodes remain normalized rejected states; targeted Ruff, `25 passed` targeted MT5 client pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `265 passed`
@@ -493,7 +498,7 @@ Current repository status:
   - Controlled Parallels demo-order validation is complete: use IOC for Dukascopy EURUSD, handle Dukascopy as hedging (`margin_mode=2`) rather than netting, and use position-ticket close logic for flattening
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging and Docker Desktop validation are complete; keep future runtime-platform work focused on long-running supervision and deployment topology
-  - Full-repo Ruff/mypy cleanup baseline is documented and now reduced to `50` Ruff issues after scripts/config/logging/journal/OMS/validation/models/risk/data/backtesting/features/RL/deployment/execution cleanup; continue retiring it in small batches rather than mixing broad style churn with trading behavior changes
+  - Full-repo Ruff cleanup is now complete for `src`, `tests`, and `scripts`; mypy remains the next cleanup baseline to retire in small batches
   - Local JSONL alert transport and HTTP webhook alert transport are implemented and now wired into the supervisor/`run_runtime.py supervise` path; concrete production endpoint values still depend on deployment topology
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics

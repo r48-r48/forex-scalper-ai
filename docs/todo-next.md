@@ -45,6 +45,7 @@
 - RL Ruff cleanup batch — completed on 2026-05-03; full Ruff backlog reduced from `93` to `77`
 - deployment Ruff cleanup batch — completed on 2026-05-03; full Ruff backlog reduced from `77` to `72`
 - execution Ruff cleanup batch — completed on 2026-05-03; full Ruff backlog reduced from `72` to `50`
+- domain and final UTC Ruff cleanup batch — completed on 2026-05-03; full Ruff backlog reduced from `50` to `0`
 - Parallels Windows 11 MT5 environment and Dukascopy demo validation — completed on 2026-04-28 without SSH and without `order_send`: `mt5_smoke.py` connected to account `610769553`; EURUSD IOC `order_check` passed with `retcode=0`; EURUSD FOK was rejected as unsupported filling mode
 - Parallels deeper MT5 history/deal check — initial 2026-04-28 read-only probe returned no rows before the controlled fill; 2026-04-30 follow-up with explicit terminal path and 8760-hour lookback resolved visibility with 4 EURUSD historical orders / 4 trade deals plus a zero-volume deposit deal
 - Docker/runtime validation — completed on 2026-05-03: Docker Desktop Engine `29.4.1` was reachable, `docker build -t forex-scalper-ai:local .` passed, Compose `paper-runtime describe` returned paper mode, Compose `health` returned `overall_status=pass`, Compose `metrics` emitted Prometheus-style runtime metrics, and the test Compose stack was cleaned up
@@ -80,6 +81,7 @@
 - RL Ruff cleanup — completed on 2026-05-03: `src/scalper_ai/rl` and selected RL tests now pass targeted Ruff; selected RL pytest passed with `5 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog is now `77`
 - Deployment Ruff cleanup — completed on 2026-05-03: `src/scalper_ai/deployment` and selected deployment tests now pass targeted Ruff; selected deployment pytest passed with `58 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog is now `72`
 - Execution Ruff cleanup — completed on 2026-05-03: `src/scalper_ai/execution` and selected execution tests now pass targeted Ruff; selected execution pytest passed with `67 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog is now `50`
+- Domain and final UTC Ruff cleanup — completed on 2026-05-03: full `.venv/bin/python -m ruff check src tests scripts` now passes with `All checks passed`; selected domain/validation pytest passed with `18 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for remaining MT5 fault-injection coverage, dependency supervision beyond the current trackers, and longer-duration runtime evidence
 - production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics

@@ -17,22 +17,10 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result after scripts, config, logging, journal, OMS, validation, models, risk, data-layer, backtesting, features, RL, deployment, and execution cleanup batches:
+Current result after scripts, config, logging, journal, OMS, validation, models, risk, data-layer, backtesting, features, RL, deployment, execution, domain, and final UTC cleanup batches:
 
 ```text
-Found 50 errors.
-42 fixable with --fix.
-```
-
-Statistics:
-
-```text
- 22 UP017 datetime-timezone-utc
- 14 UP045 non-pep604-annotation-optional
-  8 UP042 replace-str-enum
-  4 UP037 quoted-annotation
-  1 I001  unsorted-imports
-  1 UP035 deprecated-import
+All checks passed.
 ```
 
 Completed cleanup batches:
@@ -51,6 +39,7 @@ Completed cleanup batches:
 - 2026-05-03: RL cleanup modernized optional annotations, moved `Sequence` to `collections.abc`, removed an unused import, switched tests to `datetime.UTC`, sorted imports, and wrapped long environment/training expressions without changing reward or policy-training logic. Targeted Ruff is green for `src/scalper_ai/rl` and selected RL tests.
 - 2026-05-03: deployment cleanup converted `HealthStatus` to `StrEnum`, modernized health annotations/imports, and wrapped Prometheus metric rendering/key expressions without changing output semantics. Targeted Ruff is green for `src/scalper_ai/deployment` and selected deployment tests.
 - 2026-05-03: execution cleanup switched selected tests/live stub UTC usage to `datetime.UTC`, sorted imports, wrapped protocol/router signatures, and wrapped paper execution cost/order-trigger expressions without changing order lifecycle or fill math. Targeted Ruff is green for `src/scalper_ai/execution` and selected execution tests.
+- 2026-05-03: domain and final UTC cleanup modernized canonical domain annotations/imports, converted domain enums to `StrEnum`, switched remaining tests to `datetime.UTC`, and closed the remaining full-repository Ruff backlog. Full Ruff is now green for `src`, `tests`, and `scripts`.
 
 Recommended cleanup order:
 
@@ -87,6 +76,6 @@ Recommended cleanup order:
 
 ## Gate Policy Until Cleanup
 
-- Full `make lint` and `make typecheck` are known non-green baseline checks.
+- Full Ruff is green for `src`, `tests`, and `scripts`; mypy remains a known non-green baseline check.
 - Targeted Ruff must pass for newly added or materially touched code.
 - Full `.venv/bin/python -m compileall src tests scripts` and `.venv/bin/pytest` remain required regression checks.

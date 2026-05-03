@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class BookSide(str, Enum):
+class BookSide(StrEnum):
     """Side of the order book."""
 
     BID = "bid"
     ASK = "ask"
 
 
-class BarType(str, Enum):
+class BarType(StrEnum):
     """Canonical aggregated bar families."""
 
     TIME = "time"
@@ -21,14 +21,14 @@ class BarType(str, Enum):
     IMBALANCE = "imbalance"
 
 
-class OrderSide(str, Enum):
+class OrderSide(StrEnum):
     """Trading direction."""
 
     BUY = "buy"
     SELL = "sell"
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     """Execution intent category."""
 
     MARKET = "market"
@@ -37,7 +37,7 @@ class OrderType(str, Enum):
     STOP_LIMIT = "stop_limit"
 
 
-class TimeInForce(str, Enum):
+class TimeInForce(StrEnum):
     """Broker-facing lifetime instructions."""
 
     GTC = "gtc"
@@ -46,7 +46,7 @@ class TimeInForce(str, Enum):
     DAY = "day"
 
 
-class LiquidityFlag(str, Enum):
+class LiquidityFlag(StrEnum):
     """Fill-side liquidity information."""
 
     MAKER = "maker"
@@ -54,7 +54,7 @@ class LiquidityFlag(str, Enum):
     UNKNOWN = "unknown"
 
 
-class EventSource(str, Enum):
+class EventSource(StrEnum):
     """Origin of an event payload."""
 
     LIVE = "live"
@@ -64,7 +64,7 @@ class EventSource(str, Enum):
     EXTERNAL = "external"
 
 
-class PositionMode(str, Enum):
+class PositionMode(StrEnum):
     """Broker/account position accounting mode."""
 
     NETTING = "netting"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -91,7 +91,7 @@ class _SignalThresholdStrategy:
 
 
 def _feature_frame(*, row_count: int) -> pd.DataFrame:
-    base_time = datetime(2026, 3, 28, 9, 0, 0, tzinfo=timezone.utc)
+    base_time = datetime(2026, 3, 28, 9, 0, 0, tzinfo=UTC)
     records: list[dict[str, object]] = []
     for index in range(row_count):
         timestamp = base_time + timedelta(minutes=index)
