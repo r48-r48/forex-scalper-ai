@@ -76,6 +76,7 @@ The report was based on a static archive review and did not see all subsequent l
 - Completed on `2026-05-03`: offline tick/replay data-quality foundation in `src/scalper_ai/data/quality.py`, with structured reports for UTC timestamp, ordering, duplicate, bid/ask, gap, and received/event lag checks.
 - Completed on `2026-05-03`: model bundle metadata contract in `src/scalper_ai/models/bundle.py`, including deterministic feature-contract hashing, UTC metadata validation, artifact references, metrics, training window provenance, and JSON save/load helpers.
 - Completed on `2026-05-03`: first production CLI slice in `scripts/build_dataset.py`, `scripts/run_backtest.py`, and `scripts/run_walk_forward.py`, with shared UTC/JSON/frame helpers, unit coverage, and `docs/production-cli.md`. This covers dataset building, explicit-cost baseline backtests, and baseline walk-forward validation; feature-building and training CLIs remain separate follow-up work.
+- Completed on `2026-05-03`: parallel hardening batch added `scripts/build_features.py` for offline feature frames, `scripts/run_supervised_filter.py` for leakage-safe supervised filter validation, opt-in RiskEngine budget guards for risk-per-trade/open-position/weekly-loss/margin/leverage checks, and a backwards-compatible bid/ask-aware backtest execution slice; `make PYTHON=.venv/bin/python ci` passed with full pytest `306 passed`.
 
 ## Non-Goals
 

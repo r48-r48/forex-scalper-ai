@@ -22,6 +22,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed a four-way parallel hardening batch:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/build_features.py` and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_build_features.py` for UTC-safe offline feature-frame creation from one tick-like symbol/venue stream
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_supervised_filter.py` and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_supervised_filter_cli.py` for leakage-safe supervised baseline filter walk-forward reporting from flat supervised datasets
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/risk/engine.py` and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_risk_engine.py` with opt-in risk-per-trade, max-open-positions, weekly-loss, margin-level, and leverage guards; defaults remain permissive until config/runtime wiring is added
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/config.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/backtesting/engine.py`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_backtesting_bid_ask.py` with optional bid/ask-aware market execution; default mid-price behavior is preserved
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/production-cli.md`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-05-03.md`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/current-state.md`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/todo-next.md`, and handoff memory files
+  - targeted validation passed before full CI: Ruff, mypy for changed src, compileall, `git diff --check`, and new/surrounding unit tests with `34 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `89` source files, compileall green, full pytest `306 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed the first production-facing CLI slice:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/cli_utils.py` with shared CSV/Parquet frame loading/writing, UTC-aware timestamp normalization, JSON-safe serialization, and dataframe record helpers
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/build_dataset.py` for leakage-safe supervised dataset generation from flat feature frames

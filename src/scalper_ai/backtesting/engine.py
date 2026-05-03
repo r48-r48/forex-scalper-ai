@@ -129,6 +129,12 @@ def run_backtest(
                 pretrade_position.net_quantity
             )
             if not math.isclose(delta_quantity, 0.0, abs_tol=_ZERO_TOLERANCE):
+                order_side = OrderSide.BUY if delta_quantity > 0 else OrderSide.SELL
+                execution_reference_price = _execution_reference_price(
+                    event,
+                    side=order_side,
+                    config=resolved_config,
+                )
                 order = _build_market_order(
                     event=event,
                     strategy_id=strategy_id,
@@ -137,13 +143,14 @@ def run_backtest(
                     current_position=pretrade_position.net_quantity,
                     target_position=float(target_position),
                     delta_quantity=delta_quantity,
+                    execution_reference_price=execution_reference_price,
                 )
                 fill = simulate_market_fill(
                     order,
                     fill_id=f"bt-fill-{len(fills) + 1:06d}",
                     event_timestamp=event.available_timestamp.to_pydatetime(),
                     received_timestamp=event.available_timestamp.to_pydatetime(),
-                    mark_price=event.mark_price,
+                    mark_price=execution_reference_price,
                     spread_bps=resolved_config.spread_bps,
                     slippage_bps=resolved_config.slippage_bps,
                     commission_bps=resolved_config.commission_bps,
@@ -211,6 +218,13 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
         config.available_timestamp_column,
         config.price_column,
     }
+    if config.uses_bid_ask_execution:
+        required_columns.update(
+            {
+                str(config.bid_price_column),
+                str(config.ask_price_column),
+            }
+        )
     missing_columns = required_columns.difference(frame.columns)
     if missing_columns:
         raise ValueError(
@@ -233,13 +247,14 @@ def _prepare_backtest_frame(frame: pd.DataFrame, *, config: BacktestConfig) -> p
     ).any():
         raise ValueError("available_timestamp_column must not precede event_timestamp_column.")
 
-    prepared[config.price_column] = pd.to_numeric(prepared[config.price_column], errors="coerce")
-    if prepared[config.price_column].isna().any():
-        raise ValueError(f"{config.price_column} contains non-numeric values.")
-    if not np.isfinite(prepared[config.price_column].to_numpy(dtype=float, copy=False)).all():
-        raise ValueError(f"{config.price_column} contains non-finite values.")
-    if (prepared[config.price_column] <= 0).any():
-        raise ValueError(f"{config.price_column} must contain strictly positive prices.")
+    _validate_positive_price_column(prepared, column_name=config.price_column)
+    if config.uses_bid_ask_execution:
+        bid_column = str(config.bid_price_column)
+        ask_column = str(config.ask_price_column)
+        _validate_positive_price_column(prepared, column_name=bid_column)
+        _validate_positive_price_column(prepared, column_name=ask_column)
+        if (prepared[bid_column] > prepared[ask_column]).any():
+            raise ValueError("bid_price_column must not exceed ask_price_column.")
 
     if prepared[config.symbol_column].isna().any():
         raise ValueError(f"{config.symbol_column} must not contain null symbols.")
@@ -301,7 +316,13 @@ def _build_market_order(
     current_position: float,
     target_position: float,
     delta_quantity: float,
+    execution_reference_price: float | None = None,
 ) -> OrderIntent:
+    resolved_execution_reference_price = (
+        event.mark_price
+        if execution_reference_price is None
+        else execution_reference_price
+    )
     return OrderIntent(
         intent_id=f"bt-order-{order_index:06d}",
         strategy_id=strategy_id,
@@ -315,8 +336,36 @@ def _build_market_order(
             "current_position": current_position,
             "target_position": target_position,
             "mark_price": event.mark_price,
+            "execution_reference_price": resolved_execution_reference_price,
         },
     )
+
+
+def _execution_reference_price(
+    event: BacktestEvent,
+    *,
+    side: OrderSide,
+    config: BacktestConfig,
+) -> float:
+    if not config.uses_bid_ask_execution:
+        return event.mark_price
+
+    column_name = (
+        str(config.ask_price_column)
+        if side is OrderSide.BUY
+        else str(config.bid_price_column)
+    )
+    return float(event.row_payload[column_name])
+
+
+def _validate_positive_price_column(frame: pd.DataFrame, *, column_name: str) -> None:
+    frame[column_name] = pd.to_numeric(frame[column_name], errors="coerce")
+    if frame[column_name].isna().any():
+        raise ValueError(f"{column_name} contains non-numeric values.")
+    if not np.isfinite(frame[column_name].to_numpy(dtype=float, copy=False)).all():
+        raise ValueError(f"{column_name} contains non-finite values.")
+    if (frame[column_name] <= 0).any():
+        raise ValueError(f"{column_name} must contain strictly positive prices.")
 
 
 def _resolve_strategy_id(strategy: TargetPositionStrategy) -> str:

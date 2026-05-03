@@ -13,6 +13,8 @@ class BacktestConfig:
     available_timestamp_column: str = "available_timestamp"
     event_timestamp_column: str = "event_timestamp"
     symbol_column: str = "symbol"
+    bid_price_column: str | None = None
+    ask_price_column: str | None = None
     initial_cash: float = 100_000.0
     spread_bps: float = 0.0
     slippage_bps: float = 0.0
@@ -27,6 +29,12 @@ class BacktestConfig:
             raise ValueError("event_timestamp_column must be non-empty.")
         if not self.symbol_column.strip():
             raise ValueError("symbol_column must be non-empty.")
+        if (self.bid_price_column is None) != (self.ask_price_column is None):
+            raise ValueError("bid_price_column and ask_price_column must be configured together.")
+        if self.bid_price_column is not None and not self.bid_price_column.strip():
+            raise ValueError("bid_price_column must be non-empty when provided.")
+        if self.ask_price_column is not None and not self.ask_price_column.strip():
+            raise ValueError("ask_price_column must be non-empty when provided.")
         if self.initial_cash <= 0:
             raise ValueError("initial_cash must be greater than zero.")
         if self.spread_bps < 0:
@@ -35,3 +43,9 @@ class BacktestConfig:
             raise ValueError("slippage_bps must be non-negative.")
         if self.commission_bps < 0:
             raise ValueError("commission_bps must be non-negative.")
+
+    @property
+    def uses_bid_ask_execution(self) -> bool:
+        """Return whether market fills should use side-specific bid/ask prices."""
+
+        return self.bid_price_column is not None and self.ask_price_column is not None

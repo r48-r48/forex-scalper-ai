@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
-from typing import Protocol
+from typing import Protocol, SupportsFloat, SupportsInt, cast
 
 from scalper_ai.domain import OrderIntent, OrderSide, PositionState
 from scalper_ai.journal import JournalEvent, JournalEventType
@@ -37,6 +37,12 @@ class RiskRejectCode(StrEnum):
     NEWS_GUARD = "news_guard"
     MAX_DAILY_LOSS = "max_daily_loss"
     MAX_DAILY_DRAWDOWN = "max_daily_drawdown"
+    MAX_WEEKLY_LOSS = "max_weekly_loss"
+    MIN_MARGIN_LEVEL = "min_margin_level"
+    MAX_LEVERAGE = "max_leverage"
+    RISK_PER_TRADE_UNAVAILABLE = "risk_per_trade_unavailable"
+    MAX_RISK_PER_TRADE = "max_risk_per_trade"
+    MAX_OPEN_POSITIONS = "max_open_positions"
     MAX_POSITION = "max_position"
     REDUCE_ONLY_INCREASES_EXPOSURE = "reduce_only_increases_exposure"
 
@@ -62,6 +68,11 @@ class RiskLimits:
     max_position_size: float
     max_daily_loss: float | None = None
     max_daily_drawdown: float | None = None
+    max_weekly_loss: float | None = None
+    max_risk_per_trade: float | None = None
+    max_open_positions: int | None = None
+    min_margin_level_percent: float | None = None
+    max_leverage: float | None = None
     max_spread_pips: float | None = None
     max_order_rate_per_minute: int = 30
     stale_market_data_seconds: float = 2.0
@@ -79,6 +90,16 @@ class RiskLimits:
             raise ValueError("max_daily_loss must be greater than zero when provided.")
         if self.max_daily_drawdown is not None and self.max_daily_drawdown <= 0:
             raise ValueError("max_daily_drawdown must be greater than zero when provided.")
+        if self.max_weekly_loss is not None and self.max_weekly_loss <= 0:
+            raise ValueError("max_weekly_loss must be greater than zero when provided.")
+        if self.max_risk_per_trade is not None and self.max_risk_per_trade <= 0:
+            raise ValueError("max_risk_per_trade must be greater than zero when provided.")
+        if self.max_open_positions is not None and self.max_open_positions < 0:
+            raise ValueError("max_open_positions must be non-negative when provided.")
+        if self.min_margin_level_percent is not None and self.min_margin_level_percent <= 0:
+            raise ValueError("min_margin_level_percent must be greater than zero when provided.")
+        if self.max_leverage is not None and self.max_leverage <= 0:
+            raise ValueError("max_leverage must be greater than zero when provided.")
         if self.max_spread_pips is not None and self.max_spread_pips <= 0:
             raise ValueError("max_spread_pips must be greater than zero when provided.")
         if self.max_order_rate_per_minute <= 0:
@@ -101,6 +122,13 @@ class RiskLimits:
         return cls(
             max_position_size=float(config.max_position_size),
             max_daily_drawdown=float(config.max_daily_drawdown),
+            max_weekly_loss=_optional_float(getattr(config, "max_weekly_loss", None)),
+            max_risk_per_trade=_optional_float(getattr(config, "max_risk_per_trade", None)),
+            max_open_positions=_optional_int(getattr(config, "max_open_positions", None)),
+            min_margin_level_percent=_optional_float(
+                getattr(config, "min_margin_level_percent", None)
+            ),
+            max_leverage=_optional_float(getattr(config, "max_leverage", None)),
             max_spread_pips=float(config.max_spread_pips),
             max_order_rate_per_minute=int(config.max_order_frequency_per_minute),
             stale_market_data_seconds=float(config.stale_quote_seconds),
@@ -126,8 +154,13 @@ class RiskContext:
     latest_market_data_at: datetime | None = None
     current_spread_pips: float | None = None
     realized_pnl_today: float = 0.0
+    realized_pnl_this_week: float = 0.0
     starting_equity: float | None = None
     current_equity: float | None = None
+    margin_level_percent: float | None = None
+    effective_leverage: float | None = None
+    estimated_entry_price: float | None = None
+    risk_quote_conversion_rate: float = 1.0
     session_kill_switch: bool = False
     symbol_kill_switches: frozenset[str] = frozenset()
     volatility_guard_active: bool = False
@@ -149,6 +182,14 @@ class RiskContext:
             raise ValueError("current_spread_pips must be non-negative when provided.")
         if self.starting_equity is not None and self.starting_equity <= 0:
             raise ValueError("starting_equity must be greater than zero when provided.")
+        if self.margin_level_percent is not None and self.margin_level_percent < 0:
+            raise ValueError("margin_level_percent must be non-negative when provided.")
+        if self.effective_leverage is not None and self.effective_leverage < 0:
+            raise ValueError("effective_leverage must be non-negative when provided.")
+        if self.estimated_entry_price is not None and self.estimated_entry_price <= 0:
+            raise ValueError("estimated_entry_price must be greater than zero when provided.")
+        if self.risk_quote_conversion_rate <= 0:
+            raise ValueError("risk_quote_conversion_rate must be greater than zero.")
 
 
 @dataclass(frozen=True)
@@ -245,6 +286,7 @@ class RiskEngine:
 
         current_position = _current_position_for(intent.symbol, context.positions)
         projected_position = _projected_position(intent, current_position)
+        exposure_increase = _exposure_increase_units(current_position, projected_position)
         if intent.reduce_only and abs(projected_position) > abs(current_position):
             return self._reject(
                 intent,
@@ -252,11 +294,40 @@ class RiskEngine:
                 RiskRejectCode.REDUCE_ONLY_INCREASES_EXPOSURE,
                 projected_position=projected_position,
             )
+        if self._margin_level_breached(context) and exposure_increase > 0:
+            return self._reject(
+                intent,
+                context,
+                RiskRejectCode.MIN_MARGIN_LEVEL,
+                projected_position=projected_position,
+            )
+        if self._leverage_exceeded(context) and exposure_increase > 0:
+            return self._reject(
+                intent,
+                context,
+                RiskRejectCode.MAX_LEVERAGE,
+                projected_position=projected_position,
+            )
         if abs(projected_position) > self._limits.max_position_size:
             return self._reject(
                 intent,
                 context,
                 RiskRejectCode.MAX_POSITION,
+                projected_position=projected_position,
+            )
+        if self._open_position_limit_exceeded(intent.symbol, context, projected_position):
+            return self._reject(
+                intent,
+                context,
+                RiskRejectCode.MAX_OPEN_POSITIONS,
+                projected_position=projected_position,
+            )
+        risk_budget_code = self._risk_per_trade_code(intent, context, exposure_increase)
+        if risk_budget_code is not None:
+            return self._reject(
+                intent,
+                context,
+                risk_budget_code,
                 projected_position=projected_position,
             )
 
@@ -342,6 +413,60 @@ class RiskEngine:
             drawdown = (context.starting_equity - context.current_equity) / context.starting_equity
             if drawdown >= self._limits.max_daily_drawdown:
                 return RiskRejectCode.MAX_DAILY_DRAWDOWN
+        if (
+            self._limits.max_weekly_loss is not None
+            and context.realized_pnl_this_week <= -self._limits.max_weekly_loss
+        ):
+            return RiskRejectCode.MAX_WEEKLY_LOSS
+        return None
+
+    def _margin_level_breached(self, context: RiskContext) -> bool:
+        return (
+            self._limits.min_margin_level_percent is not None
+            and context.margin_level_percent is not None
+            and context.margin_level_percent < self._limits.min_margin_level_percent
+        )
+
+    def _leverage_exceeded(self, context: RiskContext) -> bool:
+        return (
+            self._limits.max_leverage is not None
+            and context.effective_leverage is not None
+            and context.effective_leverage > self._limits.max_leverage
+        )
+
+    def _open_position_limit_exceeded(
+        self,
+        symbol: str,
+        context: RiskContext,
+        projected_position: float,
+    ) -> bool:
+        if self._limits.max_open_positions is None:
+            return False
+        open_count = sum(
+            1 for position in context.positions.values() if float(position.net_quantity) != 0.0
+        )
+        current_position = _current_position_for(symbol, context.positions)
+        current_open = current_position != 0.0
+        projected_open = projected_position != 0.0
+        if not current_open and projected_open:
+            open_count += 1
+        elif current_open and not projected_open:
+            open_count -= 1
+        return open_count > self._limits.max_open_positions
+
+    def _risk_per_trade_code(
+        self,
+        intent: OrderIntent,
+        context: RiskContext,
+        exposure_increase: float,
+    ) -> RiskRejectCode | None:
+        if self._limits.max_risk_per_trade is None or exposure_increase <= 0:
+            return None
+        risk_amount = _risk_per_trade_amount(intent, context, exposure_increase)
+        if risk_amount is None:
+            return RiskRejectCode.RISK_PER_TRADE_UNAVAILABLE
+        if risk_amount > self._limits.max_risk_per_trade:
+            return RiskRejectCode.MAX_RISK_PER_TRADE
         return None
 
 
@@ -358,6 +483,54 @@ def _projected_position(intent: OrderIntent, current_position: float) -> float:
 def _current_position_for(symbol: str, positions: Mapping[str, PositionState]) -> float:
     position = positions.get(symbol)
     return 0.0 if position is None else float(position.net_quantity)
+
+
+def _exposure_increase_units(current_position: float, projected_position: float) -> float:
+    if projected_position == 0:
+        return 0.0
+    if current_position == 0:
+        return abs(projected_position)
+    if (current_position > 0 and projected_position > 0) or (
+        current_position < 0 and projected_position < 0
+    ):
+        return max(abs(projected_position) - abs(current_position), 0.0)
+    return abs(projected_position)
+
+
+def _risk_per_trade_amount(
+    intent: OrderIntent,
+    context: RiskContext,
+    exposure_increase: float,
+) -> float | None:
+    if intent.stop_loss_price is None:
+        return None
+    entry_price = _entry_reference_price(intent, context)
+    if entry_price is None:
+        return None
+    stop_loss_price = float(intent.stop_loss_price)
+    if intent.side is OrderSide.BUY:
+        price_risk = entry_price - stop_loss_price
+    else:
+        price_risk = stop_loss_price - entry_price
+    if price_risk <= 0:
+        return None
+    return exposure_increase * price_risk * context.risk_quote_conversion_rate
+
+
+def _entry_reference_price(intent: OrderIntent, context: RiskContext) -> float | None:
+    if intent.limit_price is not None:
+        return float(intent.limit_price)
+    if intent.stop_price is not None:
+        return float(intent.stop_price)
+    return context.estimated_entry_price
+
+
+def _optional_float(value: object) -> float | None:
+    return None if value is None else float(cast(SupportsFloat, value))
+
+
+def _optional_int(value: object) -> int | None:
+    return None if value is None else int(cast(SupportsInt, value))
 
 
 def _ensure_aware(timestamp: datetime, *, field_name: str) -> None:

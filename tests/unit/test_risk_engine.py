@@ -106,6 +106,106 @@ def test_risk_engine_blocks_position_limit_and_reduce_only_exposure_increase() -
     assert reduce_only_growth.projected_position == 11_000.0
 
 
+def test_risk_engine_blocks_risk_per_trade_budget() -> None:
+    engine = RiskEngine(_limits(max_risk_per_trade=40.0))
+
+    decision = engine.evaluate_order(
+        _intent(
+            quantity=10_000.0,
+            order_type=OrderType.LIMIT,
+            limit_price=1.1000,
+            stop_loss_price=1.0950,
+        ),
+        _context(),
+    )
+
+    assert decision.status is RiskDecisionStatus.REJECTED
+    assert decision.code is RiskRejectCode.MAX_RISK_PER_TRADE
+    assert decision.projected_position == 10_000.0
+
+
+def test_risk_engine_rejects_unbounded_risk_when_trade_budget_is_enabled() -> None:
+    engine = RiskEngine(_limits(max_risk_per_trade=40.0))
+
+    decision = engine.evaluate_order(
+        _intent(quantity=10_000.0),
+        _context(estimated_entry_price=1.1000),
+    )
+
+    assert decision.status is RiskDecisionStatus.REJECTED
+    assert decision.code is RiskRejectCode.RISK_PER_TRADE_UNAVAILABLE
+
+
+def test_risk_engine_blocks_max_open_positions() -> None:
+    engine = RiskEngine(_limits(max_open_positions=1))
+
+    decision = engine.evaluate_order(
+        _intent(quantity=10_000.0),
+        _context(positions={"GBPUSD": _position(5_000.0, symbol="GBPUSD")}),
+    )
+
+    assert decision.status is RiskDecisionStatus.REJECTED
+    assert decision.code is RiskRejectCode.MAX_OPEN_POSITIONS
+    assert decision.projected_position == 10_000.0
+
+
+@pytest.mark.parametrize(
+    ("limits", "context_kwargs", "expected_code"),
+    [
+        (
+            {"max_weekly_loss": 1_000.0},
+            {"realized_pnl_this_week": -1_001.0},
+            RiskRejectCode.MAX_WEEKLY_LOSS,
+        ),
+        (
+            {"min_margin_level_percent": 100.0},
+            {"margin_level_percent": 99.0},
+            RiskRejectCode.MIN_MARGIN_LEVEL,
+        ),
+        (
+            {"max_leverage": 20.0},
+            {"effective_leverage": 20.5},
+            RiskRejectCode.MAX_LEVERAGE,
+        ),
+    ],
+)
+def test_risk_engine_blocks_optional_account_budget_guards(
+    limits: dict[str, object],
+    context_kwargs: dict[str, object],
+    expected_code: RiskRejectCode,
+) -> None:
+    engine = RiskEngine(_limits(**limits))
+
+    decision = engine.evaluate_order(
+        _intent(quantity=10_000.0),
+        _context(**context_kwargs),
+    )
+
+    assert decision.status is RiskDecisionStatus.REJECTED
+    assert decision.code is expected_code
+
+
+def test_new_risk_budget_defaults_are_permissive() -> None:
+    engine = RiskEngine(_limits())
+
+    decision = engine.evaluate_order(
+        _intent(quantity=10_000.0),
+        _context(
+            positions={
+                "GBPUSD": _position(5_000.0, symbol="GBPUSD"),
+                "USDJPY": _position(-5_000.0, symbol="USDJPY"),
+            },
+            realized_pnl_this_week=-10_000.0,
+            margin_level_percent=1.0,
+            effective_leverage=100.0,
+        ),
+    )
+
+    assert decision.status is RiskDecisionStatus.APPROVED
+    assert decision.accepted is True
+    assert decision.projected_position == 10_000.0
+
+
 @pytest.mark.parametrize(
     ("limits", "context_kwargs", "expected_code"),
     [
@@ -165,6 +265,11 @@ def _limits(
     *,
     max_position_size: float = 100_000.0,
     max_spread_pips: float | None = None,
+    max_risk_per_trade: float | None = None,
+    max_open_positions: int | None = None,
+    max_weekly_loss: float | None = None,
+    min_margin_level_percent: float | None = None,
+    max_leverage: float | None = None,
     post_loss_cooldown_seconds: float = 0.0,
     loss_burst_threshold: int = 2,
 ) -> RiskLimits:
@@ -172,6 +277,11 @@ def _limits(
         max_position_size=max_position_size,
         max_daily_loss=500.0,
         max_daily_drawdown=0.02,
+        max_weekly_loss=max_weekly_loss,
+        max_risk_per_trade=max_risk_per_trade,
+        max_open_positions=max_open_positions,
+        min_margin_level_percent=min_margin_level_percent,
+        max_leverage=max_leverage,
         max_spread_pips=max_spread_pips,
         max_order_rate_per_minute=2,
         stale_market_data_seconds=2.0,
@@ -198,6 +308,11 @@ def _intent(
     *,
     quantity: float | None = 10_000.0,
     target_position: float | None = None,
+    side: OrderSide = OrderSide.BUY,
+    order_type: OrderType = OrderType.MARKET,
+    limit_price: float | None = None,
+    stop_price: float | None = None,
+    stop_loss_price: float | None = None,
     reduce_only: bool = False,
 ) -> OrderIntent:
     return OrderIntent(
@@ -205,18 +320,21 @@ def _intent(
         strategy_id="strategy-1",
         symbol="EURUSD",
         created_at=BASE_TS,
-        side=OrderSide.BUY,
-        order_type=OrderType.MARKET,
+        side=side,
+        order_type=order_type,
         quantity=quantity,
+        limit_price=limit_price,
+        stop_price=stop_price,
+        stop_loss_price=stop_loss_price,
         target_position=target_position,
         reduce_only=reduce_only,
         paper=True,
     )
 
 
-def _position(net_quantity: float) -> PositionState:
+def _position(net_quantity: float, *, symbol: str = "EURUSD") -> PositionState:
     return PositionState(
-        symbol="EURUSD",
+        symbol=symbol,
         timestamp=BASE_TS,
         net_quantity=net_quantity,
         average_entry_price=1.1 if net_quantity else 0.0,

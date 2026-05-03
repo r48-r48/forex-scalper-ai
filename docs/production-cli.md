@@ -4,6 +4,21 @@ This project keeps trading and validation logic in library modules. The scripts 
 document are thin reproducible entrypoints for local research, paper promotion checks,
 and release evidence. They do not submit broker orders.
 
+## Build Offline Features
+
+```bash
+.venv/bin/python scripts/build_features.py \
+  --input-path data/raw/eurusd-ticks.csv \
+  --output-path data/processed/eurusd-features.parquet \
+  --summary-output-path data/artifacts/eurusd-features-summary.json \
+  --symbol EURUSD \
+  --venue MT5
+```
+
+Input rows must contain `event_timestamp`, `received_timestamp`, `bid`, and `ask`.
+They may also include `symbol`, `venue`, sizes, last trade proxies, and sequence.
+Run one symbol/venue stream at a time so feature state cannot mix markets.
+
 ## Build A Supervised Dataset
 
 ```bash
@@ -38,6 +53,10 @@ The report includes explicit cost assumptions, strategy names, risk limits, and 
 baseline metrics frame. Supported strategies are `spread_mean_reversion`,
 `ofi_imbalance`, `volatility_breakout`, or `all`.
 
+For bid/ask-aware replay, call the library `BacktestConfig` with
+`bid_price_column` and `ask_price_column`. BUY fills then use ask and SELL fills use
+bid, while `price_column` remains the mark-to-market column.
+
 ## Run Walk-Forward Validation
 
 ```bash
@@ -58,3 +77,24 @@ The script reconstructs the `SupervisedDataset` contract from a flat dataset fra
 then runs the existing leakage-safe walk-forward engine over out-of-sample test folds.
 Only current-state `lag_000__` features are converted back into replay rows for the
 baseline backtester.
+
+## Run Supervised Filter Validation
+
+```bash
+.venv/bin/python scripts/run_supervised_filter.py \
+  --input-path data/processed/supervised-dataset.parquet \
+  --output-path data/artifacts/supervised-filter.json \
+  --fold-metrics-output-path data/artifacts/supervised-filter-folds.csv \
+  --train-size 2048 \
+  --validation-size 512 \
+  --test-size 512 \
+  --embargo-size 16 \
+  --target-threshold 0.0001 \
+  --spread-bps 0.5 \
+  --slippage-bps 0.2
+```
+
+This command fits the transparent supervised baseline filter on train folds only and
+evaluates directional predictions on out-of-sample test folds. Cost settings are
+recorded in the report as explicit evaluation context; this directional filter does
+not convert predictions into broker fills.
