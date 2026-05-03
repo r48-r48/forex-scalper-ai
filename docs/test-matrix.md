@@ -14,8 +14,7 @@ Result:
 
 ```text
 Ruff passed; mypy passed with "Success: no issues found in 87 source files";
-compileall passed; pytest passed with "265 passed"; MT5 preflight returned
-structured read-only diagnostics without order_send.
+compileall passed; pytest passed with "268 passed".
 ```
 
 The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created with bundled Python 3.12.13 for target-runtime validation.
@@ -43,10 +42,10 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 |---|---|---|
 | `python3 -m pytest` on local Python 3.9.6 | passing | Useful compatibility signal, but not the declared target runtime |
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
-| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, full suite currently `265 passed` |
+| Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, full suite currently `268 passed` |
 | Real MT5 terminal smoke | partial pass | Windows notebook and same-Mac Parallels VM both connect to demo terminals without `order_send`; Windows/MetaQuotes accepted EURUSD FOK, while Parallels/Dukascopy accepted EURUSD IOC and rejected FOK |
 | Docker/Compose paper runtime | passing on Docker Desktop | `docker build -t forex-scalper-ai:local .` passed on 2026-05-03; Compose `paper-runtime` describe/health/metrics passed with paper mode, health `overall_status=pass`, Prometheus metrics output, and a bounded 5-iteration supervisor run with zero alerts/errors; test Redis container/network was removed with `docker compose --profile paper down` |
-| Local paper supervisor | passing | `make supervise-paper` passed a 30-iteration paper run with `30 pass`, rendered metrics on every iteration, zero runtime errors, zero alert transport errors, and zero alerts |
+| Local paper supervisor | passing | `make supervise-paper` passed a 30-iteration paper run with `30 pass`, rendered metrics on every iteration, zero runtime errors, zero alert transport errors, and zero alerts; `make supervise-paper-wallclock` passed a 2-second run with 11 pass iterations and persisted JSON evidence |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; lint/typecheck/compile/test/preflight are now part of the gate |
 
 ## Test Risk Notes

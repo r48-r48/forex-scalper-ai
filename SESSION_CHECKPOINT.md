@@ -22,6 +22,15 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed wall-clock-bounded paper supervisor support and evidence:
+  - `RuntimeSupervisor.run_forever()` now accepts `max_runtime_seconds` and stops on whichever bound is reached first when combined with `max_iterations`
+  - `scripts/run_runtime.py supervise` now accepts `--max-runtime-seconds` plus `--output-path` for bounded JSON evidence persistence
+  - `make supervise-paper-wallclock` and `make compose-supervise-wallclock` wrap the local and Compose paper-safe wall-clock supervisor flows
+  - added unit coverage for runtime-second stopping, first-bound-wins behavior, and non-positive runtime caps
+  - ran `make PYTHON=.venv/bin/python SUPERVISOR_MAX_RUNTIME_SECONDS=2 SUPERVISOR_HEALTH_INTERVAL_SECONDS=0.2 SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS=0.2 SUPERVISOR_IDLE_SLEEP_SECONDS=0.2 LOCAL_SUPERVISOR_ALERT_JSONL_PATH=data/artifacts/paper-supervisor-wallclock-2s-alerts.jsonl LOCAL_SUPERVISOR_OUTPUT_PATH=data/artifacts/paper-supervisor-wallclock-2s.json supervise-paper-wallclock`
+  - result: `11` iterations, all `pass`, health/reconciliation due every iteration, metrics rendered every iteration, runtime errors `0`, alert transport errors `0`, alert events `0`, first check `2026-05-03T14:24:45.686780+00:00`, last check `2026-05-03T14:24:47.738805+00:00`
+  - validation passed: targeted supervisor Ruff, targeted supervisor pytest `10 passed`, `git diff --check`, and `make PYTHON=.venv/bin/python ci` with full pytest `268 passed` plus safe MT5 preflight diagnostics
+  - raw evidence was written under ignored `data/artifacts/`; `docs/runtime-supervision-evidence.md`, `docs/docker-runtime.md`, `docs/current-state.md`, `docs/todo-next.md`, `docs/post-phase-roadmap.md`, `AGENT_HANDOFF.md`, and this checkpoint were refreshed
 - 2026-05-03 completed fresh-checkout Parallels MT5 validation:
   - cloned the current repository into `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai-current` inside the same-Mac Windows 11 VM without touching the older source-copy folder
   - verified fresh Windows checkout commit `86afc80`, branch state `main...origin/main`, and clean status

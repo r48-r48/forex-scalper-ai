@@ -2,13 +2,16 @@ PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
 PYTHONPYCACHEPREFIX ?= /tmp/scalper_ai_pycache
 SUPERVISOR_ITERATIONS ?= 5
+SUPERVISOR_MAX_RUNTIME_SECONDS ?= 5
 SUPERVISOR_HEALTH_INTERVAL_SECONDS ?= 0.1
 SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS ?= 0.1
 SUPERVISOR_IDLE_SLEEP_SECONDS ?= 0.2
 SUPERVISOR_ALERT_JSONL_PATH ?= /app/data/artifacts/paper-supervisor-alerts.jsonl
+SUPERVISOR_OUTPUT_PATH ?= /app/data/artifacts/paper-supervisor-evidence.json
 LOCAL_SUPERVISOR_ALERT_JSONL_PATH ?= data/artifacts/paper-supervisor-alerts.jsonl
+LOCAL_SUPERVISOR_OUTPUT_PATH ?= data/artifacts/paper-supervisor-evidence.json
 
-.PHONY: help install test compile lint lint-baseline typecheck typecheck-baseline check ci run-paper health-paper metrics-paper supervise-paper mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics compose-supervise
+.PHONY: help install test compile lint lint-baseline typecheck typecheck-baseline check ci run-paper health-paper metrics-paper supervise-paper supervise-paper-wallclock mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics compose-supervise compose-supervise-wallclock
 
 help:
 	@echo "Available targets:"
@@ -25,6 +28,7 @@ help:
 	@echo "  health-paper   Print paper runtime health snapshot"
 	@echo "  metrics-paper  Print paper runtime metrics"
 	@echo "  supervise-paper Run bounded paper supervisor cycles locally"
+	@echo "  supervise-paper-wallclock Run wall-clock bounded paper supervisor locally"
 	@echo "  mt5-preflight  Run read-only MT5 preflight diagnostics"
 	@echo "  run-replay     Show replay tick collector help"
 	@echo "  docker-build   Build the paper-safe runtime image"
@@ -32,6 +36,7 @@ help:
 	@echo "  compose-health Run the paper runtime health check through Docker Compose"
 	@echo "  compose-metrics Run the paper runtime metrics surface through Docker Compose"
 	@echo "  compose-supervise Run bounded paper supervisor cycles through Docker Compose"
+	@echo "  compose-supervise-wallclock Run wall-clock bounded paper supervisor through Compose"
 
 install:
 	$(PIP) install -e ".[dev,ml]"
@@ -76,6 +81,9 @@ metrics-paper:
 supervise-paper:
 	$(PYTHON) scripts/run_runtime.py supervise --config-name paper --max-iterations $(SUPERVISOR_ITERATIONS) --health-interval-seconds $(SUPERVISOR_HEALTH_INTERVAL_SECONDS) --reconciliation-interval-seconds $(SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS) --idle-sleep-seconds $(SUPERVISOR_IDLE_SLEEP_SECONDS) --alert-jsonl-path $(LOCAL_SUPERVISOR_ALERT_JSONL_PATH)
 
+supervise-paper-wallclock:
+	$(PYTHON) scripts/run_runtime.py supervise --config-name paper --max-runtime-seconds $(SUPERVISOR_MAX_RUNTIME_SECONDS) --health-interval-seconds $(SUPERVISOR_HEALTH_INTERVAL_SECONDS) --reconciliation-interval-seconds $(SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS) --idle-sleep-seconds $(SUPERVISOR_IDLE_SLEEP_SECONDS) --alert-jsonl-path $(LOCAL_SUPERVISOR_ALERT_JSONL_PATH) --output-path $(LOCAL_SUPERVISOR_OUTPUT_PATH)
+
 mt5-preflight:
 	$(PYTHON) scripts/mt5_smoke.py --config-name mt5 --preflight-only
 
@@ -96,3 +104,6 @@ compose-metrics:
 
 compose-supervise:
 	docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-iterations $(SUPERVISOR_ITERATIONS) --health-interval-seconds $(SUPERVISOR_HEALTH_INTERVAL_SECONDS) --reconciliation-interval-seconds $(SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS) --idle-sleep-seconds $(SUPERVISOR_IDLE_SLEEP_SECONDS) --alert-jsonl-path $(SUPERVISOR_ALERT_JSONL_PATH)
+
+compose-supervise-wallclock:
+	docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-runtime-seconds $(SUPERVISOR_MAX_RUNTIME_SECONDS) --health-interval-seconds $(SUPERVISOR_HEALTH_INTERVAL_SECONDS) --reconciliation-interval-seconds $(SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS) --idle-sleep-seconds $(SUPERVISOR_IDLE_SLEEP_SECONDS) --alert-jsonl-path $(SUPERVISOR_ALERT_JSONL_PATH) --output-path $(SUPERVISOR_OUTPUT_PATH)

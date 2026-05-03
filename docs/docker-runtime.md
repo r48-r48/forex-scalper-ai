@@ -39,12 +39,14 @@ make compose-paper
 make compose-health
 make compose-metrics
 make compose-supervise
+make compose-supervise-wallclock
 ```
 
 For local non-Docker bounded supervision, use:
 
 ```bash
 make supervise-paper
+make supervise-paper-wallclock
 ```
 
 Equivalent raw commands:
@@ -55,6 +57,7 @@ docker compose --profile paper run --rm paper-runtime describe --config-name pap
 docker compose --profile paper run --rm paper-runtime health --config-name paper
 docker compose --profile paper run --rm paper-runtime metrics --config-name paper
 docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-iterations 5 --health-interval-seconds 0.1 --reconciliation-interval-seconds 0.1 --idle-sleep-seconds 0.2 --alert-jsonl-path /app/data/artifacts/paper-supervisor-alerts.jsonl
+docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-runtime-seconds 5 --health-interval-seconds 0.1 --reconciliation-interval-seconds 0.1 --idle-sleep-seconds 0.2 --alert-jsonl-path /app/data/artifacts/paper-supervisor-alerts.jsonl --output-path /app/data/artifacts/paper-supervisor-evidence.json
 ```
 
 ## Current Validation Status
@@ -101,6 +104,17 @@ Local 30-iteration paper supervisor validation on 2026-05-03:
   were due on every iteration, metrics rendered each time, and there were zero
   runtime errors, alert transport errors, or alert events.
 - See `docs/runtime-supervision-evidence.md` for the evidence summary.
+
+Local wall-clock paper supervisor validation on 2026-05-03:
+
+- `make PYTHON=.venv/bin/python SUPERVISOR_MAX_RUNTIME_SECONDS=2
+  SUPERVISOR_HEALTH_INTERVAL_SECONDS=0.2
+  SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS=0.2
+  SUPERVISOR_IDLE_SLEEP_SECONDS=0.2 supervise-paper-wallclock` completed
+  successfully and persisted JSON evidence under ignored `data/artifacts/`.
+- The 2-second bounded run produced 11 iterations, all `overall_status=pass`,
+  with health/reconciliation due and metrics rendered on every iteration, and
+  zero runtime errors, alert transport errors, or alert events.
 
 ## Safety Notes
 

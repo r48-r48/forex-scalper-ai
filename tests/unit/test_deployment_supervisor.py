@@ -135,6 +135,57 @@ def test_runtime_supervisor_run_forever_honors_max_iterations() -> None:
     assert sleeps == [0.25, 0.25]
 
 
+def test_runtime_supervisor_run_forever_honors_max_runtime_seconds() -> None:
+    checked_at = datetime(2026, 4, 30, 13, 0, tzinfo=UTC)
+    clock_values = [
+        checked_at,
+        checked_at + timedelta(seconds=0.2),
+        checked_at + timedelta(seconds=0.4),
+        checked_at + timedelta(seconds=0.6),
+    ]
+    sleeps: list[float] = []
+    supervisor = RuntimeSupervisor(
+        _RecordingRuntime(checked_at),
+        config=RuntimeSupervisorConfig(
+            health_interval_seconds=0.1,
+            reconciliation_interval_seconds=0.1,
+            idle_sleep_seconds=0.05,
+        ),
+        clock=lambda: clock_values.pop(0),
+        sleeper=lambda seconds: sleeps.append(seconds),
+    )
+
+    iterations = supervisor.run_forever(max_runtime_seconds=0.4)
+
+    assert len(iterations) == 3
+    assert iterations[-1].checked_at == checked_at + timedelta(seconds=0.4)
+    assert sleeps == [0.05, 0.05]
+
+
+def test_runtime_supervisor_run_forever_stops_on_first_bound_reached() -> None:
+    checked_at = datetime(2026, 4, 30, 13, 0, tzinfo=UTC)
+    clock_values = [checked_at + timedelta(seconds=index) for index in range(4)]
+    supervisor = RuntimeSupervisor(
+        _RecordingRuntime(checked_at),
+        config=RuntimeSupervisorConfig(idle_sleep_seconds=0.0),
+        clock=lambda: clock_values.pop(0),
+        sleeper=lambda seconds: None,
+    )
+
+    iterations = supervisor.run_forever(max_iterations=2, max_runtime_seconds=100.0)
+
+    assert len(iterations) == 2
+
+
+def test_runtime_supervisor_rejects_non_positive_max_runtime_seconds() -> None:
+    supervisor = RuntimeSupervisor(
+        _RecordingRuntime(datetime(2026, 4, 30, 13, 0, tzinfo=UTC)),
+    )
+
+    with pytest.raises(ValueError, match="max_runtime_seconds"):
+        supervisor.run_forever(max_runtime_seconds=0.0)
+
+
 def test_runtime_supervisor_rejects_naive_clock() -> None:
     supervisor = RuntimeSupervisor(
         _RecordingRuntime(datetime(2026, 4, 30, 13, 0, tzinfo=UTC)),

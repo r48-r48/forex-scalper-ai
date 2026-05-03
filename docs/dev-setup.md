@@ -46,6 +46,7 @@ make ci
 make run-paper
 make health-paper
 make supervise-paper
+make supervise-paper-wallclock
 make mt5-preflight
 make docker-build
 make compose-paper
@@ -63,6 +64,7 @@ python3 -m pytest
 python3 scripts/run_runtime.py describe --config-name paper
 python3 scripts/run_runtime.py health --config-name paper
 python3 scripts/run_runtime.py supervise --config-name paper --max-iterations 30 --health-interval-seconds 0.05 --reconciliation-interval-seconds 0.05 --idle-sleep-seconds 0.05 --alert-jsonl-path data/artifacts/paper-supervisor-alerts.jsonl
+python3 scripts/run_runtime.py supervise --config-name paper --max-runtime-seconds 5 --health-interval-seconds 0.2 --reconciliation-interval-seconds 0.2 --idle-sleep-seconds 0.2 --alert-jsonl-path data/artifacts/paper-supervisor-alerts.jsonl --output-path data/artifacts/paper-supervisor-evidence.json
 python3 scripts/mt5_smoke.py --config-name mt5 --preflight-only
 python3 scripts/mt5_broker_probe.py --config-name mt5 --symbol EURUSD --time-in-force fok --skip-order-check
 ```
@@ -94,6 +96,7 @@ Important safety posture:
 make run-paper
 make health-paper
 make supervise-paper
+make supervise-paper-wallclock
 ```
 
 Expected behavior:
@@ -150,6 +153,7 @@ make compose-paper
 make compose-health
 make compose-metrics
 make compose-supervise
+make compose-supervise-wallclock
 ```
 
 `paper-runtime` is profile-gated and keeps live trading disabled by default. See `docs/docker-runtime.md`.

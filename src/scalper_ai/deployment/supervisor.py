@@ -153,17 +153,30 @@ class RuntimeSupervisor:
         self,
         *,
         max_iterations: int | None = None,
+        max_runtime_seconds: float | None = None,
     ) -> tuple[RuntimeSupervisorIteration, ...]:
-        """Run the supervisor loop until max_iterations is reached, if provided."""
+        """Run the supervisor loop until one configured bound is reached."""
 
         if max_iterations is not None and max_iterations <= 0:
             raise ValueError("max_iterations must be positive when provided.")
+        if max_runtime_seconds is not None and max_runtime_seconds <= 0:
+            raise ValueError("max_runtime_seconds must be positive when provided.")
 
         iterations: list[RuntimeSupervisorIteration] = []
-        while max_iterations is None or len(iterations) < max_iterations:
-            iterations.append(self.run_once())
-            if max_iterations is None or len(iterations) < max_iterations:
-                self._sleeper(self._config.idle_sleep_seconds)
+        started_at: datetime | None = None
+        while True:
+            iteration = self.run_once()
+            iterations.append(iteration)
+            if started_at is None:
+                started_at = iteration.checked_at
+            if max_iterations is not None and len(iterations) >= max_iterations:
+                break
+            if (
+                max_runtime_seconds is not None
+                and (iteration.checked_at - started_at).total_seconds() >= max_runtime_seconds
+            ):
+                break
+            self._sleeper(self._config.idle_sleep_seconds)
         return tuple(iterations)
 
     @staticmethod

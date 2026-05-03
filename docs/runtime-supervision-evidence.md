@@ -38,6 +38,48 @@ Result:
 Raw local evidence was written under ignored `data/artifacts/` paths. The alert
 JSONL file was not created because no alert events were emitted.
 
+## Local Wall-Clock Paper Supervisor
+
+The supervisor now supports wall-clock-bounded execution with persisted JSON
+evidence through `--max-runtime-seconds` and `--output-path`.
+
+Command:
+
+```bash
+make PYTHON=.venv/bin/python \
+  SUPERVISOR_MAX_RUNTIME_SECONDS=2 \
+  SUPERVISOR_HEALTH_INTERVAL_SECONDS=0.2 \
+  SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS=0.2 \
+  SUPERVISOR_IDLE_SLEEP_SECONDS=0.2 \
+  LOCAL_SUPERVISOR_ALERT_JSONL_PATH=data/artifacts/paper-supervisor-wallclock-2s-alerts.jsonl \
+  LOCAL_SUPERVISOR_OUTPUT_PATH=data/artifacts/paper-supervisor-wallclock-2s.json \
+  supervise-paper-wallclock
+```
+
+Result:
+
+- iterations: `11`
+- overall status: `11 pass`
+- health due on every iteration: `true`
+- reconciliation due on every iteration: `true`
+- metrics rendered on every iteration: `true`
+- runtime errors: `0`
+- alert transport errors: `0`
+- alert events: `0`
+- first check: `2026-05-03T14:24:45.686780+00:00`
+- last check: `2026-05-03T14:24:47.738805+00:00`
+
+Raw wall-clock evidence was written under ignored `data/artifacts/` paths. The
+alert JSONL file was not created because no alert events were emitted.
+
+Validation after the wall-clock supervisor change:
+
+- targeted supervisor Ruff: passed
+- targeted supervisor pytest: `10 passed`
+- `git diff --check`: passed
+- `make PYTHON=.venv/bin/python ci`: Ruff passed, mypy passed, compileall
+  passed, full pytest `268 passed`, and safe MT5 preflight diagnostics passed
+
 ## Parallels MT5 Read-Only Smoke
 
 The same-Mac Parallels VM was reachable as `Windows 11`.
@@ -106,7 +148,7 @@ Fresh-checkout broker probe result:
 ## Operational Reading
 
 - Paper supervisor scheduling, health, reconciliation, metrics rendering, and
-  alert routing stayed stable across a longer bounded loop.
+  alert routing stayed stable across bounded iteration and wall-clock loops.
 - The Parallels terminal session remains available for future explicit read-only
   MT5 probes or controlled demo-only scenarios.
 - The earlier source-copy limitation is closed for code-sensitive Parallels

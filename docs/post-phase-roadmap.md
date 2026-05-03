@@ -68,8 +68,9 @@ Known gaps:
 - MT5 execution/reconciliation needs hedging-aware behavior for accounts with `margin_mode=2`
 - Docker/Compose runtime image has now been validated on Docker Desktop: image build passed, Compose paper-runtime `describe`, `health`, `metrics`, and bounded `supervise` passed, and the test stack was cleaned up
 - Longer local paper supervision evidence now exists: `make supervise-paper` ran 30 bounded iterations with `30 pass`, rendered metrics on every iteration, zero runtime errors, zero alert transport errors, and zero alerts
+- Wall-clock local paper supervision evidence now exists: `RuntimeSupervisor` and `run_runtime.py supervise` support `max_runtime_seconds`, bounded JSON evidence can be persisted with `--output-path`, a 2-second local paper run produced 11 pass iterations with zero runtime errors, alert transport errors, or alert events, and `make PYTHON=.venv/bin/python ci` passed with full pytest `268 passed`
 - HTTP webhook alert transport exists and is wired through the supervisor/`run_runtime.py supervise` path; concrete production endpoint values and OpenTelemetry trace path remain pending
-- full-repo Ruff/mypy cleanup baseline exists; cleanup is being retired in small batches
+- full-repo Ruff/mypy cleanup is complete and both gates are now part of local/CI validation
 
 ## Roadmap Status
 
@@ -109,7 +110,7 @@ Known gaps:
 - Concrete runtime dependency provider trackers: completed on 2026-05-03 with updatable data freshness, model readiness/prediction freshness, and volatility/news guard providers; targeted Ruff, compileall, `git diff --check`, targeted provider/runtime pytest, and full `.venv/bin/python -m pytest` passed with `254 passed`.
 - Concrete runtime dependency provider event-loop wiring: completed on 2026-05-03 with runtime quote-to-provider updates, optional `OnlineFeatureCalculator` updates into data/guard providers, direct market/feature/model runtime hooks, bootstrap provider passthrough, targeted Ruff, `45 passed` targeted provider/runtime/bootstrap validation, paper runtime describe/health validation, and `258 passed` full pytest validation.
 - MT5 partial-fill fault-injection validation: completed on 2026-05-03 with partial `order_send` fallback volume preservation, impossible partial-volume clamping, incremental adapter deal-fill polling coverage without duplicate deal fills, `42 passed` targeted MT5 client/live validation, and `261 passed` full pytest validation.
-- Current next task: continue with remaining MT5 fault-injection validation, longer wall-clock paper/shadow supervision evidence, production-startup hardening, and any further demo order-sending checks only as explicit controlled scenarios.
+- Current next task: continue with remaining MT5 fault-injection validation, longer paper/shadow supervision evidence with real alert sink topology, production-startup hardening, and any further demo order-sending checks only as explicit controlled scenarios.
 
 ## P0 Workstream
 
@@ -501,7 +502,7 @@ Recommended next MT5 slice:
 4. Reconcile the resulting order/deal/position state back through the existing snapshot contracts.
 
 If further MT5 validation is paused, the next non-MT5 work is platform cleanup:
-1. Extend bounded paper-runtime supervision evidence into longer wall-clock paper/shadow runs using the existing supervisor surfaces.
+1. Extend the new wall-clock paper supervisor path into longer paper/shadow runs with persisted artifacts.
 2. Continue production-startup hardening around persisted artifacts, alert sink topology, and operator runbooks.
 3. Wire the HTTP webhook alert transport into the concrete runtime topology when the target alert endpoint is chosen.
 

@@ -60,6 +60,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional supervisor iteration cap. Omit for a long-running loop.",
     )
     parser.add_argument(
+        "--max-runtime-seconds",
+        type=float,
+        default=None,
+        help="Optional supervisor wall-clock cap. Omit for a long-running loop.",
+    )
+    parser.add_argument(
         "--health-interval-seconds",
         type=float,
         default=30.0,
@@ -82,6 +88,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="Optional local JSONL alert sink used by the supervisor.",
+    )
+    parser.add_argument(
+        "--output-path",
+        type=Path,
+        default=None,
+        help="Optional JSON file for bounded supervisor iteration evidence.",
     )
     return parser.parse_args()
 
@@ -122,19 +134,26 @@ def main() -> None:
                 jsonl_path=args.alert_jsonl_path,
             ),
         )
-        if args.max_iterations is None:
+        is_bounded = args.max_iterations is not None or args.max_runtime_seconds is not None
+        if args.output_path is not None and not is_bounded:
+            raise SystemExit("--output-path requires --max-iterations or --max-runtime-seconds.")
+        if not is_bounded:
             while True:
                 iteration = supervisor.run_forever(max_iterations=1)[0]
                 print(json.dumps(_iteration_to_dict(iteration), sort_keys=True), flush=True)
                 sleep(args.idle_sleep_seconds)
-        iterations = supervisor.run_forever(max_iterations=args.max_iterations)
-        print(
-            json.dumps(
-                [_iteration_to_dict(iteration) for iteration in iterations],
-                indent=2,
-                sort_keys=True,
-            )
+        iterations = supervisor.run_forever(
+            max_iterations=args.max_iterations,
+            max_runtime_seconds=args.max_runtime_seconds,
         )
+        payload = [_iteration_to_dict(iteration) for iteration in iterations]
+        if args.output_path is not None:
+            args.output_path.parent.mkdir(parents=True, exist_ok=True)
+            args.output_path.write_text(
+                json.dumps(payload, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+        print(json.dumps(payload, indent=2, sort_keys=True))
     finally:
         runtime.stop()
 
