@@ -22,6 +22,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed the first production-facing CLI slice:
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/cli_utils.py` with shared CSV/Parquet frame loading/writing, UTC-aware timestamp normalization, JSON-safe serialization, and dataframe record helpers
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/build_dataset.py` for leakage-safe supervised dataset generation from flat feature frames
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_backtest.py` for explicit-cost default baseline backtests over replay frames
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_walk_forward.py` for baseline walk-forward validation from flat supervised datasets
+  - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_production_cli.py` and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/production-cli.md`
+  - targeted validation passed: Ruff, compileall, `git diff --check`, and `tests/unit/test_scripts_production_cli.py` with `3 passed`
+  - full local CI passed: `make PYTHON=.venv/bin/python ci` returned Ruff green, mypy green with `89` source files, compileall green, full pytest `293 passed`, and safe MT5 preflight diagnostics with no `order_send`
 - 2026-05-03 completed three parallel follow-ups from the external audit:
   - clean release/export path: added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/create_release_archive.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_create_release_archive.py`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/release-archive.md`; the script supports dry-run/list manifests and creates clean source tarballs excluding `.git`, `.venv`, caches, generated data, local evidence, archives, secrets, and macOS metadata
   - data QA foundation: added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/data/quality.py`, exports in `src/scalper_ai/data/__init__.py`, `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_data_quality.py`, and `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/data-quality.md`; reports cover UTC timestamp validity, ordering, duplicate timestamps/rows, bid/ask validity, crossed quotes, large gaps, and received/event lag without trading logic or lookahead
