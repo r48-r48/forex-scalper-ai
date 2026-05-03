@@ -498,7 +498,7 @@ Current repository status:
   - Controlled Parallels demo-order validation is complete: use IOC for Dukascopy EURUSD, handle Dukascopy as hedging (`margin_mode=2`) rather than netting, and use position-ticket close logic for flattening
   - MT5 Python bridge comment-limit hardening is complete: live probing showed comments at `30+` characters are rejected, so the client now sanitizes and clamps comments at `29`
   - Paper-safe Docker/Compose runtime packaging and Docker Desktop validation are complete; keep future runtime-platform work focused on long-running supervision and deployment topology
-  - Full-repo Ruff cleanup is now complete for `src`, `tests`, and `scripts`; mypy remains the next cleanup baseline to retire in small batches
+  - Full-repo Ruff cleanup is now complete for `src`, `tests`, and `scripts`; repository-wide mypy cleanup is also complete for `src` with `Success: no issues found in 87 source files`; full Ruff, compileall, `git diff --check`, targeted pytest (`103 passed`), and full pytest (`265 passed`) passed after the cleanup
   - Local JSONL alert transport and HTTP webhook alert transport are implemented and now wired into the supervisor/`run_runtime.py supervise` path; concrete production endpoint values still depend on deployment topology
   - P1.2 Baseline Strategy Suite is complete: `scalper_ai.backtesting.baselines` now provides spread/mean-reversion, OFI/imbalance, and volatility-breakout baselines, while `scalper_ai.validation.baseline_suite` provides suite, sensitivity, and walk-forward reports
   - P1.1 Execution-Aware Simulator V2 is complete: `scalper_ai.backtesting.execution_simulator` now provides `run_execution_aware_backtest`, forced execution scenarios, and execution-quality metrics
@@ -528,7 +528,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue small-batch Ruff/mypy cleanup, remaining MT5 fault-injection validation, and longer-duration runtime supervision evidence
+  - continue remaining MT5 fault-injection validation, longer-duration runtime supervision evidence, and promotion of the now-green Ruff/mypy checks into the normal gate
   - if MT5 remains unavailable, continue platform cleanup and runtime supervision hardening now that Docker/Compose validation and bounded supervisor evidence are complete
 
 ## Constraints To Preserve

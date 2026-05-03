@@ -91,9 +91,10 @@ class JournalEvent(DomainModel):
             event_timestamp or _extract_timestamp(payload, normalized_payload) or recorded_at
         )
         inferred_symbol = symbol or _extract_symbol(normalized_payload)
+        normalized_event_type = JournalEventType(event_type)
         return cls(
             event_id=event_id,
-            event_type=event_type,
+            event_type=normalized_event_type,
             event_timestamp=inferred_timestamp,
             recorded_at=recorded_at,
             source=source,

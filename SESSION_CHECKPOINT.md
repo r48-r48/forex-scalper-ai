@@ -22,6 +22,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed repository-wide mypy cleanup:
+  - `.venv/bin/mypy src` now passes with `Success: no issues found in 87 source files`
+  - cleanup added a central missing-import policy for `pandas`/`pyarrow`, made the Pydantic settings fallback mypy-friendly, fixed source/writer protocol variance, narrowed optional execution quantities and MT5/runtime union branches, added typed JSON numeric helpers for SQLite recovery payloads, normalized journal event types, typed dataset target literals, and wrapped unavoidable Torch distribution calls with narrow `no-untyped-call` ignores
+  - full `.venv/bin/python -m ruff check src tests scripts`, `.venv/bin/mypy src`, `git diff --check`, and `.venv/bin/python -m compileall src tests scripts` passed
+  - targeted regression pytest passed with `103 passed`
+  - full `.venv/bin/python -m pytest` passed with `265 passed`
+  - `docs/lint-typecheck-baseline.md`, `docs/current-state.md`, `docs/todo-next.md`, `AGENT_HANDOFF.md`, and this checkpoint were refreshed so future continuation knows the mypy baseline is retired
 - 2026-05-03 completed domain and final UTC Ruff cleanup:
   - full `.venv/bin/python -m ruff check src tests scripts` now passes with `All checks passed`
   - cleanup modernized canonical domain annotations/imports, converted domain enums to `StrEnum`, and switched the remaining validation UTC test to `datetime.UTC`

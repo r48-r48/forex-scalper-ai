@@ -6,15 +6,20 @@ import json
 import logging
 import logging.config
 import time
+from collections.abc import Callable
 from typing import Any
 
 from scalper_ai.config.models import LoggingConfig
 
 
+def _utc_time_converter(timestamp: float | None = None) -> time.struct_time:
+    return time.gmtime(timestamp)
+
+
 class UTCFormatter(logging.Formatter):
     """Base formatter that emits timestamps in UTC."""
 
-    converter = time.gmtime
+    converter: Callable[[float | None], time.struct_time] = staticmethod(_utc_time_converter)
 
     def __init__(self) -> None:
         super().__init__(

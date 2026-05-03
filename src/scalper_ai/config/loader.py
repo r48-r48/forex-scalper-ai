@@ -6,16 +6,21 @@ import json
 import os
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-try:
-    from pydantic_settings import BaseSettings, SettingsConfigDict
-except ModuleNotFoundError:  # pragma: no cover - exercised only in reduced local environments
-    BaseSettings = None
-    SettingsConfigDict = dict
+if TYPE_CHECKING:
+    from pydantic_settings import BaseSettings as _EnvBaseSettings
+    from pydantic_settings import SettingsConfigDict as _EnvSettingsConfigDict
+else:
+    try:
+        from pydantic_settings import BaseSettings as _EnvBaseSettings
+        from pydantic_settings import SettingsConfigDict as _EnvSettingsConfigDict
+    except ModuleNotFoundError:  # pragma: no cover - exercised only in reduced environments
+        _EnvBaseSettings = BaseModel
+        _EnvSettingsConfigDict = ConfigDict
 
 from scalper_ai.config.models import AppConfig
 from scalper_ai.utils.paths import resolve_repo_root
@@ -189,7 +194,7 @@ class _EnvOverridesMixin:
 
     @classmethod
     def load(cls) -> _EnvOverridesMixin:
-        return cls()  # type: ignore[call-arg]
+        return cls()
 
     def to_nested_dict(self) -> dict[str, Any]:
         """Convert flat environment fields into config tree patches."""
@@ -313,32 +318,20 @@ class _EnvOverridesMixin:
         return overrides
 
 
-if BaseSettings is not None:
+class EnvOverrides(_EnvOverridesMixin, _EnvBaseSettings):
+    """Environment variable overrides applied after YAML overlays."""
 
-    class EnvOverrides(_EnvOverridesMixin, BaseSettings):
-        """Environment variable overrides applied after YAML overlays."""
+    model_config = _EnvSettingsConfigDict(
+        env_prefix="SCALPER_AI_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+    )
 
-        model_config = SettingsConfigDict(
-            env_prefix="SCALPER_AI_",
-            env_file=".env",
-            env_file_encoding="utf-8",
-            extra="ignore",
-        )
-
-        @classmethod
-        def load(cls) -> EnvOverrides:
-            return cls.model_validate(_load_env_override_payload())
-
-else:
-
-    class EnvOverrides(_EnvOverridesMixin, BaseModel):
-        """Fallback environment override loader when pydantic-settings is unavailable."""
-
-        model_config = ConfigDict(extra="ignore", populate_by_name=True)
-
-        @classmethod
-        def load(cls) -> EnvOverrides:
-            return cls.model_validate(_load_env_override_payload())
+    @classmethod
+    def load(cls) -> EnvOverrides:
+        return cls.model_validate(_load_env_override_payload())
 
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:

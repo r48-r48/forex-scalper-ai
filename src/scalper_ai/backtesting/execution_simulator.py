@@ -631,7 +631,7 @@ def _event_is_stale(event: BacktestEvent, *, config: ExecutionSimulatorConfig) -
     if config.stale_after_seconds is None:
         return False
     age_seconds = (event.available_timestamp - event.event_timestamp).total_seconds()
-    return age_seconds > config.stale_after_seconds
+    return bool(age_seconds > config.stale_after_seconds)
 
 
 def _market_status(row: pd.Series, *, config: ExecutionSimulatorConfig) -> str:

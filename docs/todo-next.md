@@ -6,9 +6,9 @@
 
 ## Current Next Step
 
-- Continue acting on the 2026-04-30 external audit triage after the first runtime Risk/OMS gate, durable recovery, broker-source MT5 hedging, deal-based accounting, durable per-deal attribution, protective SL/TP, position-protection fail-safe, risk-config guard, MT5 symbol-spec quantization/enforcement, MT5 reconnect supervision, approved protection-flatten, startup recovery/fault-injection, MT5 protective repair/modify, post-repair kill-switch reset, pending-order modify, history-probe tooling, runtime supervisor, real read-only Parallels history validation, supervisor alert routing, controlled pending-order modify demo validation, richer runtime health provider contracts, concrete runtime dependency provider trackers, provider event-loop wiring, MT5 partial-fill fault-injection coverage, MT5 post-send fallback fault-injection coverage, Docker/Compose paper-runtime validation, and bounded paper supervisor validation: next deepen any remaining MT5 fault-injection scenarios, add longer-duration runtime supervision evidence, and continue small-batch Ruff/mypy cleanup.
+- Continue acting on the 2026-04-30 external audit triage after the first runtime Risk/OMS gate, durable recovery, broker-source MT5 hedging, deal-based accounting, durable per-deal attribution, protective SL/TP, position-protection fail-safe, risk-config guard, MT5 symbol-spec quantization/enforcement, MT5 reconnect supervision, approved protection-flatten, startup recovery/fault-injection, MT5 protective repair/modify, post-repair kill-switch reset, pending-order modify, history-probe tooling, runtime supervisor, real read-only Parallels history validation, supervisor alert routing, controlled pending-order modify demo validation, richer runtime health provider contracts, concrete runtime dependency provider trackers, provider event-loop wiring, MT5 partial-fill fault-injection coverage, MT5 post-send fallback fault-injection coverage, Docker/Compose paper-runtime validation, bounded paper supervisor validation, full Ruff cleanup, and full mypy cleanup: next deepen any remaining MT5 fault-injection scenarios, add longer-duration runtime supervision evidence, and promote lint/typecheck gates into CI/local workflows.
 - Keep the completed Parallels MT5 demo-order findings in scope while doing this work: Dukascopy `margin_mode=2` behaved as hedging, IOC is required for EURUSD, and historical orders/deals are visible when an explicit terminal path plus sufficient lookback is used.
-- If further MT5 work is paused, continue with small-batch Ruff/mypy cleanup and runtime supervision evidence from `docs/post-phase-roadmap.md`.
+- If further MT5 work is paused, continue with runtime supervision evidence, CI gate promotion, and production-startup hardening from `docs/post-phase-roadmap.md`.
 
 ## Deliverables
 
@@ -82,9 +82,10 @@
 - Deployment Ruff cleanup — completed on 2026-05-03: `src/scalper_ai/deployment` and selected deployment tests now pass targeted Ruff; selected deployment pytest passed with `58 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog is now `72`
 - Execution Ruff cleanup — completed on 2026-05-03: `src/scalper_ai/execution` and selected execution tests now pass targeted Ruff; selected execution pytest passed with `67 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog is now `50`
 - Domain and final UTC Ruff cleanup — completed on 2026-05-03: full `.venv/bin/python -m ruff check src tests scripts` now passes with `All checks passed`; selected domain/validation pytest passed with `18 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`
+- Full mypy cleanup — completed on 2026-05-03: `.venv/bin/mypy src` now passes with `Success: no issues found in 87 source files`; full Ruff, compileall, `git diff --check`, targeted pytest (`103 passed`), and full pytest (`265 passed`) passed; `docs/lint-typecheck-baseline.md` records the retired typecheck baseline and the follow-up to promote mypy into the normal gate
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for remaining MT5 fault-injection coverage, dependency supervision beyond the current trackers, and longer-duration runtime evidence
-- production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics
+- production-readiness cleanup to keep full-repo lint/typecheck green and harden startup ergonomics
 
 ## Must-Have Capabilities
 

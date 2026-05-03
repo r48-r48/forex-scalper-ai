@@ -192,7 +192,7 @@ class DeploymentRuntime:
         self._router: ExecutionRouter | None = None
         self._live_adapter: ExecutionAdapter | None = None
         self._state = RuntimeLifecycleState.CREATED
-        self._effective_mode = config.runtime.mode
+        self._effective_mode: str = config.runtime.mode
         self._started_at: datetime | None = None
         self._startup_reason: str | None = None
         self._last_broker_connectivity_snapshot: BrokerConnectivitySnapshot | None = None
@@ -963,7 +963,7 @@ class DeploymentRuntime:
         data_snapshot = self._data_freshness_snapshot_for_risk()
         model_snapshot = self._model_health_snapshot_for_risk()
         guard_snapshot = self._guard_state_snapshot_for_risk()
-        latest_market_data_at = quote.received_timestamp
+        latest_market_data_at: datetime | None = quote.received_timestamp
         features_healthy = True
         model_healthy = True
         volatility_guard_active = False
@@ -1964,11 +1964,7 @@ class DeploymentRuntime:
         )
         self._metrics.set_gauge(
             "scalper_ai_broker_snapshot_age_seconds",
-            (
-                0.0
-                if snapshot is None or snapshot.snapshot_age_seconds() is None
-                else snapshot.snapshot_age_seconds()
-            ),
+            _broker_snapshot_age_seconds(snapshot),
             **labels,
         )
         self._metrics.set_gauge(
@@ -2223,6 +2219,7 @@ def _position_protection_repair_targets(
         expected_value = issue.details.get("expected_value")
         if expected_value is None:
             continue
+        expected_value_float = float(cast(float | int | str, expected_value))
         symbol = _repair_issue_symbol(issue)
         if symbol is None:
             continue
@@ -2239,7 +2236,7 @@ def _position_protection_repair_targets(
             previous
             or _PositionProtectionRepairTarget(symbol=symbol, position_id=position_id),
             field_name=field_name,
-            expected_value=float(expected_value),
+            expected_value=expected_value_float,
             issue_code=issue.code,
         )
         targets[key] = target
@@ -2463,6 +2460,13 @@ def _guard_state_details(snapshot: GuardStateSnapshot) -> dict[str, object]:
 
 def _metric_optional_seconds(value: float | None) -> float:
     return 0.0 if value is None else float(value)
+
+
+def _broker_snapshot_age_seconds(snapshot: BrokerConnectivitySnapshot | None) -> float:
+    if snapshot is None:
+        return 0.0
+    snapshot_age_seconds = snapshot.snapshot_age_seconds()
+    return _metric_optional_seconds(snapshot_age_seconds)
 
 
 def _spread_pips_for_quote(quote: ExecutionQuote) -> float:

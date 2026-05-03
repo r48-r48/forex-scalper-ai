@@ -1,6 +1,6 @@
 # Lint And Typecheck Baseline
 
-Snapshot date: 2026-04-28
+Snapshot date: 2026-05-03
 
 ## Purpose
 
@@ -54,28 +54,21 @@ Recommended cleanup order:
 Current result:
 
 ```text
-Found 51 errors in 30 files.
+Success: no issues found in 87 source files.
 ```
 
-Main categories:
+Completed cleanup batch:
 
-- missing third-party stubs for `pandas` and `pyarrow`
-- Pydantic settings fallback typing in `config/loader.py`
-- protocol variance in `data/interfaces.py`
-- optional float narrowing in execution adapters
-- union narrowing in online features and MT5 live adapter
-- untyped Torch distribution calls in RL policy/training
-- a few `Any` returns in model/simulator paths
+- 2026-05-03: repository-wide mypy cleanup retired the historical typecheck baseline. The batch added a central missing-import policy for `pandas`/`pyarrow`, made the Pydantic settings fallback mypy-friendly, fixed source/writer protocol variance, narrowed optional execution quantities and MT5/runtime union branches, added typed JSON numeric helpers for SQLite state recovery, normalized journal event types, typed dataset target literals, and wrapped unavoidable Torch distribution calls with narrow `no-untyped-call` ignores.
 
-Recommended cleanup order:
+Recommended follow-up:
 
-1. Add dependency-stub policy first, especially whether to add `pandas-stubs` and whether to ignore `pyarrow` imports centrally.
-2. Fix small internal typing errors that do not touch behavior: logging formatter signature, protocol variance, optional narrowing, and literal narrowing.
-3. Add explicit casts or helper functions around Torch distribution calls.
-4. Re-run mypy after each batch and update this baseline until `make typecheck` can become a CI gate.
+1. Promote `.venv/bin/mypy src` or `make typecheck-baseline` into the normal local/CI gate once the CI environment is confirmed to use the same Python and dependency set.
+2. Keep future `# type: ignore[...]` comments narrow and tied to third-party untyped calls only.
+3. Re-run full Ruff, mypy, compileall, and pytest after source-wide typing changes.
 
 ## Gate Policy Until Cleanup
 
-- Full Ruff is green for `src`, `tests`, and `scripts`; mypy remains a known non-green baseline check.
+- Full Ruff and mypy are green for the repository source surface.
 - Targeted Ruff must pass for newly added or materially touched code.
 - Full `.venv/bin/python -m compileall src tests scripts` and `.venv/bin/pytest` remain required regression checks.

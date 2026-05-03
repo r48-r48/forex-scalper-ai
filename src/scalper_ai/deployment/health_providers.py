@@ -317,14 +317,14 @@ class RuntimeModelHealthProvider:
             raise ValueError("model_id must be non-empty when provided.")
         if not source.strip():
             raise ValueError("source must be non-empty.")
-        self._model_id = None if model_id is None else model_id.strip()
+        self._model_id: str | None = None if model_id is None else model_id.strip()
         self._prediction_stale_after_seconds = prediction_stale_after_seconds
         self._source = source
         self._clock = clock or _utc_now
         self._ready = False
         self._last_loaded_at: datetime | None = None
         self._last_prediction_at: datetime | None = None
-        self._reason = "model_not_loaded"
+        self._reason: str | None = "model_not_loaded"
         self._details: dict[str, object] = {}
 
     def mark_loaded(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -164,7 +165,10 @@ def _coerce_feature_matrix(
     if missing:
         raise ValueError(f"Feature frame is missing required columns: {', '.join(missing)}")
 
-    values = feature_frame.loc[:, list(feature_columns)].to_numpy(dtype=float, copy=True)
+    values = cast(
+        np.ndarray,
+        feature_frame.loc[:, list(feature_columns)].to_numpy(dtype=float, copy=True),
+    )
     if values.ndim != 2 or values.shape[1] != len(feature_columns):
         raise ValueError("feature frame must be a two-dimensional matrix.")
     if not np.isfinite(values).all():

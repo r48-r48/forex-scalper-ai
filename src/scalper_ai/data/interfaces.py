@@ -8,7 +8,7 @@ from typing import Protocol, TypeVar
 
 from scalper_ai.domain import BookSnapshot, DomainModel, TickEvent
 
-EventT = TypeVar("EventT", bound=DomainModel)
+EventT = TypeVar("EventT", bound=DomainModel, contravariant=True)
 
 
 class TickStreamSource(Protocol):

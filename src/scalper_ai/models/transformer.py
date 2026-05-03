@@ -113,13 +113,13 @@ class TransformerSignalPredictor:
         """Tensorize a feature frame and run model inference."""
 
         batch = self._tensorizer.build_batch(feature_frame, device=self._device)
-        return self._model(batch.inputs)
+        return self._model.forward(batch.inputs)
 
     @torch.inference_mode()
     def predict_batch(self, batch: SignalModelBatch) -> SignalModelOutput:
         """Run inference on an already-tensorized batch."""
 
-        return self._model(batch.inputs)
+        return self._model.forward(batch.inputs)
 
 
 def causal_attention_mask(

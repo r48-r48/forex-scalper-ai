@@ -150,21 +150,21 @@ class ExecutionDealAttribution:
     venue: str | None = None
 
     def __post_init__(self) -> None:
-        for field_name, value in {
+        for field_name, text_value in {
             "broker_deal_id": self.broker_deal_id,
             "fill_id": self.fill_id,
             "intent_id": self.intent_id,
             "symbol": self.symbol,
         }.items():
-            if not value.strip():
+            if not text_value.strip():
                 raise ValueError(f"{field_name} must be non-empty.")
-        for field_name, value in {
+        for field_name, optional_text_value in {
             "broker_order_id": self.broker_order_id,
             "broker_symbol": self.broker_symbol,
             "broker_position_id": self.broker_position_id,
             "venue": self.venue,
         }.items():
-            if value is not None and not value.strip():
+            if optional_text_value is not None and not optional_text_value.strip():
                 raise ValueError(f"{field_name} must be non-empty when provided.")
         if self.event_timestamp.tzinfo is None or self.event_timestamp.utcoffset() is None:
             raise ValueError("event_timestamp must be timezone-aware.")
@@ -174,7 +174,7 @@ class ExecutionDealAttribution:
             raise ValueError("fill_price must be greater than zero.")
         if self.execution_cost < 0:
             raise ValueError("execution_cost must be non-negative.")
-        for field_name, value in {
+        for field_name, numeric_value in {
             "fill_quantity": self.fill_quantity,
             "fill_price": self.fill_price,
             "execution_cost": self.execution_cost,
@@ -182,5 +182,5 @@ class ExecutionDealAttribution:
             "broker_fee": self.broker_fee,
             "broker_swap": self.broker_swap,
         }.items():
-            if not math.isfinite(value):
+            if not math.isfinite(numeric_value):
                 raise ValueError(f"{field_name} must be finite.")

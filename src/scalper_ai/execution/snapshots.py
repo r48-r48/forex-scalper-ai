@@ -61,9 +61,9 @@ class ExecutionStateTracker:
     def list_positions(self, *, paper: bool | None = None) -> tuple[PositionState, ...]:
         """Return tracked positions, optionally filtered by paper/live routing."""
 
-        items = self._positions.items()
+        items = tuple(self._positions.items())
         if paper is not None:
-            items = ((key, position) for key, position in items if key[0] is paper)
+            items = tuple((key, position) for key, position in items if key[0] is paper)
         positions = [position for _, position in items]
         return tuple(sorted(positions, key=lambda position: position.symbol))
 

@@ -82,8 +82,8 @@ def select_action(
     if deterministic:
         action_indices = torch.argmax(output.logits, dim=-1)
     else:
-        action_indices = distribution.sample()
-    log_probabilities = distribution.log_prob(action_indices)
+        action_indices = distribution.sample()  # type: ignore[no-untyped-call]
+    log_probabilities = distribution.log_prob(action_indices)  # type: ignore[no-untyped-call]
     return action_indices, log_probabilities
 
 

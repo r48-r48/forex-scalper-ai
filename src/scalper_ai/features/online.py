@@ -115,7 +115,7 @@ class OnlineFeatureCalculator:
             self._ofi_increments.append(ofi_increment)
         self._previous_top_of_book = event
 
-        if is_trade_event:
+        if is_trade_event and isinstance(event, TickEvent):
             volume, signed_volume, sign = signed_trade_volume(
                 event,
                 previous_trade_price=self._previous_trade_price,

@@ -101,6 +101,9 @@ class PaperExecutionAdapter:
             self._orders[broker_order_id] = rejected_order
             return self._build_update(rejected_order, (), quote)
 
+        if requested_quantity is None:
+            raise RuntimeError("Resolved requested quantity is required for accepted orders.")
+
         order = ExecutionOrder(
             intent=intent,
             broker_order_id=broker_order_id,

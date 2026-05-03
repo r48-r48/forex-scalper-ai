@@ -100,8 +100,8 @@ def compute_reinforce_loss(
 
     output = policy(batch.observations)
     distribution = torch.distributions.Categorical(logits=output.logits)
-    log_probabilities = distribution.log_prob(batch.action_indices)
-    entropy = distribution.entropy()
+    log_probabilities = distribution.log_prob(batch.action_indices)  # type: ignore[no-untyped-call]
+    entropy = distribution.entropy()  # type: ignore[no-untyped-call]
     loss = -(log_probabilities * batch.returns).mean() - entropy_coefficient * entropy.mean()
     return loss, entropy
 
@@ -122,7 +122,7 @@ def train_policy_batch(
         batch,
         entropy_coefficient=resolved_config.entropy_coefficient,
     )
-    loss.backward()
+    loss.backward()  # type: ignore[no-untyped-call]
     if resolved_config.grad_clip_norm is not None:
         nn.utils.clip_grad_norm_(policy.parameters(), max_norm=resolved_config.grad_clip_norm)
     optimizer.step()

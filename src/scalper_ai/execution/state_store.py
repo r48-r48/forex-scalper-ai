@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, StrEnum
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 import orjson
 
@@ -605,7 +605,7 @@ def _oms_record_from_payload(payload: Mapping[str, object]) -> OmsOrderRecord:
         broker_order_id=(
             None if payload.get("broker_order_id") is None else str(payload["broker_order_id"])
         ),
-        filled_quantity=float(payload.get("filled_quantity") or 0.0),
+        filled_quantity=_float_or_default(payload, "filled_quantity"),
         rejection_reason=(
             None if payload.get("rejection_reason") is None else str(payload["rejection_reason"])
         ),
@@ -629,8 +629,8 @@ def _execution_update_from_payload(payload: Mapping[str, object]) -> ExecutionUp
         order=_execution_order_from_payload(_mapping(payload["order"])),
         fills=tuple(FillEvent.from_record(_mapping(fill)) for fill in _sequence(payload["fills"])),
         position=PositionState.from_record(_mapping(payload["position"])),
-        cash_balance=float(payload["cash_balance"]),
-        equity=float(payload["equity"]),
+        cash_balance=_required_float(payload, "cash_balance"),
+        equity=_required_float(payload, "equity"),
         quote=_quote_from_payload(_mapping(payload["quote"])),
     )
 
@@ -690,14 +690,14 @@ def _deal_attribution_from_payload(
         symbol=str(payload["symbol"]),
         event_timestamp=_parse_datetime(str(payload["event_timestamp"])),
         side=OrderSide(str(payload["side"])),
-        fill_quantity=float(payload["fill_quantity"]),
-        fill_price=float(payload["fill_price"]),
-        execution_cost=float(payload["execution_cost"]),
+        fill_quantity=_required_float(payload, "fill_quantity"),
+        fill_price=_required_float(payload, "fill_price"),
+        execution_cost=_required_float(payload, "execution_cost"),
         broker_symbol=_optional_str(payload, "broker_symbol"),
         broker_position_id=_optional_str(payload, "broker_position_id"),
-        broker_commission=float(payload.get("broker_commission") or 0.0),
-        broker_fee=float(payload.get("broker_fee") or 0.0),
-        broker_swap=float(payload.get("broker_swap") or 0.0),
+        broker_commission=_float_or_default(payload, "broker_commission"),
+        broker_fee=_float_or_default(payload, "broker_fee"),
+        broker_swap=_float_or_default(payload, "broker_swap"),
         venue=_optional_str(payload, "venue"),
     )
 
@@ -727,9 +727,9 @@ def _execution_order_from_payload(payload: Mapping[str, object]) -> ExecutionOrd
         status=ExecutionOrderStatus(str(payload["status"])),
         submitted_at=_parse_datetime(str(payload["submitted_at"])),
         updated_at=_parse_datetime(str(payload["updated_at"])),
-        requested_quantity=float(payload["requested_quantity"]),
-        filled_quantity=float(payload.get("filled_quantity") or 0.0),
-        remaining_quantity=float(payload.get("remaining_quantity") or 0.0),
+        requested_quantity=_required_float(payload, "requested_quantity"),
+        filled_quantity=_float_or_default(payload, "filled_quantity"),
+        remaining_quantity=_float_or_default(payload, "remaining_quantity"),
         fills=tuple(FillEvent.from_record(_mapping(fill)) for fill in _sequence(payload["fills"])),
         triggered_at=None if triggered_at is None else _parse_datetime(str(triggered_at)),
         rejection_reason=(
@@ -755,8 +755,8 @@ def _quote_from_payload(payload: Mapping[str, object]) -> ExecutionQuote:
         symbol=str(payload["symbol"]),
         event_timestamp=_parse_datetime(str(payload["event_timestamp"])),
         received_timestamp=_parse_datetime(str(payload["received_timestamp"])),
-        bid=float(payload["bid"]),
-        ask=float(payload["ask"]),
+        bid=_required_float(payload, "bid"),
+        ask=_required_float(payload, "ask"),
         venue=str(payload["venue"]),
     )
 
@@ -802,12 +802,30 @@ def _sequence(value: object) -> tuple[object, ...]:
 
 def _optional_float(payload: Mapping[str, object], key: str) -> float | None:
     value = payload.get(key)
-    return None if value is None else float(value)
+    return None if value is None else _coerce_float(value)
 
 
 def _optional_str(payload: Mapping[str, object], key: str) -> str | None:
     value = payload.get(key)
     return None if value is None else str(value)
+
+
+def _required_float(payload: Mapping[str, object], key: str) -> float:
+    return _coerce_float(payload[key])
+
+
+def _float_or_default(
+    payload: Mapping[str, object],
+    key: str,
+    *,
+    default: float = 0.0,
+) -> float:
+    value = payload.get(key)
+    return default if value is None or value == "" else _coerce_float(value)
+
+
+def _coerce_float(value: object) -> float:
+    return float(cast(float | int | str, value))
 
 
 def _kill_switch_symbol_key(state: KillSwitchState) -> str:

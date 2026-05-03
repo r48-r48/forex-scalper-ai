@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, Protocol, TypeVar
 
 from scalper_ai.data.buffering import BufferedBatchWriter
 from scalper_ai.domain import DomainModel
 
 EventT = TypeVar("EventT", bound=DomainModel)
+EventT_co = TypeVar("EventT_co", bound=DomainModel, covariant=True)
+
+
+class ReplaySource(Protocol[EventT_co]):
+    """Source contract for replay-driven ingestion."""
+
+    def stream(self, *, limit: int | None = None) -> Iterator[EventT_co]:
+        """Yield replay events up to an optional limit."""
 
 
 @dataclass
@@ -29,7 +38,7 @@ class IngestionRunStats:
 class ReplayCollector(Generic[EventT]):
     """Collect replay events into a buffered raw writer."""
 
-    def __init__(self, source: object, writer: BufferedBatchWriter[EventT]) -> None:
+    def __init__(self, source: ReplaySource[EventT], writer: BufferedBatchWriter[EventT]) -> None:
         self._source = source
         self._writer = writer
 

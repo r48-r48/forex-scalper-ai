@@ -15,6 +15,7 @@ import pandas as pd
 from scalper_ai.backtesting.accounting import mark_position
 from scalper_ai.backtesting.config import BacktestConfig
 from scalper_ai.backtesting.engine import (
+    BacktestEvent,
     BacktestState,
     TargetPositionStrategy,
     _build_backtest_event,
@@ -238,7 +239,7 @@ def _build_decision(
     *,
     strategy_name: str,
     role: str,
-    event,
+    event: BacktestEvent,
     current_position: PositionState,
     target_position: float,
     raw_target_position: float | None,

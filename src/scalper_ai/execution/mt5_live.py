@@ -664,8 +664,10 @@ class Mt5ExecutionAdapter:
             if state is None:
                 continue
             previous_order = self._orders.get(broker_order_id)
+            if previous_order is None:
+                continue
             update = self._sync_order_state(previous_order.intent, state, quote=quote)
-            if previous_order is None or previous_order != update.order or update.fills:
+            if previous_order != update.order or update.fills:
                 updates.append(update)
         return tuple(updates)
 
@@ -970,31 +972,31 @@ class Mt5ExecutionAdapter:
 
         snapshots: list[BrokerPositionSnapshot] = []
         for broker_symbol, positions in positions_by_symbol.items():
-            position = aggregate_mt5_positions(
+            aggregated_position = aggregate_mt5_positions(
                 positions,
                 broker_symbol=broker_symbol,
                 position_mode=self._config.account_mode,
             )
-            if position is None:
+            if aggregated_position is None:
                 continue
             snapshots.append(
                 BrokerPositionSnapshot(
-                    symbol=self._internal_symbol_for(position.broker_symbol),
-                    timestamp=position.timestamp,
+                    symbol=self._internal_symbol_for(aggregated_position.broker_symbol),
+                    timestamp=aggregated_position.timestamp,
                     net_quantity=self._lots_to_base_units(
-                        position.net_volume_lots,
-                        broker_symbol=position.broker_symbol,
+                        aggregated_position.net_volume_lots,
+                        broker_symbol=aggregated_position.broker_symbol,
                     ),
-                    average_entry_price=position.average_entry_price,
-                    position_mode=position.position_mode,
-                    position_id=position.position_ticket,
+                    average_entry_price=aggregated_position.average_entry_price,
+                    position_mode=aggregated_position.position_mode,
+                    position_id=aggregated_position.position_ticket,
                     gross_quantity=self._lots_to_base_units(
-                        position.gross_lots,
-                        broker_symbol=position.broker_symbol,
+                        aggregated_position.gross_lots,
+                        broker_symbol=aggregated_position.broker_symbol,
                     ),
-                    source_position_ids=position.source_position_tickets,
-                    stop_loss_price=position.stop_loss_price,
-                    take_profit_price=position.take_profit_price,
+                    source_position_ids=aggregated_position.source_position_tickets,
+                    stop_loss_price=aggregated_position.stop_loss_price,
+                    take_profit_price=aggregated_position.take_profit_price,
                 )
             )
         return tuple(sorted(snapshots, key=lambda snapshot: snapshot.symbol))
@@ -1592,7 +1594,7 @@ class Mt5ExecutionAdapter:
         spec_provider = getattr(self._client, "get_symbol_spec", None)
         if callable(spec_provider):
             spec = spec_provider(broker_symbol)
-            if spec is not None:
+            if isinstance(spec, Mt5SymbolSpec):
                 self._symbol_specs[broker_symbol] = spec
                 return spec
         spec = Mt5SymbolSpec(

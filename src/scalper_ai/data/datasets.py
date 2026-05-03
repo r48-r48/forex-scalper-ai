@@ -13,7 +13,9 @@ from scalper_ai.data.labels import (
     TARGET_COLUMN,
     TARGET_END_EVENT_TIMESTAMP_COLUMN,
     TARGET_END_TIMESTAMP_COLUMN,
+    TargetAggregation,
     TargetConfig,
+    TargetMode,
     add_future_targets,
 )
 from scalper_ai.domain import FeatureSnapshot
@@ -35,8 +37,8 @@ class DatasetConfig:
     horizon: int = 1
     stride: int = 1
     target_column: str = "mid_return"
-    target_aggregation: str = "sum"
-    target_mode: str = "regression"
+    target_aggregation: TargetAggregation = "sum"
+    target_mode: TargetMode = "regression"
     classification_threshold: float = 0.0
 
     def __post_init__(self) -> None:
