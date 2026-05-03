@@ -22,6 +22,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed CI/local lint/typecheck gate promotion:
+  - `Makefile` now has `check` for Ruff, mypy, compileall, and full pytest
+  - `Makefile` now has `ci` for the local safe CI mirror, adding MT5 preflight to `check`
+  - GitHub Actions now runs Ruff and mypy before compile/test/preflight
+  - `make PYTHON=.venv/bin/python ci` passed end-to-end: Ruff passed, mypy passed with `Success: no issues found in 87 source files`, compileall passed, full pytest passed with `265 passed`, and MT5 preflight returned structured read-only diagnostics without `order_send`
+  - `docs/dev-setup.md`, `docs/test-matrix.md`, `docs/lint-typecheck-baseline.md`, `docs/current-state.md`, `docs/todo-next.md`, `AGENT_HANDOFF.md`, and this checkpoint were refreshed so continuation knows lint/typecheck are now enforced gates
 - 2026-05-03 completed repository-wide mypy cleanup:
   - `.venv/bin/mypy src` now passes with `Success: no issues found in 87 source files`
   - cleanup added a central missing-import policy for `pandas`/`pyarrow`, made the Pydantic settings fallback mypy-friendly, fixed source/writer protocol variance, narrowed optional execution quantities and MT5/runtime union branches, added typed JSON numeric helpers for SQLite recovery payloads, normalized journal event types, typed dataset target literals, and wrapped unavoidable Torch distribution calls with narrow `no-untyped-call` ignores

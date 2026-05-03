@@ -63,12 +63,12 @@ Completed cleanup batch:
 
 Recommended follow-up:
 
-1. Promote `.venv/bin/mypy src` or `make typecheck-baseline` into the normal local/CI gate once the CI environment is confirmed to use the same Python and dependency set.
+1. Keep `.venv/bin/mypy src`, `make typecheck`, and `make ci` green now that mypy is part of the local and GitHub Actions gate.
 2. Keep future `# type: ignore[...]` comments narrow and tied to third-party untyped calls only.
 3. Re-run full Ruff, mypy, compileall, and pytest after source-wide typing changes.
 
 ## Gate Policy Until Cleanup
 
-- Full Ruff and mypy are green for the repository source surface.
+- Full Ruff and mypy are green and wired into the normal local/CI gate.
 - Targeted Ruff must pass for newly added or materially touched code.
 - Full `.venv/bin/python -m compileall src tests scripts` and `.venv/bin/pytest` remain required regression checks.

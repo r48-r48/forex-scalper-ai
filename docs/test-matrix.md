@@ -1,19 +1,21 @@
 # Test Matrix
 
-Snapshot date: 2026-04-30
+Snapshot date: 2026-05-03
 
 ## Current Status
 
 Latest local validation in the available desktop environment:
 
 ```bash
-.venv/bin/pytest
+make PYTHON=.venv/bin/python ci
 ```
 
 Result:
 
 ```text
-188 passed
+Ruff passed; mypy passed with "Success: no issues found in 87 source files";
+compileall passed; pytest passed with "265 passed"; MT5 preflight returned
+structured read-only diagnostics without order_send.
 ```
 
 The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created with bundled Python 3.12.13 for target-runtime validation.
@@ -44,7 +46,7 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 | Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, full suite currently `265 passed` |
 | Real MT5 terminal smoke | partial pass | Windows notebook and same-Mac Parallels VM both connect to demo terminals without `order_send`; Windows/MetaQuotes accepted EURUSD FOK, while Parallels/Dukascopy accepted EURUSD IOC and rejected FOK |
 | Docker/Compose paper runtime | passing on Docker Desktop | `docker build -t forex-scalper-ai:local .` passed on 2026-05-03; Compose `paper-runtime` describe/health/metrics passed with paper mode, health `overall_status=pass`, Prometheus metrics output, and a bounded 5-iteration supervisor run with zero alerts/errors; test Redis container/network was removed with `docker compose --profile paper down` |
-| GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
+| GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; lint/typecheck/compile/test/preflight are now part of the gate |
 
 ## Test Risk Notes
 
@@ -52,5 +54,6 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 - Webhook alert transport tests use a fake opener and do not send real network requests.
 - Backtesting V1 models immediate market fills with explicit costs; execution-aware V2 now covers latency, queue position, partial fills, stale/closed markets, and cancel/replace races with forced-scenario tests.
 - Baseline strategies are deterministic and report explicit costs, but they still rely on replayed feature-frame quality and do not prove live broker profitability.
-- Linting is exposed through `make lint` and `make lint-baseline`. The Python 3.12.13 `.venv` baseline currently reports `374` historical Ruff issues after the scripts, config-layer, logging-utils, journal, OMS, validation, models, and risk cleanup batches; targeted Ruff is green for the 2026-04-30 P0.C/P0.D/P0.E MT5/reconciliation/deal-accounting/protective-order changes; newly touched code should keep targeted Ruff checks green.
-- Full type checking is exposed through `make typecheck` and `make typecheck-baseline`. The Python 3.12.13 `.venv` baseline currently reports `51` mypy errors in `30` files, so mypy is not yet part of the GitHub Actions gate.
+- Linting is exposed through `make lint` and `make lint-baseline`; full Ruff is now green for `src`, `tests`, and `scripts`.
+- Full type checking is exposed through `make typecheck` and `make typecheck-baseline`; `.venv/bin/mypy src` now passes with `Success: no issues found in 87 source files`.
+- `make check` runs lint, typecheck, compile, and the full pytest suite. `make ci` adds the safe MT5 preflight check and mirrors the GitHub Actions gate.

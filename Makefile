@@ -7,7 +7,7 @@ SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS ?= 0.1
 SUPERVISOR_IDLE_SLEEP_SECONDS ?= 0.2
 SUPERVISOR_ALERT_JSONL_PATH ?= /app/data/artifacts/paper-supervisor-alerts.jsonl
 
-.PHONY: help install test compile lint lint-baseline typecheck typecheck-baseline run-paper health-paper metrics-paper mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics compose-supervise
+.PHONY: help install test compile lint lint-baseline typecheck typecheck-baseline check ci run-paper health-paper metrics-paper mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics compose-supervise
 
 help:
 	@echo "Available targets:"
@@ -18,6 +18,8 @@ help:
 	@echo "  lint-baseline  Run ruff checks with statistics for cleanup tracking"
 	@echo "  typecheck      Run mypy"
 	@echo "  typecheck-baseline Run mypy for cleanup tracking"
+	@echo "  check          Run lint, typecheck, compile, and tests"
+	@echo "  ci             Run the safe CI gate locally"
 	@echo "  run-paper      Print paper runtime summary"
 	@echo "  health-paper   Print paper runtime health snapshot"
 	@echo "  metrics-paper  Print paper runtime metrics"
@@ -49,6 +51,16 @@ typecheck:
 
 typecheck-baseline:
 	$(PYTHON) -m mypy src
+
+check:
+	$(MAKE) lint
+	$(MAKE) typecheck
+	$(MAKE) compile
+	$(MAKE) test
+
+ci:
+	$(MAKE) check
+	$(MAKE) mt5-preflight
 
 run-paper:
 	$(PYTHON) scripts/run_runtime.py describe --config-name paper

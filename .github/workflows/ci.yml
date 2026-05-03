@@ -27,6 +27,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,ml]"
 
+      - name: Lint
+        run: python -m ruff check src tests scripts
+
+      - name: Typecheck
+        run: python -m mypy src
+
       - name: Compile
         run: PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python -m compileall src tests scripts
 
