@@ -14,9 +14,12 @@ from scalper_ai.deployment import (
     HealthStatus,
     MetricsRegistry,
     ModelHealthSnapshot,
+    RuntimeDataFreshnessProvider,
+    RuntimeGuardStateProvider,
     RuntimeLifecycleState,
+    RuntimeModelHealthProvider,
 )
-from scalper_ai.domain import OrderIntent, OrderSide, OrderType, PositionState
+from scalper_ai.domain import FeatureSnapshot, OrderIntent, OrderSide, OrderType, PositionState
 from scalper_ai.execution import (
     BrokerConnectivitySnapshot,
     BrokerOrderSnapshot,
@@ -523,6 +526,78 @@ def test_runtime_risk_rejects_when_data_freshness_provider_is_stale() -> None:
     assert adapter.submit_count == 0
     assert update.order.status is ExecutionOrderStatus.REJECTED
     assert update.order.rejection_reason == "stale_market_data"
+
+
+def test_runtime_uses_concrete_dependency_providers_for_health_and_risk() -> None:
+    config = AppConfig.model_validate({"runtime": {"mode": "paper"}})
+    adapter = _RejectIfSubmittedAdapter()
+    timestamp = datetime(2026, 5, 3, 10, 6, tzinfo=UTC)
+    data_provider = RuntimeDataFreshnessProvider(
+        market_data_stale_after_seconds=30.0,
+        features_stale_after_seconds=30.0,
+        clock=lambda: timestamp,
+    )
+    model_provider = RuntimeModelHealthProvider(
+        model_id="runtime-test-model",
+        prediction_stale_after_seconds=30.0,
+        clock=lambda: timestamp,
+    )
+    guard_provider = RuntimeGuardStateProvider(
+        volatility_threshold=0.002,
+        clock=lambda: timestamp,
+    )
+    feature_snapshot = FeatureSnapshot(
+        symbol="EURUSD",
+        event_timestamp=timestamp,
+        available_timestamp=timestamp,
+        feature_set="runtime-test",
+        feature_version="1",
+        values={"realized_volatility": 0.003, "spread": 0.0002},
+    )
+    data_provider.record_market_data_timestamp(timestamp, symbol="EURUSD")
+    data_provider.record_feature_snapshot(feature_snapshot)
+    model_provider.mark_loaded(timestamp=timestamp)
+    model_provider.record_prediction(timestamp=timestamp)
+    guard_provider.record_feature_snapshot(feature_snapshot)
+    runtime = DeploymentRuntime(
+        config,
+        paper_adapter_factory=lambda: adapter,
+        data_freshness_provider=data_provider,
+        model_health_provider=model_provider,
+        guard_state_provider=guard_provider,
+    )
+    runtime.start()
+
+    snapshot = runtime.health_snapshot()
+    dependency_check = next(
+        check for check in snapshot.checks if check.name == "dependency_guards"
+    )
+    assert dependency_check.status is HealthStatus.WARN
+
+    update = runtime.submit_order(
+        OrderIntent(
+            intent_id="blocked-by-concrete-volatility-provider",
+            strategy_id="dependency-health-test",
+            symbol="EURUSD",
+            created_at=timestamp,
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=2.0,
+            paper=True,
+        ),
+        ExecutionQuote(
+            symbol="EURUSD",
+            event_timestamp=timestamp,
+            received_timestamp=timestamp,
+            bid=1.0999,
+            ask=1.1001,
+            venue="paper",
+        ),
+    )
+
+    assert adapter.submit_count == 0
+    assert update.order.status is ExecutionOrderStatus.REJECTED
+    assert update.order.rejection_reason == "volatility_guard"
 
 
 def test_health_snapshot_reports_recovered_session_kill_switch(tmp_path) -> None:

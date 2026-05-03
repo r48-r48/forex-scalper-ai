@@ -16,6 +16,9 @@ from scalper_ai.deployment.health_providers import (
     GuardStateSnapshot,
     ModelHealthProvider,
     ModelHealthSnapshot,
+    RuntimeDataFreshnessProvider,
+    RuntimeGuardStateProvider,
+    RuntimeModelHealthProvider,
 )
 from scalper_ai.deployment.live_factory import (
     build_mt5_execution_adapter,
@@ -61,5 +64,8 @@ __all__ = [
     "RuntimeSupervisor",
     "RuntimeSupervisorConfig",
     "RuntimeSupervisorIteration",
+    "RuntimeDataFreshnessProvider",
+    "RuntimeGuardStateProvider",
+    "RuntimeModelHealthProvider",
     "bootstrap_runtime",
 ]

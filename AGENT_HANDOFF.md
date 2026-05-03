@@ -432,9 +432,10 @@ Current repository status:
 
 ## Last Session Snapshot
 
-- Session updated on: 2026-05-01
+- Session updated on: 2026-05-03
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - Concrete runtime dependency provider trackers are complete: `RuntimeDataFreshnessProvider`, `RuntimeModelHealthProvider`, and `RuntimeGuardStateProvider` now provide mutable runtime-updated data/feature freshness, model readiness/prediction freshness, and volatility/news guard state; providers are exported from `scalper_ai.deployment`; targeted Ruff, compileall, `git diff --check`, targeted provider/runtime pytest, and full `.venv/bin/python -m pytest` passed with `254 passed`
   - Richer runtime health provider contracts are complete: added `scalper_ai.deployment.health_providers` with typed data freshness, model readiness, and dependency guard provider contracts; `DeploymentRuntime` now registers `data_freshness`, `model_readiness`, `dependency_guards`, and `risk_guardrails`; provider state feeds metrics, alert routing, and pre-trade `RiskContext`; live mode warns when providers are missing and fails health on stale live data or an unready model; broker connectivity now surfaces reconnect attempt/circuit-breaker state; targeted Ruff, compileall, `git diff --check`, targeted runtime/bootstrap pytest, and full `.venv/bin/python -m pytest` passed with `250 passed`
   - Supervisor alert routing and controlled Parallels pending-order modify validation are complete: `RuntimeSupervisor` now renders warning/failing health snapshots into alert events and sends them through an injected transport without failing the health loop on transport errors; `scripts/run_runtime.py supervise` wires supervisor polling to optional JSONL/webhook alert routing; `scripts/mt5_pending_modify_demo.py` placed a far-away EURUSD demo pending limit order on Dukascopy account `610769553`, modified it through `TRADE_ACTION_MODIFY`, canceled it, and final smoke confirmed `order_count=0` and `position_count=0`; the live run exposed and fixed MT5 history ticket filtering after cancel so old filled history rows are not mistaken for the canceled pending order
   - Real read-only Parallels MT5 history/deal validation is complete: with explicit `BROKER_MT5_TERMINAL_PATH=C:\Program Files\MetaTrader 5\terminal64.exe` and 8760-hour lookback, `mt5_history_probe.py` found 4 EURUSD historical orders and 4 EURUSD trade deals without `order_send`; the normalized client was hardened to skip zero-volume deposit deals; `mt5_broker_probe.py --skip-order-check` then returned `normalized_order_count=4` with per-order deal attribution; full `.venv/bin/pytest` passed with `236 passed`
@@ -487,7 +488,7 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue concrete live data/model/guard provider integrations, Docker/runtime validation where available, small-batch Ruff/mypy cleanup, and deeper MT5 fault-injection/partial-fill validation
+  - wire concrete data/model/guard provider trackers into actual live/paper event loops, continue Docker/runtime validation where available, small-batch Ruff/mypy cleanup, and deeper MT5 fault-injection/partial-fill validation
   - if MT5 remains unavailable, validate Docker/Compose runtime packaging where Docker is available, then continue with network alert transport wiring and small-batch Ruff/mypy cleanup
 
 ## Constraints To Preserve

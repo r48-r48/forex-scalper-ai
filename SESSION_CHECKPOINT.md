@@ -14,7 +14,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Current Snapshot
 
-- Date: `2026-05-01`
+- Date: `2026-05-03`
 - Repo phase status: `PHASE 1-12 complete`
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
@@ -22,6 +22,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed the first concrete runtime dependency provider implementation slice:
+  - `RuntimeDataFreshnessProvider` tracks latest market-data and `FeatureSnapshot` timestamps for health/risk freshness checks
+  - `RuntimeModelHealthProvider` tracks model loaded/unavailable state and prediction freshness
+  - `RuntimeGuardStateProvider` tracks explicit news/volatility guards and can derive volatility guard state from online feature snapshots
+  - these providers are exported from `scalper_ai.deployment` and covered by unit tests plus a `DeploymentRuntime` integration test
+  - targeted Ruff passed for touched deployment/provider/runtime tests
+  - `.venv/bin/python -m pytest tests/unit/test_deployment_health_providers.py tests/unit/test_deployment_runtime.py -q` passed with `39 passed`
+  - `.venv/bin/python -m compileall src tests scripts`, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `254 passed`
 - 2026-05-01 completed richer runtime health provider contracts:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/health_providers.py`
   - `DeploymentRuntime` now accepts data freshness, model health, and dependency guard providers
