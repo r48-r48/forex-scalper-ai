@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Mapping, Optional
 
 from scalper_ai.domain import EventSource, FeatureSnapshot
 
@@ -100,8 +100,8 @@ def feature_snapshot_from_values(
     event_timestamp: datetime,
     available_timestamp: datetime,
     values: Mapping[str, float],
-    source: Optional[EventSource] = None,
-    tags: Optional[dict[str, str]] = None,
+    source: EventSource | None = None,
+    tags: dict[str, str] | None = None,
 ) -> FeatureSnapshot:
     """Build a canonical feature snapshot from a flat numeric mapping."""
 

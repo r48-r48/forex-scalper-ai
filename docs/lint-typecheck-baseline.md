@@ -17,25 +17,23 @@ New or touched production code should keep passing targeted Ruff checks even whi
 
 ## Ruff Baseline
 
-Current result after scripts, config, logging, journal, OMS, validation, models, risk, data-layer, and backtesting cleanup batches:
+Current result after scripts, config, logging, journal, OMS, validation, models, risk, data-layer, backtesting, and features cleanup batches:
 
 ```text
-Found 138 errors.
-90 fixable with --fix.
+Found 93 errors.
+61 fixable with --fix.
 ```
 
 Statistics:
 
 ```text
- 40 UP017 datetime-timezone-utc
- 33 E501  line-too-long
- 28 UP045 non-pep604-annotation-optional
-  9 I001  unsorted-imports
+ 29 UP017 datetime-timezone-utc
+ 23 E501  line-too-long
+ 18 UP045 non-pep604-annotation-optional
   9 UP042 replace-str-enum
-  8 UP035 deprecated-import
-  4 B905  zip-without-explicit-strict
+  6 I001  unsorted-imports
   4 UP037 quoted-annotation
-  2 UP007 non-pep604-annotation-union
+  3 UP035 deprecated-import
   1 F401  unused-import
 ```
 
@@ -51,6 +49,7 @@ Completed cleanup batches:
 - 2026-04-28: risk cleanup converted risk enums to `StrEnum`, added a narrow `RiskConfigLike` protocol for typed config-derived limits, modernized optional annotations, and switched tests to `datetime.UTC`. Targeted Ruff is green for `src/scalper_ai/risk` and risk tests.
 - 2026-05-03: data-layer cleanup modernized optional annotations, switched UTC usage to `datetime.UTC`, sorted imports, removed a constant `getattr`, and wrapped remaining long expressions across `src/scalper_ai/data` and selected data tests. Targeted Ruff is green for the data package and selected data/integration tests.
 - 2026-05-03: backtesting cleanup switched tests to `datetime.UTC`, sorted imports, added explicit `zip(..., strict=True)`, removed one unused loop index, and wrapped long accounting/engine expressions without changing fill or PnL math. Targeted Ruff is green for `src/scalper_ai/backtesting` and selected backtesting tests.
+- 2026-05-03: features cleanup modernized optional and union annotations, moved imports to `collections.abc`, switched tests to `datetime.UTC`, added explicit `zip(..., strict=True)`, sorted imports, and wrapped long feature expressions without changing feature calculations. Targeted Ruff is green for `src/scalper_ai/features` and selected feature tests.
 
 Recommended cleanup order:
 

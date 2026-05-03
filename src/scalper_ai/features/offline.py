@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Optional, Sequence
 
 import pandas as pd
 
@@ -47,14 +47,18 @@ def build_feature_snapshots(
     *,
     ticks: Sequence[TickEvent] = (),
     books: Sequence[BookSnapshot] = (),
-    events: Optional[Iterable[TopOfBookEvent]] = None,
-    config: Optional[FeatureConfig] = None,
-    macro_provider: Optional[MacroContextProvider] = None,
+    events: Iterable[TopOfBookEvent] | None = None,
+    config: FeatureConfig | None = None,
+    macro_provider: MacroContextProvider | None = None,
 ) -> list[FeatureSnapshot]:
     """Build canonical feature snapshots from offline replay streams."""
 
     calculator = OnlineFeatureCalculator(config=config, macro_provider=macro_provider)
-    ordered_events = list(events) if events is not None else merge_feature_events(ticks=ticks, books=books)
+    ordered_events = (
+        list(events)
+        if events is not None
+        else merge_feature_events(ticks=ticks, books=books)
+    )
     return [calculator.update(event) for event in ordered_events]
 
 
@@ -62,9 +66,9 @@ def build_feature_frame(
     *,
     ticks: Sequence[TickEvent] = (),
     books: Sequence[BookSnapshot] = (),
-    events: Optional[Iterable[TopOfBookEvent]] = None,
-    config: Optional[FeatureConfig] = None,
-    macro_provider: Optional[MacroContextProvider] = None,
+    events: Iterable[TopOfBookEvent] | None = None,
+    config: FeatureConfig | None = None,
+    macro_provider: MacroContextProvider | None = None,
 ) -> pd.DataFrame:
     """Build a flat pandas frame suitable for model input or persistence."""
 

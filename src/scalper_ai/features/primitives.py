@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from datetime import datetime, timedelta
-from typing import Sequence, Union
 
 import numpy as np
 
 from scalper_ai.domain import BookSnapshot, TickEvent
 
-TopOfBookEvent = Union[TickEvent, BookSnapshot]
+TopOfBookEvent = TickEvent | BookSnapshot
 
 
 def best_bid_ask(event: TopOfBookEvent) -> tuple[float, float]:

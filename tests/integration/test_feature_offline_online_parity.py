@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from scalper_ai.domain import BookLevel, BookSide, BookSnapshot, TickEvent
-from scalper_ai.features.offline import build_feature_frame, build_feature_snapshots, merge_feature_events
+from scalper_ai.features.offline import (
+    build_feature_frame,
+    build_feature_snapshots,
+    merge_feature_events,
+)
 from scalper_ai.features.online import OnlineFeatureCalculator
 from scalper_ai.features.schema import FeatureConfig
 
@@ -122,7 +126,7 @@ def _make_tick(
     last_price: float,
     last_size: float,
 ) -> TickEvent:
-    event_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc) + timedelta(
+    event_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC) + timedelta(
         seconds=offset_seconds
     )
     received_timestamp = event_timestamp + timedelta(milliseconds=receive_delay_ms)
@@ -149,7 +153,7 @@ def _make_book(
     bid_sizes: list[float],
     ask_sizes: list[float],
 ) -> BookSnapshot:
-    event_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc) + timedelta(
+    event_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC) + timedelta(
         seconds=offset_seconds
     )
     received_timestamp = event_timestamp + timedelta(milliseconds=receive_delay_ms)
@@ -157,11 +161,11 @@ def _make_book(
     assert len(ask_prices) == len(ask_sizes)
     bids = [
         BookLevel(side=BookSide.BID, level=index + 1, price=price, size=size)
-        for index, (price, size) in enumerate(zip(bid_prices, bid_sizes))
+        for index, (price, size) in enumerate(zip(bid_prices, bid_sizes, strict=True))
     ]
     asks = [
         BookLevel(side=BookSide.ASK, level=index + 1, price=price, size=size)
-        for index, (price, size) in enumerate(zip(ask_prices, ask_sizes))
+        for index, (price, size) in enumerate(zip(ask_prices, ask_sizes, strict=True))
     ]
     return BookSnapshot(
         symbol="EURUSD",

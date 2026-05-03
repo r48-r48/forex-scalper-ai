@@ -1,9 +1,18 @@
 """Feature engineering utilities for offline and online microstructure pipelines."""
 
 from scalper_ai.features.macro import MacroContextProvider, NullMacroContextProvider
-from scalper_ai.features.offline import build_feature_frame, build_feature_snapshots, merge_feature_events
+from scalper_ai.features.offline import (
+    build_feature_frame,
+    build_feature_snapshots,
+    merge_feature_events,
+)
 from scalper_ai.features.online import OnlineFeatureCalculator
-from scalper_ai.features.order_flow import empty_mlofi, multi_level_ofi, rolling_ofi, top_of_book_ofi
+from scalper_ai.features.order_flow import (
+    empty_mlofi,
+    multi_level_ofi,
+    rolling_ofi,
+    top_of_book_ofi,
+)
 from scalper_ai.features.primitives import (
     best_bid_ask,
     best_sizes,

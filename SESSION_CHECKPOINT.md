@@ -34,6 +34,12 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - selected backtesting pytest passed with `14 passed`
   - compileall, `git diff --check`, and full pytest passed with `265 passed`
   - full-repository Ruff baseline dropped from `163` to `138` historical issues
+- 2026-05-03 completed features Ruff cleanup:
+  - `src/scalper_ai/features` and selected feature tests now pass targeted Ruff
+  - cleanup modernized optional and union annotations, moved imports to `collections.abc`, switched tests to `datetime.UTC`, added explicit `zip(..., strict=True)`, sorted imports, and wrapped long feature expressions without changing feature calculations
+  - selected feature pytest passed with `9 passed`
+  - compileall, `git diff --check`, and full pytest passed with `265 passed`
+  - full-repository Ruff baseline dropped from `138` to `93` historical issues
 - 2026-05-03 completed Docker/Compose bounded paper supervisor validation:
   - added `make compose-supervise` for reproducible bounded supervisor checks with configurable iteration and interval variables
   - `docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-iterations 5 --health-interval-seconds 0.1 --reconciliation-interval-seconds 0.1 --idle-sleep-seconds 0.2 --alert-jsonl-path /app/data/artifacts/paper-supervisor-alerts.jsonl` completed successfully
@@ -249,6 +255,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - updated selected backtesting unit/integration tests to use modern imports and explicit zip strictness
   - targeted Ruff is now green for `src/scalper_ai/backtesting` and selected backtesting tests
   - full Ruff baseline dropped from `163` to `138` issues
+- 2026-05-03 completed features Ruff cleanup batch:
+  - updated `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/features`
+  - updated selected feature unit/integration tests to use modern imports and explicit zip strictness
+  - targeted Ruff is now green for `src/scalper_ai/features` and selected feature tests
+  - full Ruff baseline dropped from `138` to `93` issues
 - 2026-04-28 completed same-Mac Parallels Windows 11 MT5 setup and safe demo validation:
   - VM: `Windows 11`, accessed directly with `prlctl exec --current-user`; SSH is not required for this VM
   - Windows project copy: `C:\Users\dzhabrailtalkanov\projects\forex-scalper-ai`

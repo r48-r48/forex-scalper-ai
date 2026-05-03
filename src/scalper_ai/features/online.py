@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from collections import deque
 from datetime import datetime, timedelta
-from typing import Optional
 
 from scalper_ai.domain import BookSnapshot, FeatureSnapshot, TickEvent
 from scalper_ai.features.macro import MacroContextProvider, NullMacroContextProvider
-from scalper_ai.features.order_flow import empty_mlofi, multi_level_ofi, rolling_ofi, top_of_book_ofi
+from scalper_ai.features.order_flow import (
+    empty_mlofi,
+    multi_level_ofi,
+    rolling_ofi,
+    top_of_book_ofi,
+)
 from scalper_ai.features.primitives import (
     TopOfBookEvent,
     log_mid_return,
@@ -19,7 +23,6 @@ from scalper_ai.features.primitives import (
     spread_bps,
 )
 from scalper_ai.features.schema import (
-    FeatureConfig,
     MID_RETURN_FEATURE,
     OFI_FEATURE,
     QUOTE_INTENSITY_FEATURE,
@@ -27,6 +30,7 @@ from scalper_ai.features.schema import (
     SPREAD_BPS_FEATURE,
     SPREAD_FEATURE,
     TOXICITY_VPIN_FEATURE,
+    FeatureConfig,
     empty_feature_values,
     feature_names,
     feature_snapshot_from_values,
@@ -41,8 +45,8 @@ class OnlineFeatureCalculator:
     def __init__(
         self,
         *,
-        config: Optional[FeatureConfig] = None,
-        macro_provider: Optional[MacroContextProvider] = None,
+        config: FeatureConfig | None = None,
+        macro_provider: MacroContextProvider | None = None,
     ) -> None:
         self._config = config or FeatureConfig()
         self._macro_provider = macro_provider or NullMacroContextProvider()
@@ -121,7 +125,10 @@ class OnlineFeatureCalculator:
             self._signed_volumes.append(signed_volume)
             self._previous_trade_price = float(event.last_price or current_mid)
             self._previous_trade_sign = sign
-            self._latest_toxicity = toxicity_vpin_proxy(self._signed_volumes, self._absolute_volumes)
+            self._latest_toxicity = toxicity_vpin_proxy(
+                self._signed_volumes,
+                self._absolute_volumes,
+            )
 
         values = empty_feature_values(self._config)
         values[SPREAD_FEATURE] = spread(event)

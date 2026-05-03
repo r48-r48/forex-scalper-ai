@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from scalper_ai.domain import TickEvent
 from scalper_ai.features.online import OnlineFeatureCalculator
@@ -24,8 +24,8 @@ def test_online_calculator_emits_stable_feature_vector_without_l2() -> None:
         TickEvent(
             symbol="EURUSD",
             venue="TEST",
-            event_timestamp=datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc),
-            received_timestamp=datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc),
+            event_timestamp=datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC),
+            received_timestamp=datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC),
             bid=1.1000,
             ask=1.1002,
             bid_size=2.0,
@@ -51,7 +51,7 @@ def test_online_calculator_rolls_forward_ofi_and_volatility() -> None:
             mlofi_depth=1,
         )
     )
-    base_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc)
+    base_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC)
 
     calculator.update_tick(
         TickEvent(

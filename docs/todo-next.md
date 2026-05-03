@@ -41,6 +41,7 @@
 - risk Ruff cleanup batch — completed on 2026-04-28; full Ruff backlog reduced from `392` to `374`
 - data-layer Ruff cleanup batch — completed on 2026-05-03; full Ruff backlog reduced from `374` to `163`
 - backtesting Ruff cleanup batch — completed on 2026-05-03; full Ruff backlog reduced from `163` to `138`
+- features Ruff cleanup batch — completed on 2026-05-03; full Ruff backlog reduced from `138` to `93`
 - Parallels Windows 11 MT5 environment and Dukascopy demo validation — completed on 2026-04-28 without SSH and without `order_send`: `mt5_smoke.py` connected to account `610769553`; EURUSD IOC `order_check` passed with `retcode=0`; EURUSD FOK was rejected as unsupported filling mode
 - Parallels deeper MT5 history/deal check — initial 2026-04-28 read-only probe returned no rows before the controlled fill; 2026-04-30 follow-up with explicit terminal path and 8760-hour lookback resolved visibility with 4 EURUSD historical orders / 4 trade deals plus a zero-volume deposit deal
 - Docker/runtime validation — completed on 2026-05-03: Docker Desktop Engine `29.4.1` was reachable, `docker build -t forex-scalper-ai:local .` passed, Compose `paper-runtime describe` returned paper mode, Compose `health` returned `overall_status=pass`, Compose `metrics` emitted Prometheus-style runtime metrics, and the test Compose stack was cleaned up
@@ -72,6 +73,7 @@
 - Docker/Compose bounded supervisor validation — completed on 2026-05-03: `compose-supervise` / Compose `paper-runtime supervise` completed 5 safe paper iterations with health/reconciliation due, `overall_status=pass`, rendered metrics, and zero alerts/errors
 - Data-layer Ruff cleanup — completed on 2026-05-03: `src/scalper_ai/data` and selected data tests now pass targeted Ruff; selected data pytest passed with `20 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog is now `163`
 - Backtesting Ruff cleanup — completed on 2026-05-03: `src/scalper_ai/backtesting` and selected backtesting tests now pass targeted Ruff; selected backtesting pytest passed with `14 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog is now `138`
+- Features Ruff cleanup — completed on 2026-05-03: `src/scalper_ai/features` and selected feature tests now pass targeted Ruff; selected feature pytest passed with `9 passed`; compileall, `git diff --check`, and full pytest passed with `265 passed`; full Ruff backlog is now `93`
 - real-terminal validation and refinement of the new MT5-backed client, reusing the existing reconciliation and connectivity contracts plus the new preflight/auto-discovery layer
 - deeper operational hardening for remaining MT5 fault-injection coverage, dependency supervision beyond the current trackers, and longer-duration runtime evidence
 - production-readiness cleanup to retire the full-repo lint/typecheck baseline and harden startup ergonomics

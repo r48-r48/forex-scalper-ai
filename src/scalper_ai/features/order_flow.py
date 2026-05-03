@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from scalper_ai.domain import BookLevel, BookSnapshot, TickEvent
 from scalper_ai.features.primitives import best_bid_ask, best_sizes
 from scalper_ai.features.schema import MLOFI_TOTAL_FEATURE, mlofi_feature_name
 
-TopOfBookEvent = Union[TickEvent, BookSnapshot]
+TopOfBookEvent = TickEvent | BookSnapshot
 
 
 def top_of_book_ofi(previous: TopOfBookEvent, current: TopOfBookEvent) -> float:
@@ -36,7 +36,12 @@ def rolling_ofi(increments: Sequence[float]) -> float:
     return float(sum(increments))
 
 
-def multi_level_ofi(previous: BookSnapshot, current: BookSnapshot, *, depth: int) -> dict[str, float]:
+def multi_level_ofi(
+    previous: BookSnapshot,
+    current: BookSnapshot,
+    *,
+    depth: int,
+) -> dict[str, float]:
     """Return flat MLOFI features for a top-N book depth."""
 
     if depth <= 0:
@@ -84,8 +89,16 @@ def _level_ofi_contribution(
     *,
     is_bid: bool,
 ) -> float:
-    previous_price, previous_size = _level_price_size(previous_level, is_bid=is_bid, is_previous=True)
-    current_price, current_size = _level_price_size(current_level, is_bid=is_bid, is_previous=False)
+    previous_price, previous_size = _level_price_size(
+        previous_level,
+        is_bid=is_bid,
+        is_previous=True,
+    )
+    current_price, current_size = _level_price_size(
+        current_level,
+        is_bid=is_bid,
+        is_previous=False,
+    )
     if is_bid:
         return (
             float(current_price >= previous_price) * current_size

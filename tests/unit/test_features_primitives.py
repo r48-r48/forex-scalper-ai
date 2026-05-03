@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -27,14 +27,14 @@ def test_spread_and_spread_bps_from_tick() -> None:
 
 def test_quote_intensity_counts_trailing_updates_per_second() -> None:
     timestamps = [
-        datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc),
-        datetime(2026, 3, 26, 9, 0, 10, tzinfo=timezone.utc),
-        datetime(2026, 3, 26, 9, 0, 20, tzinfo=timezone.utc),
+        datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC),
+        datetime(2026, 3, 26, 9, 0, 10, tzinfo=UTC),
+        datetime(2026, 3, 26, 9, 0, 20, tzinfo=UTC),
     ]
 
     value = quote_intensity(
         timestamps,
-        now=datetime(2026, 3, 26, 9, 0, 20, tzinfo=timezone.utc),
+        now=datetime(2026, 3, 26, 9, 0, 20, tzinfo=UTC),
         window_seconds=20.0,
     )
 
@@ -97,7 +97,7 @@ def _make_tick(
     last_price: float | None = None,
     last_size: float | None = None,
 ) -> TickEvent:
-    event_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc) + timedelta(
+    event_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC) + timedelta(
         seconds=offset_seconds
     )
     return TickEvent(
@@ -122,18 +122,18 @@ def _make_book(
     bid_sizes: list[float],
     ask_sizes: list[float],
 ) -> BookSnapshot:
-    event_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=timezone.utc) + timedelta(
+    event_timestamp = datetime(2026, 3, 26, 9, 0, 0, tzinfo=UTC) + timedelta(
         seconds=offset_seconds
     )
     assert len(bid_prices) == len(bid_sizes)
     assert len(ask_prices) == len(ask_sizes)
     bids = [
         BookLevel(side=BookSide.BID, level=index + 1, price=price, size=size)
-        for index, (price, size) in enumerate(zip(bid_prices, bid_sizes))
+        for index, (price, size) in enumerate(zip(bid_prices, bid_sizes, strict=True))
     ]
     asks = [
         BookLevel(side=BookSide.ASK, level=index + 1, price=price, size=size)
-        for index, (price, size) in enumerate(zip(ask_prices, ask_sizes))
+        for index, (price, size) in enumerate(zip(ask_prices, ask_sizes, strict=True))
     ]
     return BookSnapshot(
         symbol="EURUSD",
