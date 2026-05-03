@@ -22,6 +22,11 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## What Was Just Finished
 
+- 2026-05-03 completed Docker/Compose bounded paper supervisor validation:
+  - added `make compose-supervise` for reproducible bounded supervisor checks with configurable iteration and interval variables
+  - `docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-iterations 5 --health-interval-seconds 0.1 --reconciliation-interval-seconds 0.1 --idle-sleep-seconds 0.2 --alert-jsonl-path /app/data/artifacts/paper-supervisor-alerts.jsonl` completed successfully
+  - all 5 iterations had `health_due=true`, `reconciliation_due=true`, `overall_status=pass`, rendered metrics, `alert_count=0`, no alert errors, and no runtime errors
+  - `docker compose --profile paper down` stopped and removed the test Redis container/network
 - 2026-05-03 completed Docker/Compose paper-runtime validation:
   - `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1` through the `desktop-linux` context
   - `docker build -t forex-scalper-ai:local .` completed successfully from `python:3.12-slim`
@@ -502,6 +507,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - 2026-05-03: `docker compose --profile paper run --rm paper-runtime describe --config-name paper` -> paper mode returned
 - 2026-05-03: `docker compose --profile paper run --rm paper-runtime health --config-name paper` -> `overall_status=pass`
 - 2026-05-03: `docker compose --profile paper run --rm paper-runtime metrics --config-name paper` -> Prometheus-style metrics emitted
+- 2026-05-03: `docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-iterations 5 --health-interval-seconds 0.1 --reconciliation-interval-seconds 0.1 --idle-sleep-seconds 0.2 --alert-jsonl-path /app/data/artifacts/paper-supervisor-alerts.jsonl` -> 5 pass iterations, zero alerts/errors
 - 2026-05-03: `docker compose --profile paper down` -> test Redis container/network removed
 - 2026-04-28: `.venv/bin/python scripts/run_runtime.py describe --config-name paper`, `health --config-name paper`, and `metrics --config-name paper` -> passed after Docker/Compose packaging
 - 2026-04-28: `docker-compose.yml` parsed successfully with PyYAML after Docker/Compose packaging
@@ -674,7 +680,7 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 Continue remaining live hardening:
 - keep explicit `BROKER_MT5_TERMINAL_PATH` and sufficient `BROKER_MT5_HISTORY_LOOKBACK_HOURS` in future Parallels history/deal checks
-- continue concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, long-running runtime supervision evidence, and small-batch Ruff/mypy cleanup
+- continue concrete volatility/news/model/feature provider integrations, deeper MT5 fault-injection validation, longer-duration runtime supervision evidence, and small-batch Ruff/mypy cleanup
 
 If further MT5 validation is paused:
 - continue with network alert transport topology, runtime supervision hardening, and small-batch Ruff/mypy cleanup now that Docker/Compose validation is complete

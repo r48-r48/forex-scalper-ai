@@ -43,7 +43,7 @@ The local desktop `/usr/bin/python3` is 3.9.6. A project `.venv` was created wit
 | `PYTHONPYCACHEPREFIX=/tmp/scalper_ai_pycache python3 -m compileall src tests scripts` | passing | Needed locally because default Python cache path can be sandbox-blocked |
 | Python 3.11+ full suite | passing | Python 3.12.13 `.venv`, full suite currently `265 passed` |
 | Real MT5 terminal smoke | partial pass | Windows notebook and same-Mac Parallels VM both connect to demo terminals without `order_send`; Windows/MetaQuotes accepted EURUSD FOK, while Parallels/Dukascopy accepted EURUSD IOC and rejected FOK |
-| Docker/Compose paper runtime | passing on Docker Desktop | `docker build -t forex-scalper-ai:local .` passed on 2026-05-03; Compose `paper-runtime` describe/health/metrics passed with paper mode, health `overall_status=pass`, and Prometheus metrics output; test Redis container/network was removed with `docker compose --profile paper down` |
+| Docker/Compose paper runtime | passing on Docker Desktop | `docker build -t forex-scalper-ai:local .` passed on 2026-05-03; Compose `paper-runtime` describe/health/metrics passed with paper mode, health `overall_status=pass`, Prometheus metrics output, and a bounded 5-iteration supervisor run with zero alerts/errors; test Redis container/network was removed with `docker compose --profile paper down` |
 | GitHub Actions Python 3.11 | added | Safe CI, no live credentials or live order submission; compile/test/preflight only until lint/typecheck are validated in a dev environment |
 
 ## Test Risk Notes

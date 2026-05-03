@@ -144,6 +144,7 @@ make docker-build
 make compose-paper
 make compose-health
 make compose-metrics
+make compose-supervise
 ```
 
 `paper-runtime` is profile-gated and keeps live trading disabled by default. See `docs/docker-runtime.md`.

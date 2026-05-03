@@ -1,8 +1,13 @@
 PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
 PYTHONPYCACHEPREFIX ?= /tmp/scalper_ai_pycache
+SUPERVISOR_ITERATIONS ?= 5
+SUPERVISOR_HEALTH_INTERVAL_SECONDS ?= 0.1
+SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS ?= 0.1
+SUPERVISOR_IDLE_SLEEP_SECONDS ?= 0.2
+SUPERVISOR_ALERT_JSONL_PATH ?= /app/data/artifacts/paper-supervisor-alerts.jsonl
 
-.PHONY: help install test compile lint lint-baseline typecheck typecheck-baseline run-paper health-paper metrics-paper mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics
+.PHONY: help install test compile lint lint-baseline typecheck typecheck-baseline run-paper health-paper metrics-paper mt5-preflight run-replay docker-build compose-paper compose-health compose-metrics compose-supervise
 
 help:
 	@echo "Available targets:"
@@ -22,6 +27,7 @@ help:
 	@echo "  compose-paper  Run the paper runtime summary through Docker Compose"
 	@echo "  compose-health Run the paper runtime health check through Docker Compose"
 	@echo "  compose-metrics Run the paper runtime metrics surface through Docker Compose"
+	@echo "  compose-supervise Run bounded paper supervisor cycles through Docker Compose"
 
 install:
 	$(PIP) install -e ".[dev,ml]"
@@ -70,3 +76,6 @@ compose-health:
 
 compose-metrics:
 	docker compose --profile paper run --rm paper-runtime metrics --config-name paper
+
+compose-supervise:
+	docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-iterations $(SUPERVISOR_ITERATIONS) --health-interval-seconds $(SUPERVISOR_HEALTH_INTERVAL_SECONDS) --reconciliation-interval-seconds $(SUPERVISOR_RECONCILIATION_INTERVAL_SECONDS) --idle-sleep-seconds $(SUPERVISOR_IDLE_SLEEP_SECONDS) --alert-jsonl-path $(SUPERVISOR_ALERT_JSONL_PATH)

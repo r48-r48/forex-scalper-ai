@@ -435,6 +435,7 @@ Current repository status:
 - Session updated on: 2026-05-03
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
+  - Docker/Compose bounded paper supervisor validation is complete: added `make compose-supervise` for reproducible bounded supervisor runs, then ran Compose `paper-runtime supervise` for 5 paper iterations with `health_due=true`, `reconciliation_due=true`, `overall_status=pass`, rendered metrics on every iteration, `alert_count=0`, no alert errors, no runtime errors, and Compose cleanup afterward
   - Docker/Compose paper-runtime validation is complete on Docker Desktop: `docker version` reached Docker Desktop `4.71.0` / Engine `29.4.1`, `docker build -t forex-scalper-ai:local .` passed, Compose `paper-runtime describe` returned paper mode, Compose `health` returned `overall_status=pass`, Compose `metrics` emitted Prometheus-style runtime metrics, and `docker compose --profile paper down` cleaned up the test Redis container/network
   - MT5 post-send fallback fault-injection validation is complete: after a successful MT5 `order_send`, `Mt5TerminalClient` now falls back to the broker send result instead of raising if immediate order/history/deal refresh fails or the success response lacks a numeric ticket; explicit non-success `order_send` retcodes remain normalized rejected states; targeted Ruff, `25 passed` targeted MT5 client pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `265 passed`
   - MT5 partial-fill fault-injection validation is complete: `Mt5TerminalClient` fallback normalization now preserves `TRADE_RETCODE_DONE_PARTIAL` result volume when broker history/order refresh is temporarily unavailable, clamps impossible oversized partial result volume, and `Mt5ExecutionAdapter` tests cover incremental broker deal fills across successive `process_quote()` polls without duplicate fill creation; targeted Ruff, `42 passed` targeted MT5 client/live pytest, compileall, `git diff --check`, and full `.venv/bin/python -m pytest` passed with `261 passed`
@@ -492,8 +493,8 @@ Current repository status:
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/src/scalper_ai/deployment/`
   - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/run_runtime.py`
 - The exact next task is post-phase hardening:
-  - continue small-batch Ruff/mypy cleanup, remaining MT5 fault-injection validation, and long-running runtime supervision evidence
-  - if MT5 remains unavailable, continue platform cleanup and runtime supervision hardening now that Docker/Compose validation is complete
+  - continue small-batch Ruff/mypy cleanup, remaining MT5 fault-injection validation, and longer-duration runtime supervision evidence
+  - if MT5 remains unavailable, continue platform cleanup and runtime supervision hardening now that Docker/Compose validation and bounded supervisor evidence are complete
 
 ## Constraints To Preserve
 

@@ -38,6 +38,7 @@ make docker-build
 make compose-paper
 make compose-health
 make compose-metrics
+make compose-supervise
 ```
 
 Equivalent raw commands:
@@ -47,6 +48,7 @@ docker build -t forex-scalper-ai:local .
 docker compose --profile paper run --rm paper-runtime describe --config-name paper
 docker compose --profile paper run --rm paper-runtime health --config-name paper
 docker compose --profile paper run --rm paper-runtime metrics --config-name paper
+docker compose --profile paper run --rm paper-runtime supervise --config-name paper --max-iterations 5 --health-interval-seconds 0.1 --reconciliation-interval-seconds 0.1 --idle-sleep-seconds 0.2 --alert-jsonl-path /app/data/artifacts/paper-supervisor-alerts.jsonl
 ```
 
 ## Current Validation Status
@@ -74,6 +76,12 @@ Docker Desktop validation on 2026-05-03:
   reconciliation, and metrics-surface checks.
 - `docker compose --profile paper run --rm paper-runtime metrics --config-name paper`
   emitted the Prometheus-style runtime metrics surface.
+- `docker compose --profile paper run --rm paper-runtime supervise --config-name paper
+  --max-iterations 5 --health-interval-seconds 0.1
+  --reconciliation-interval-seconds 0.1 --idle-sleep-seconds 0.2
+  --alert-jsonl-path /app/data/artifacts/paper-supervisor-alerts.jsonl` completed
+  five bounded supervisor iterations with `overall_status=pass`, `health_due=true`,
+  `reconciliation_due=true`, rendered metrics, and zero alerts/errors.
 - `docker compose --profile paper down` was run afterward to stop and remove the
   test Redis container/network.
 
