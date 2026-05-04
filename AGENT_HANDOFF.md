@@ -7,6 +7,11 @@
 - Goal: production-grade AI Forex scalping agent with tick/M1/L2 support, Transformer forecasting, DRL policy layer, execution adapters, validation, and deployment.
 - Persistent same-window checkpoint: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/SESSION_CHECKPOINT.md`
 - Latest external audit triage: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-05-03.md`
+- Active long-running data job: detached screen `dukascopy_eurusd_coverage_then_repair_2016_2026`
+  is downloading EURUSD Dukascopy history from `2016-01-01` through `2026-05-04`
+  with `--defer-incomplete-repair`, then automatically runs a second
+  `--repair-incomplete-only` pass if coverage succeeds. Logs are under
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/`.
 
 ## Completed Phases
 

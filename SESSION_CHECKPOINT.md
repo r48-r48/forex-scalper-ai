@@ -19,6 +19,13 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
 - Current branch/worktree note: local Git repository is initialized on `main`, tracking `origin/main` at `git@github.com:r48-r48/forex-scalper-ai.git`.
+- Active data job: detached screen `dukascopy_eurusd_coverage_then_repair_2016_2026`
+  is running the EURUSD Dukascopy `2016-01-01` through `2026-05-04`
+  coverage-first pass and will automatically start the repair-only pass if coverage
+  exits successfully. Coverage log:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-coverage-2016-01-01-to-2026-05-04.log`.
+  Repair log:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-repair-2016-01-01-to-2026-05-04.log`.
 
 ## What Was Just Finished
 
