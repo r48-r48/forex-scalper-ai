@@ -303,6 +303,39 @@ def test_repair_incomplete_only_skips_clean_days(
     assert daily["reason"] == "not_marked_for_repair"
 
 
+def test_download_bytes_retries_remote_disconnect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    script = _load_script_module("download_dukascopy_ticks")
+    calls = 0
+
+    class FakeResponse:
+        def __enter__(self) -> FakeResponse:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return b"ok"
+
+    def fake_urlopen(request: object, *, timeout: float) -> FakeResponse:
+        nonlocal calls
+        assert timeout == 2.0
+        calls += 1
+        if calls == 1:
+            raise script.RemoteDisconnected("closed")
+        return FakeResponse()
+
+    monkeypatch.setattr(script, "urlopen", fake_urlopen)
+    monkeypatch.setattr(script.time, "sleep", lambda seconds: None)
+
+    payload = script._download_bytes("https://example.test/EURUSD.bi5", timeout_seconds=2.0)
+
+    assert payload == b"ok"
+    assert calls == 2
+
+
 def _compressed_bi5_payload(records: tuple[tuple[int, int, int, float, float], ...]) -> bytes:
     raw_payload = b"".join(struct.pack(">IIIff", *record) for record in records)
     return lzma.compress(raw_payload)

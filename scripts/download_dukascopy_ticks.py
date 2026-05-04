@@ -14,6 +14,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from http.client import RemoteDisconnected
 from pathlib import Path
 from typing import Final
 from urllib.error import HTTPError, URLError
@@ -808,6 +809,11 @@ def _download_bytes(url: str, *, timeout_seconds: float) -> bytes | None:
         except URLError as exc:
             if attempt >= DOWNLOAD_RETRY_COUNT:
                 raise RuntimeError(f"Failed to download {url}: {exc.reason}") from exc
+        except RemoteDisconnected as exc:
+            if attempt >= DOWNLOAD_RETRY_COUNT:
+                raise RuntimeError(
+                    f"Failed to download {url}: remote disconnected"
+                ) from exc
         except TimeoutError as exc:
             if attempt >= DOWNLOAD_RETRY_COUNT:
                 raise RuntimeError(f"Failed to download {url}: timed out") from exc

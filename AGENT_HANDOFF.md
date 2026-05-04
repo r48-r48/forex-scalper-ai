@@ -12,6 +12,8 @@
   with `--defer-incomplete-repair`, then automatically runs a second
   `--repair-incomplete-only` pass if coverage succeeds. Logs are under
   `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/`.
+  The downloader now retries `RemoteDisconnected` events after the first coverage
+  attempt stopped on a transient Dukascopy connection close.
 
 ## Completed Phases
 

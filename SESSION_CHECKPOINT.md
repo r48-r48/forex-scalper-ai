@@ -26,6 +26,8 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-coverage-2016-01-01-to-2026-05-04.log`.
   Repair log:
   `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-repair-2016-01-01-to-2026-05-04.log`.
+  The downloader now treats `RemoteDisconnected` as retryable after the first
+  coverage attempt stopped on a transient Dukascopy connection close around 2022.
 
 ## What Was Just Finished
 
