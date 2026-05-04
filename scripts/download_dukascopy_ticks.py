@@ -139,6 +139,8 @@ def download_dukascopy_ticks_cli(
     timeout_seconds: float = 30.0,
     timeframes: tuple[str, ...] = DEFAULT_TIMEFRAMES,
     resume: bool = True,
+    defer_incomplete_repair: bool = False,
+    repair_incomplete_only: bool = False,
     compression: str = "zstd",
     day_workers: int = 1,
     hour_workers: int = 1,
@@ -152,6 +154,10 @@ def download_dukascopy_ticks_cli(
         raise ValueError("day_workers must be at least one.")
     if hour_workers < 1:
         raise ValueError("hour_workers must be at least one.")
+    if defer_incomplete_repair and repair_incomplete_only:
+        raise ValueError(
+            "defer_incomplete_repair cannot be combined with repair_incomplete_only."
+        )
     dates = _resolve_dates(
         trading_date=trading_date,
         start_date=start_date,
@@ -179,6 +185,8 @@ def download_dukascopy_ticks_cli(
                 timeout_seconds=timeout_seconds,
                 timeframes=resolved_timeframes,
                 resume=resume,
+                defer_incomplete_repair=defer_incomplete_repair,
+                repair_incomplete_only=repair_incomplete_only,
                 compression=compression,
                 hour_workers=hour_workers,
             )
@@ -206,6 +214,8 @@ def download_dukascopy_ticks_cli(
                         timeout_seconds=timeout_seconds,
                         timeframes=resolved_timeframes,
                         resume=resume,
+                        defer_incomplete_repair=defer_incomplete_repair,
+                        repair_incomplete_only=repair_incomplete_only,
                         compression=compression,
                         hour_workers=hour_workers,
                     ),
@@ -407,6 +417,22 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument(
+        "--defer-incomplete-repair",
+        action="store_true",
+        help=(
+            "During resume, skip days already marked with failed hours or failed-day "
+            "summaries so a coverage pass can continue to later years first."
+        ),
+    )
+    parser.add_argument(
+        "--repair-incomplete-only",
+        action="store_true",
+        help=(
+            "Process only days previously marked with failed hours or failed-day "
+            "summaries; useful after a coverage-first pass."
+        ),
+    )
+    parser.add_argument(
         "--compression",
         default="zstd",
         help="Parquet compression codec, or 'none'. Ignored for CSV output.",
@@ -453,6 +479,8 @@ def main() -> None:
         timeout_seconds=args.timeout_seconds,
         timeframes=tuple(args.timeframes.split(",")),
         resume=not args.no_resume,
+        defer_incomplete_repair=args.defer_incomplete_repair,
+        repair_incomplete_only=args.repair_incomplete_only,
         compression=args.compression,
         day_workers=args.day_workers,
         hour_workers=args.hour_workers,
@@ -479,6 +507,8 @@ def _process_one_day_request(
     timeout_seconds: float,
     timeframes: tuple[str, ...],
     resume: bool,
+    defer_incomplete_repair: bool,
+    repair_incomplete_only: bool,
     compression: str,
     hour_workers: int,
 ) -> dict[str, object]:
@@ -496,6 +526,23 @@ def _process_one_day_request(
         quality_report_path=quality_report_path,
         multiple_days=date_count > 1,
     )
+    repair_needed = _daily_incomplete_repair_needed(paths=resolved_paths)
+    if repair_incomplete_only and not repair_needed:
+        return {
+            "symbol": symbol,
+            "date": trading_date.isoformat(),
+            "skipped": True,
+            "reason": "not_marked_for_repair",
+            "message": "no previous incomplete-day evidence was found",
+        }
+    if resume and defer_incomplete_repair and repair_needed:
+        return {
+            "symbol": symbol,
+            "date": trading_date.isoformat(),
+            "skipped": True,
+            "reason": "deferred_incomplete_day_repair",
+            "message": "previous incomplete-day evidence was left for repair pass",
+        }
     if resume and _daily_outputs_complete(
         paths=resolved_paths,
         symbol=symbol,
@@ -716,6 +763,21 @@ def _daily_has_failed_hours(*, paths: DailyOutputPaths) -> bool:
     except (OSError, json.JSONDecodeError):
         return False
     return int(payload.get("failed_hour_count", 0)) > 0
+
+
+def _daily_has_failed_day_summary(*, paths: DailyOutputPaths) -> bool:
+    if paths.summary_output_path is None or not paths.summary_output_path.exists():
+        return False
+    try:
+        payload = json.loads(paths.summary_output_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    repair_reasons = {"day_download_failed", "day_materialization_failed"}
+    return bool(payload.get("skipped")) and payload.get("reason") in repair_reasons
+
+
+def _daily_incomplete_repair_needed(*, paths: DailyOutputPaths) -> bool:
+    return _daily_has_failed_hours(paths=paths) or _daily_has_failed_day_summary(paths=paths)
 
 
 def _dukascopy_hour_url(

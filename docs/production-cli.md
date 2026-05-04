@@ -58,6 +58,12 @@ archives are recorded as `no_data_available` instead of stopping a multi-year ra
 and `--hour-workers` downloads independent hourly archives inside each day in
 parallel. All timestamps are decoded as UTC; no broker orders are submitted.
 
+For a first broad coverage pass over many years, use `--defer-incomplete-repair`.
+That leaves days already marked with failed hourly archives or failed-day summaries
+for a later cleanup pass instead of repeatedly retrying old partial days while newer
+years are still missing. After the coverage pass finishes, run the same command with
+`--repair-incomplete-only` to revisit only those marked days.
+
 ## Build Offline Features
 
 ```bash

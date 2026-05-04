@@ -176,6 +176,133 @@ def test_multi_day_download_records_no_data_days_without_failing(
     assert compact["daily"]["reason_counts"] == {"no_data_available": 2}
 
 
+def test_defer_incomplete_repair_skips_failed_hour_day(
+    tmp_path: Path,
+) -> None:
+    script = _load_script_module("download_dukascopy_ticks")
+    summary_path = tmp_path / "summary.json"
+    tick_path = tmp_path / "history" / "EURUSD" / "TICK" / "date=2026-05-04.parquet"
+    bar_path = tmp_path / "bars" / "EURUSD" / "M1" / "date=2026-05-04.parquet"
+    tick_path.parent.mkdir(parents=True)
+    bar_path.parent.mkdir(parents=True)
+    tick_path.write_bytes(b"existing")
+    bar_path.write_bytes(b"existing")
+    summary_path.write_text(json.dumps({"failed_hour_count": 1}), encoding="utf-8")
+
+    def fake_download_one_day(**kwargs: object) -> dict[str, object]:
+        raise AssertionError("incomplete days should be left for the repair pass")
+
+    script._download_one_day = fake_download_one_day
+
+    result = script.download_dukascopy_ticks_cli(
+        symbol="EURUSD",
+        trading_date=date(2026, 5, 4),
+        vendor_output_dir=tmp_path / "vendor",
+        bootstrap_output_dir=tmp_path / "history",
+        bars_output_dir=tmp_path / "bars",
+        summary_output_path=summary_path,
+        timeframes=("TICK", "M1"),
+        defer_incomplete_repair=True,
+    )
+
+    daily = result["daily"][0]
+    assert result["skipped_date_count"] == 1
+    assert daily["reason"] == "deferred_incomplete_day_repair"
+
+
+def test_defer_incomplete_repair_skips_failed_day_summary(
+    tmp_path: Path,
+) -> None:
+    script = _load_script_module("download_dukascopy_ticks")
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(
+        json.dumps({"skipped": True, "reason": "day_download_failed"}),
+        encoding="utf-8",
+    )
+
+    def fake_download_one_day(**kwargs: object) -> dict[str, object]:
+        raise AssertionError("failed-day summaries should be left for the repair pass")
+
+    script._download_one_day = fake_download_one_day
+
+    result = script.download_dukascopy_ticks_cli(
+        symbol="EURUSD",
+        trading_date=date(2026, 5, 4),
+        vendor_output_dir=tmp_path / "vendor",
+        bootstrap_output_dir=tmp_path / "history",
+        bars_output_dir=tmp_path / "bars",
+        summary_output_path=summary_path,
+        timeframes=("TICK", "M1"),
+        defer_incomplete_repair=True,
+    )
+
+    daily = result["daily"][0]
+    assert result["skipped_date_count"] == 1
+    assert daily["reason"] == "deferred_incomplete_day_repair"
+
+
+def test_repair_incomplete_only_processes_marked_days(
+    tmp_path: Path,
+) -> None:
+    script = _load_script_module("download_dukascopy_ticks")
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(json.dumps({"failed_hour_count": 1}), encoding="utf-8")
+    calls: list[date] = []
+
+    def fake_download_one_day(**kwargs: object) -> dict[str, object]:
+        trading_date = kwargs["trading_date"]
+        assert isinstance(trading_date, date)
+        calls.append(trading_date)
+        return {
+            "symbol": kwargs["symbol"],
+            "date": trading_date.isoformat(),
+            "row_count": 10,
+            "byte_count": 20,
+        }
+
+    script._download_one_day = fake_download_one_day
+
+    result = script.download_dukascopy_ticks_cli(
+        symbol="EURUSD",
+        trading_date=date(2026, 5, 4),
+        vendor_output_dir=tmp_path / "vendor",
+        bootstrap_output_dir=tmp_path / "history",
+        bars_output_dir=tmp_path / "bars",
+        summary_output_path=summary_path,
+        timeframes=("TICK", "M1"),
+        repair_incomplete_only=True,
+    )
+
+    assert calls == [date(2026, 5, 4)]
+    assert result["completed_date_count"] == 1
+
+
+def test_repair_incomplete_only_skips_clean_days(
+    tmp_path: Path,
+) -> None:
+    script = _load_script_module("download_dukascopy_ticks")
+
+    def fake_download_one_day(**kwargs: object) -> dict[str, object]:
+        raise AssertionError("clean days should not run in repair-only mode")
+
+    script._download_one_day = fake_download_one_day
+
+    result = script.download_dukascopy_ticks_cli(
+        symbol="EURUSD",
+        trading_date=date(2026, 5, 4),
+        vendor_output_dir=tmp_path / "vendor",
+        bootstrap_output_dir=tmp_path / "history",
+        bars_output_dir=tmp_path / "bars",
+        summary_output_path=tmp_path / "summary.json",
+        timeframes=("TICK", "M1"),
+        repair_incomplete_only=True,
+    )
+
+    daily = result["daily"][0]
+    assert result["skipped_date_count"] == 1
+    assert daily["reason"] == "not_marked_for_repair"
+
+
 def _compressed_bi5_payload(records: tuple[tuple[int, int, int, float, float], ...]) -> bytes:
     raw_payload = b"".join(struct.pack(">IIIff", *record) for record in records)
     return lzma.compress(raw_payload)

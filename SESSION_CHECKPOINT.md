@@ -27,6 +27,9 @@ If a later assistant turn needs to recover the full working state quickly, it sh
     for public hourly `.bi5` vendor archive download from Dukascopy, UTC bid/ask
     tick decoding, SHA/provenance capture, failed-hour evidence, and resumable
     multi-year execution
+  - added coverage-first and repair-only resume modes so long ranges can first
+    continue into later years while days with failed hourly archives or failed-day
+    summaries are deferred for one later cleanup pass
   - the script reuses `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/bootstrap_history.py`
     for QA-gated normalized tick parquet and derives `TICK`, `M1`, `M2`, `M3`,
     `M4`, `M5`, `M6`, `M10`, `M12`, `M15`, `M20`, `M30`, `H1`, `H2`, `H3`,
