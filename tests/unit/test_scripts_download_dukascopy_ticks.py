@@ -167,6 +167,52 @@ def test_download_archives_only_caches_raw_without_parsing(
     assert summary_payload["safety"]["order_send_called"] is False
 
 
+def test_offline_cache_only_processes_cached_archives_without_http(
+    tmp_path: Path,
+) -> None:
+    script = _load_script_module("download_dukascopy_ticks")
+    payload = _compressed_bi5_payload(
+        (
+            (0, 110_020, 110_000, 2.5, 2.0),
+            (60_000, 110_030, 110_010, 3.5, 3.0),
+        )
+    )
+    archive_path = tmp_path / "vendor" / "EURUSD" / "2026-05-04" / "00h_ticks.bi5"
+    archive_path.parent.mkdir(parents=True)
+    archive_path.write_bytes(payload)
+
+    def fail_download_bytes(url: str, *, timeout_seconds: float) -> bytes | None:
+        raise AssertionError("offline cache processing must not call Dukascopy")
+
+    script._download_bytes = fail_download_bytes
+
+    result = script.download_dukascopy_ticks_cli(
+        symbol="EURUSD",
+        trading_date=date(2026, 5, 4),
+        vendor_output_dir=tmp_path / "vendor",
+        parsed_output_dir=tmp_path / "parsed",
+        bootstrap_output_dir=tmp_path / "history",
+        bars_output_dir=tmp_path / "bars",
+        summary_output_path=tmp_path / "summary.json",
+        timeframes=("TICK", "M1"),
+        compression="none",
+        offline_cache_only=True,
+        hour_workers=2,
+    )
+
+    tick_path = tmp_path / "history" / "EURUSD" / "TICK" / "date=2026-05-04.parquet"
+    m1_path = tmp_path / "bars" / "EURUSD" / "M1" / "date=2026-05-04.parquet"
+    summary_payload = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
+
+    assert tick_path.exists()
+    assert m1_path.exists()
+    assert result["completed_date_count"] == 1
+    assert result["row_count"] == 2
+    assert summary_payload["downloaded_hour_count"] == 1
+    assert summary_payload["downloaded_hours"][0]["cached"] is True
+    assert summary_payload["safety"]["order_send_called"] is False
+
+
 def test_sorted_parsed_tick_frame_uses_real_utc_timestamp_order() -> None:
     script = _load_script_module("download_dukascopy_ticks")
     sorted_frame = script._sorted_parsed_tick_frame(

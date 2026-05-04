@@ -67,8 +67,9 @@ years are still missing. After the coverage pass finishes, run the same command 
 For the fastest first pass, add `--download-archives-only`. That mode downloads and
 caches only the raw hourly `.bi5` archives, writes daily `raw-archive-summary.json`
 evidence, and intentionally skips tick decoding, QA bootstrap, and bar derivation.
-After the archive cache is complete, rerun without `--download-archives-only` to
-process everything locally from cached files.
+After the archive cache is complete, rerun without `--download-archives-only` and
+with `--offline-cache-only` to process everything locally from cached files without
+making any further Dukascopy HTTP requests.
 
 ## Build Offline Features
 

@@ -143,6 +143,7 @@ def download_dukascopy_ticks_cli(
     defer_incomplete_repair: bool = False,
     repair_incomplete_only: bool = False,
     download_archives_only: bool = False,
+    offline_cache_only: bool = False,
     compression: str = "zstd",
     day_workers: int = 1,
     hour_workers: int = 1,
@@ -164,6 +165,8 @@ def download_dukascopy_ticks_cli(
         raise ValueError(
             "download_archives_only cannot be combined with repair_incomplete_only."
         )
+    if offline_cache_only and not resume:
+        raise ValueError("offline_cache_only requires resume to read cached archives.")
     dates = _resolve_dates(
         trading_date=trading_date,
         start_date=start_date,
@@ -194,6 +197,7 @@ def download_dukascopy_ticks_cli(
                 defer_incomplete_repair=defer_incomplete_repair,
                 repair_incomplete_only=repair_incomplete_only,
                 download_archives_only=download_archives_only,
+                offline_cache_only=offline_cache_only,
                 compression=compression,
                 hour_workers=hour_workers,
             )
@@ -224,6 +228,7 @@ def download_dukascopy_ticks_cli(
                         defer_incomplete_repair=defer_incomplete_repair,
                         repair_incomplete_only=repair_incomplete_only,
                         download_archives_only=download_archives_only,
+                        offline_cache_only=offline_cache_only,
                         compression=compression,
                         hour_workers=hour_workers,
                     ),
@@ -255,6 +260,7 @@ def _download_one_day_archives_only(
     price_scale: float,
     timeout_seconds: float,
     resume: bool,
+    offline_cache_only: bool,
     hour_workers: int,
 ) -> dict[str, object]:
     """Download only the raw hourly Dukascopy archives for one day."""
@@ -272,6 +278,7 @@ def _download_one_day_archives_only(
                 vendor_output_dir=vendor_output_dir,
                 timeout_seconds=timeout_seconds,
                 resume=resume,
+                offline_cache_only=offline_cache_only,
             )
             for hour in hours
         ]
@@ -287,6 +294,7 @@ def _download_one_day_archives_only(
                         vendor_output_dir=vendor_output_dir,
                         timeout_seconds=timeout_seconds,
                         resume=resume,
+                        offline_cache_only=offline_cache_only,
                     ),
                     hours,
                 )
@@ -337,6 +345,7 @@ def _download_one_day(
     timeframes: tuple[str, ...],
     resume: bool,
     compression: str,
+    offline_cache_only: bool,
     hour_workers: int,
 ) -> dict[str, object]:
     """Download and materialize one day of Dukascopy data."""
@@ -356,6 +365,7 @@ def _download_one_day(
                 timeout_seconds=timeout_seconds,
                 price_scale=price_scale,
                 resume=resume,
+                offline_cache_only=offline_cache_only,
             )
             for hour in hours
         ]
@@ -372,6 +382,7 @@ def _download_one_day(
                         timeout_seconds=timeout_seconds,
                         price_scale=price_scale,
                         resume=resume,
+                        offline_cache_only=offline_cache_only,
                     ),
                     hours,
                 )
@@ -525,6 +536,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--offline-cache-only",
+        action="store_true",
+        help=(
+            "Use only already cached hourly .bi5 files and never make HTTP requests; "
+            "use this for local decode/bootstrap/bar processing after raw download."
+        ),
+    )
+    parser.add_argument(
         "--compression",
         default="zstd",
         help="Parquet compression codec, or 'none'. Ignored for CSV output.",
@@ -574,6 +593,7 @@ def main() -> None:
         defer_incomplete_repair=args.defer_incomplete_repair,
         repair_incomplete_only=args.repair_incomplete_only,
         download_archives_only=args.download_archives_only,
+        offline_cache_only=args.offline_cache_only,
         compression=args.compression,
         day_workers=args.day_workers,
         hour_workers=args.hour_workers,
@@ -603,6 +623,7 @@ def _process_one_day_request(
     defer_incomplete_repair: bool,
     repair_incomplete_only: bool,
     download_archives_only: bool,
+    offline_cache_only: bool,
     compression: str,
     hour_workers: int,
 ) -> dict[str, object]:
@@ -654,6 +675,7 @@ def _process_one_day_request(
                 price_scale=price_scale,
                 timeout_seconds=timeout_seconds,
                 resume=resume,
+                offline_cache_only=offline_cache_only,
                 hour_workers=hour_workers,
             )
         except NoDukascopyDataError as exc:
@@ -731,6 +753,7 @@ def _process_one_day_request(
             timeframes=timeframes,
             resume=resume,
             compression=compression,
+            offline_cache_only=offline_cache_only,
             hour_workers=hour_workers,
         )
     except NoDukascopyDataError as exc:
@@ -995,6 +1018,7 @@ def _materialize_hour(
     timeout_seconds: float,
     price_scale: float,
     resume: bool,
+    offline_cache_only: bool,
 ) -> HourMaterializationResult:
     url = _dukascopy_hour_url(
         base_url=base_url,
@@ -1011,6 +1035,7 @@ def _materialize_hour(
             hour=hour,
             timeout_seconds=timeout_seconds,
             resume=resume,
+            offline_cache_only=offline_cache_only,
         )
     except RuntimeError as exc:
         hour_path = _hour_payload_path(
@@ -1087,6 +1112,7 @@ def _materialize_archive_hour(
     vendor_output_dir: Path,
     timeout_seconds: float,
     resume: bool,
+    offline_cache_only: bool,
 ) -> HourMaterializationResult:
     url = _dukascopy_hour_url(
         base_url=base_url,
@@ -1103,6 +1129,7 @@ def _materialize_archive_hour(
             hour=hour,
             timeout_seconds=timeout_seconds,
             resume=resume,
+            offline_cache_only=offline_cache_only,
         )
     except RuntimeError as exc:
         hour_path = _hour_payload_path(
@@ -1168,6 +1195,7 @@ def _load_or_download_hour_payload(
     hour: int,
     timeout_seconds: float,
     resume: bool,
+    offline_cache_only: bool = False,
 ) -> tuple[bytes | None, bool]:
     output_path = _hour_payload_path(
         vendor_output_dir=vendor_output_dir,
@@ -1177,6 +1205,8 @@ def _load_or_download_hour_payload(
     )
     if resume and output_path.exists():
         return output_path.read_bytes(), True
+    if offline_cache_only:
+        return None, False
     payload = _download_bytes(url, timeout_seconds=timeout_seconds)
     if payload is None:
         return None, False
