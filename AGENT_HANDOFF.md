@@ -7,13 +7,15 @@
 - Goal: production-grade AI Forex scalping agent with tick/M1/L2 support, Transformer forecasting, DRL policy layer, execution adapters, validation, and deployment.
 - Persistent same-window checkpoint: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/SESSION_CHECKPOINT.md`
 - Latest external audit triage: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-05-03.md`
-- Active long-running data job: detached screen `dukascopy_eurusd_coverage_then_repair_2016_2026`
-  is downloading EURUSD Dukascopy history from `2016-01-01` through `2026-05-04`
-  with `--defer-incomplete-repair`, then automatically runs a second
-  `--repair-incomplete-only` pass if coverage succeeds. Logs are under
-  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/`.
-  The downloader now retries `RemoteDisconnected` events after the first coverage
-  attempt stopped on a transient Dukascopy connection close.
+- Active long-running data job: detached screen `dukascopy_eurusd_raw_archives_2016_2026`
+  is downloading EURUSD Dukascopy raw hourly `.bi5` archives from `2016-01-01`
+  through `2026-05-04` with `--download-archives-only`, `--day-workers 16`, and
+  `--hour-workers 4`. The previous coverage/decode pass reached early 2024 but
+  remained too slow and hit another transient remote disconnect, so it was stopped
+  in favor of a faster archive-cache-first pass. The active raw-only log is:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-raw-archives-2016-01-01-to-2026-05-04.log`.
+  The range summary target is:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/download-summary-raw-archives-2016-01-01-to-2026-05-04.json`.
 
 ## Completed Phases
 
@@ -470,7 +472,7 @@ Current repository status:
 - Session updated on: 2026-05-04
 - Last completed implementation phase: PHASE 12
 - Last completed post-phase hardening milestone:
-  - direct Dukascopy historical data downloader is source-complete: `scripts/download_dukascopy_ticks.py` downloads public hourly `.bi5` archives, retries transient network failures, decodes UTC bid/ask ticks, records failed-hour evidence without hiding it, reuses `bootstrap_history.py` for QA-gated tick parquet, derives standard `TICK` plus M1-D1 bar artifacts, supports resumable multi-year ranges with day/hour workers, now has coverage-first and repair-only modes for long downloads, and has focused tests; EURUSD real-data pilots passed, and the long 2016-01-01 to 2026-05-04 download is being run under ignored `data/`
+  - direct Dukascopy historical data downloader is source-complete and now supports a fast archive-cache-first mode: `scripts/download_dukascopy_ticks.py` downloads public hourly `.bi5` archives, retries transient network failures, decodes UTC bid/ask ticks when not in raw-only mode, records failed-hour evidence without hiding it, reuses `bootstrap_history.py` for QA-gated tick parquet, derives standard `TICK` plus M1-D1 bar artifacts, supports resumable multi-year ranges with day/hour workers, has coverage-first / repair-only / `--download-archives-only` modes for long ranges, and has focused tests; the active EURUSD 2016-01-01 to 2026-05-04 run is currently the raw-only screen job under ignored `data/`
   - transformer training/export and runtime inference packaging are complete: `scripts/train_transformer.py` exports leakage-controlled `model.pt`, `scaler.json`, `metadata.json`, and `training-report.json` bundles; training requires `training_end` or `input_is_train_only`, target-end cutoff is enforced when present, validation is a tail split inside the selected training window, `load_transformer_inference_package()` verifies artifact hashes, `model_type`, ordered feature schema, scaler contract, and transformer input/context dimensions before scoring; targeted Ruff/mypy and focused tests passed with `8 passed`; `make PYTHON=.venv/bin/python ci` passed with full pytest `334 passed`
   - fourth FX backtest realism slice is complete: `FxSymbolSpec` now has strict JSON mapping/file loaders for broker or curated symbol assumptions; `scripts/run_backtest.py` exposes `--fx-symbol-spec-path` as an explicit alternative to manual FX flags, rejects hidden/manual-field conflicts, and records the loaded spec in the backtest report; `docs/production-cli.md` documents the schema; targeted validation passed with `15 passed`, and `make PYTHON=.venv/bin/python ci` passed with full pytest `329 passed`
   - third FX backtest realism slice is complete: `BacktestConfig` now supports opt-in completed-bar `high_price_column` / `low_price_column`, `stop_loss_price_column`, `take_profit_price_column`, and `protective_exit_priority`; `run_backtest()` triggers only previously active protection to avoid same-row lookahead, records active protection and SL/TP exit counters, `scripts/run_backtest.py` exposes the protective path flags, targeted validation passed with `24 passed`, and `make PYTHON=.venv/bin/python ci` passed with full pytest `326 passed`

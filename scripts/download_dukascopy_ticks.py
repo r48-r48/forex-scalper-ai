@@ -142,6 +142,7 @@ def download_dukascopy_ticks_cli(
     resume: bool = True,
     defer_incomplete_repair: bool = False,
     repair_incomplete_only: bool = False,
+    download_archives_only: bool = False,
     compression: str = "zstd",
     day_workers: int = 1,
     hour_workers: int = 1,
@@ -158,6 +159,10 @@ def download_dukascopy_ticks_cli(
     if defer_incomplete_repair and repair_incomplete_only:
         raise ValueError(
             "defer_incomplete_repair cannot be combined with repair_incomplete_only."
+        )
+    if download_archives_only and repair_incomplete_only:
+        raise ValueError(
+            "download_archives_only cannot be combined with repair_incomplete_only."
         )
     dates = _resolve_dates(
         trading_date=trading_date,
@@ -188,6 +193,7 @@ def download_dukascopy_ticks_cli(
                 resume=resume,
                 defer_incomplete_repair=defer_incomplete_repair,
                 repair_incomplete_only=repair_incomplete_only,
+                download_archives_only=download_archives_only,
                 compression=compression,
                 hour_workers=hour_workers,
             )
@@ -217,6 +223,7 @@ def download_dukascopy_ticks_cli(
                         resume=resume,
                         defer_incomplete_repair=defer_incomplete_repair,
                         repair_incomplete_only=repair_incomplete_only,
+                        download_archives_only=download_archives_only,
                         compression=compression,
                         hour_workers=hour_workers,
                     ),
@@ -231,9 +238,85 @@ def download_dukascopy_ticks_cli(
         price_scale=price_scale,
         timeframes=resolved_timeframes,
         daily_payloads=daily_payloads,
+        download_archives_only=download_archives_only,
     )
     if summary_output_path is not None and len(dates) > 1:
         write_json(payload, summary_output_path)
+    return payload
+
+
+def _download_one_day_archives_only(
+    *,
+    symbol: str,
+    trading_date: date,
+    vendor_output_dir: Path,
+    summary_output_path: Path | None,
+    base_url: str,
+    price_scale: float,
+    timeout_seconds: float,
+    resume: bool,
+    hour_workers: int,
+) -> dict[str, object]:
+    """Download only the raw hourly Dukascopy archives for one day."""
+
+    downloaded_hours: list[DownloadedHour] = []
+    failed_hours: list[dict[str, object]] = []
+    hours = tuple(range(24))
+    if hour_workers == 1:
+        hour_results = [
+            _materialize_archive_hour(
+                base_url=base_url,
+                symbol=symbol,
+                trading_date=trading_date,
+                hour=hour,
+                vendor_output_dir=vendor_output_dir,
+                timeout_seconds=timeout_seconds,
+                resume=resume,
+            )
+            for hour in hours
+        ]
+    else:
+        with ThreadPoolExecutor(max_workers=hour_workers) as executor:
+            hour_results = list(
+                executor.map(
+                    lambda hour: _materialize_archive_hour(
+                        base_url=base_url,
+                        symbol=symbol,
+                        trading_date=trading_date,
+                        hour=hour,
+                        vendor_output_dir=vendor_output_dir,
+                        timeout_seconds=timeout_seconds,
+                        resume=resume,
+                    ),
+                    hours,
+                )
+            )
+
+    for result in hour_results:
+        if result.downloaded_hour is not None:
+            downloaded_hours.append(result.downloaded_hour)
+        if result.failed_hour is not None:
+            failed_hours.append(result.failed_hour)
+
+    downloaded_hours.sort(key=lambda hour: hour.hour)
+    if not downloaded_hours and failed_hours:
+        raise RuntimeError(
+            f"All Dukascopy hourly archive downloads failed for {symbol} {trading_date}."
+        )
+    if not downloaded_hours:
+        raise NoDukascopyDataError(
+            f"No Dukascopy tick archives were downloaded for {symbol} {trading_date}."
+        )
+
+    payload = _archive_summary_payload(
+        symbol=symbol,
+        trading_date=trading_date,
+        base_url=base_url,
+        price_scale=price_scale,
+        downloaded_hours=downloaded_hours,
+        failed_hours=failed_hours,
+    )
+    write_json(payload, summary_output_path)
     return payload
 
 
@@ -434,6 +517,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--download-archives-only",
+        action="store_true",
+        help=(
+            "Download and cache only raw hourly .bi5 archives without parsing ticks, "
+            "running QA bootstrap, or deriving timeframe bars."
+        ),
+    )
+    parser.add_argument(
         "--compression",
         default="zstd",
         help="Parquet compression codec, or 'none'. Ignored for CSV output.",
@@ -482,6 +573,7 @@ def main() -> None:
         resume=not args.no_resume,
         defer_incomplete_repair=args.defer_incomplete_repair,
         repair_incomplete_only=args.repair_incomplete_only,
+        download_archives_only=args.download_archives_only,
         compression=args.compression,
         day_workers=args.day_workers,
         hour_workers=args.hour_workers,
@@ -510,6 +602,7 @@ def _process_one_day_request(
     resume: bool,
     defer_incomplete_repair: bool,
     repair_incomplete_only: bool,
+    download_archives_only: bool,
     compression: str,
     hour_workers: int,
 ) -> dict[str, object]:
@@ -526,7 +619,63 @@ def _process_one_day_request(
         bootstrap_summary_output_path=bootstrap_summary_output_path,
         quality_report_path=quality_report_path,
         multiple_days=date_count > 1,
+        summary_filename=(
+            "raw-archive-summary.json" if download_archives_only else "download-summary.json"
+        ),
     )
+    if download_archives_only:
+        if resume and _daily_archive_outputs_complete(paths=resolved_paths):
+            return {
+                "symbol": symbol,
+                "date": trading_date.isoformat(),
+                "skipped": True,
+                "reason": "raw_archives_exist",
+                "summary_output_path": (
+                    None
+                    if resolved_paths.summary_output_path is None
+                    else str(resolved_paths.summary_output_path)
+                ),
+            }
+        if resume and _daily_no_data_complete(paths=resolved_paths):
+            return {
+                "symbol": symbol,
+                "date": trading_date.isoformat(),
+                "skipped": True,
+                "reason": "no_data_available",
+                "message": "previous no-data summary exists",
+            }
+        try:
+            return _download_one_day_archives_only(
+                symbol=symbol,
+                trading_date=trading_date,
+                vendor_output_dir=vendor_output_dir,
+                summary_output_path=resolved_paths.summary_output_path,
+                base_url=base_url,
+                price_scale=price_scale,
+                timeout_seconds=timeout_seconds,
+                resume=resume,
+                hour_workers=hour_workers,
+            )
+        except NoDukascopyDataError as exc:
+            if date_count == 1:
+                raise
+            return _skipped_day_payload(
+                symbol=symbol,
+                trading_date=trading_date,
+                reason="no_data_available",
+                exc=exc,
+                summary_output_path=resolved_paths.summary_output_path,
+            )
+        except RuntimeError as exc:
+            if date_count == 1:
+                raise
+            return _skipped_day_payload(
+                symbol=symbol,
+                trading_date=trading_date,
+                reason="day_download_failed",
+                exc=exc,
+                summary_output_path=resolved_paths.summary_output_path,
+            )
     repair_needed = _daily_incomplete_repair_needed(paths=resolved_paths)
     if repair_incomplete_only and not repair_needed:
         return {
@@ -681,6 +830,7 @@ def _daily_paths(
     bootstrap_summary_output_path: Path | None,
     quality_report_path: Path | None,
     multiple_days: bool,
+    summary_filename: str = "download-summary.json",
 ) -> DailyOutputPaths:
     if multiple_days and (
         parsed_output_path is not None
@@ -709,7 +859,7 @@ def _daily_paths(
             / f"date={trading_date.isoformat()}.parquet"
         ),
         summary_output_path=(
-            artifact_root / "download-summary.json" if multiple_days else summary_output_path
+            artifact_root / summary_filename if multiple_days else summary_output_path
         ),
         bootstrap_summary_output_path=(
             bootstrap_summary_output_path or artifact_root / "bootstrap-summary.json"
@@ -754,6 +904,20 @@ def _daily_no_data_complete(*, paths: DailyOutputPaths) -> bool:
     except (OSError, json.JSONDecodeError):
         return False
     return bool(payload.get("skipped")) and payload.get("reason") == "no_data_available"
+
+
+def _daily_archive_outputs_complete(*, paths: DailyOutputPaths) -> bool:
+    if paths.summary_output_path is None or not paths.summary_output_path.exists():
+        return False
+    try:
+        payload = json.loads(paths.summary_output_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if payload.get("processing_mode") != "download_archives_only":
+        return False
+    if int(payload.get("failed_hour_count", 0)) > 0:
+        return False
+    return int(payload.get("downloaded_hour_count", 0)) > 0
 
 
 def _daily_has_failed_hours(*, paths: DailyOutputPaths) -> bool:
@@ -910,6 +1074,77 @@ def _materialize_hour(
             cached=cached,
         ),
         records=tuple(hour_records),
+        failed_hour=None,
+    )
+
+
+def _materialize_archive_hour(
+    *,
+    base_url: str,
+    symbol: str,
+    trading_date: date,
+    hour: int,
+    vendor_output_dir: Path,
+    timeout_seconds: float,
+    resume: bool,
+) -> HourMaterializationResult:
+    url = _dukascopy_hour_url(
+        base_url=base_url,
+        symbol=symbol,
+        trading_date=trading_date,
+        hour=hour,
+    )
+    try:
+        raw_payload, cached = _load_or_download_hour_payload(
+            url=url,
+            vendor_output_dir=vendor_output_dir,
+            symbol=symbol,
+            trading_date=trading_date,
+            hour=hour,
+            timeout_seconds=timeout_seconds,
+            resume=resume,
+        )
+    except RuntimeError as exc:
+        hour_path = _hour_payload_path(
+            vendor_output_dir=vendor_output_dir,
+            symbol=symbol,
+            trading_date=trading_date,
+            hour=hour,
+        )
+        return HourMaterializationResult(
+            downloaded_hour=None,
+            records=(),
+            failed_hour={
+                "hour": hour,
+                "url": url,
+                "path": str(hour_path),
+                "message": str(exc),
+            },
+        )
+    if raw_payload is None:
+        return HourMaterializationResult(
+            downloaded_hour=None,
+            records=(),
+            failed_hour=None,
+        )
+
+    hour_path = _hour_payload_path(
+        vendor_output_dir=vendor_output_dir,
+        symbol=symbol,
+        trading_date=trading_date,
+        hour=hour,
+    )
+    return HourMaterializationResult(
+        downloaded_hour=DownloadedHour(
+            hour=hour,
+            url=url,
+            path=hour_path,
+            byte_count=len(raw_payload),
+            sha256=hashlib.sha256(raw_payload).hexdigest(),
+            row_count=0,
+            cached=cached,
+        ),
+        records=(),
         failed_hour=None,
     )
 
@@ -1208,6 +1443,53 @@ _BAR_OUTPUT_COLUMNS: Final[list[str]] = [
 ]
 
 
+def _archive_summary_payload(
+    *,
+    symbol: str,
+    trading_date: date,
+    base_url: str,
+    price_scale: float,
+    downloaded_hours: list[DownloadedHour],
+    failed_hours: list[dict[str, object]],
+) -> dict[str, object]:
+    byte_count = sum(hour.byte_count for hour in downloaded_hours)
+    return {
+        "created_at": datetime.now(UTC),
+        "processing_mode": "download_archives_only",
+        "download_archives_only": True,
+        "source": {
+            "name": "Dukascopy Historical Data Feed",
+            "base_url": base_url,
+            "format": "hourly .bi5 LZMA tick archives",
+            "timezone": "UTC",
+        },
+        "symbol": symbol,
+        "date": trading_date.isoformat(),
+        "price_scale": price_scale,
+        "downloaded_hour_count": len(downloaded_hours),
+        "failed_hour_count": len(failed_hours),
+        "row_count": 0,
+        "byte_count": byte_count,
+        "downloaded_hours": [
+            {
+                "hour": hour.hour,
+                "url": hour.url,
+                "path": str(hour.path),
+                "byte_count": hour.byte_count,
+                "sha256": hour.sha256,
+                "cached": hour.cached,
+            }
+            for hour in downloaded_hours
+        ],
+        "failed_hours": failed_hours,
+        "safety": {
+            "offline_only": True,
+            "broker_orders_submitted": False,
+            "order_send_called": False,
+        },
+    }
+
+
 def _summary_payload(
     *,
     symbol: str,
@@ -1279,11 +1561,16 @@ def _range_summary_payload(
     price_scale: float,
     timeframes: tuple[str, ...],
     daily_payloads: list[dict[str, object]],
+    download_archives_only: bool,
 ) -> dict[str, object]:
     completed_payloads = [payload for payload in daily_payloads if not payload.get("skipped")]
     skipped_payloads = [payload for payload in daily_payloads if payload.get("skipped")]
     return {
         "created_at": datetime.now(UTC),
+        "processing_mode": (
+            "download_archives_only" if download_archives_only else "decode_bootstrap_bars"
+        ),
+        "download_archives_only": download_archives_only,
         "source": {
             "name": "Dukascopy Historical Data Feed",
             "base_url": base_url,
@@ -1347,6 +1634,9 @@ def _compact_daily_payload(payload: object) -> object:
         "row_count",
         "byte_count",
         "downloaded_hour_count",
+        "failed_hour_count",
+        "processing_mode",
+        "summary_output_path",
         "bootstrap_output_path",
         "quality_report_path",
         "message",

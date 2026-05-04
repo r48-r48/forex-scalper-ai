@@ -115,6 +115,58 @@ def test_download_dukascopy_ticks_cli_materializes_tick_and_bars(
     assert pd.read_parquet(d1_path)["tick_count"].tolist() == [2]
 
 
+def test_download_archives_only_caches_raw_without_parsing(
+    tmp_path: Path,
+) -> None:
+    script = _load_script_module("download_dukascopy_ticks")
+    payload = _compressed_bi5_payload(((0, 110_020, 110_000, 2.5, 2.0),))
+
+    def fake_download_bytes(url: str, *, timeout_seconds: float) -> bytes | None:
+        assert timeout_seconds == 5.0
+        if url.endswith("/00h_ticks.bi5"):
+            return payload
+        return None
+
+    def fail_if_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("raw-only mode must not parse or bootstrap data")
+
+    script._download_bytes = fake_download_bytes
+    script._parse_bi5_ticks = fail_if_called
+    script.bootstrap_history_cli = fail_if_called
+    script._write_timeframe_bars = fail_if_called
+
+    result = script.download_dukascopy_ticks_cli(
+        symbol="eurusd",
+        trading_date=date(2026, 5, 4),
+        vendor_output_dir=tmp_path / "vendor",
+        parsed_output_dir=tmp_path / "parsed",
+        bootstrap_output_dir=tmp_path / "history",
+        bars_output_dir=tmp_path / "bars",
+        summary_output_path=tmp_path / "raw-summary.json",
+        timeout_seconds=5.0,
+        download_archives_only=True,
+        hour_workers=2,
+    )
+
+    archive_path = tmp_path / "vendor" / "EURUSD" / "2026-05-04" / "00h_ticks.bi5"
+    summary_payload = json.loads(
+        (tmp_path / "raw-summary.json").read_text(encoding="utf-8")
+    )
+
+    assert archive_path.read_bytes() == payload
+    assert not (tmp_path / "parsed").exists()
+    assert not (tmp_path / "history").exists()
+    assert not (tmp_path / "bars").exists()
+    assert result["processing_mode"] == "download_archives_only"
+    assert result["completed_date_count"] == 1
+    assert result["byte_count"] == len(payload)
+    assert summary_payload["processing_mode"] == "download_archives_only"
+    assert summary_payload["download_archives_only"] is True
+    assert summary_payload["downloaded_hour_count"] == 1
+    assert summary_payload["downloaded_hours"][0]["cached"] is False
+    assert summary_payload["safety"]["order_send_called"] is False
+
+
 def test_sorted_parsed_tick_frame_uses_real_utc_timestamp_order() -> None:
     script = _load_script_module("download_dukascopy_ticks")
     sorted_frame = script._sorted_parsed_tick_frame(
@@ -174,6 +226,50 @@ def test_multi_day_download_records_no_data_days_without_failing(
     assert {daily["reason"] for daily in result["daily"]} == {"no_data_available"}
     assert (tmp_path / "range-summary.json").exists()
     assert compact["daily"]["reason_counts"] == {"no_data_available": 2}
+
+
+def test_archives_only_multi_day_records_no_data_days_without_bootstrap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    script = _load_script_module("download_dukascopy_ticks")
+
+    def fake_download_bytes(url: str, *, timeout_seconds: float) -> bytes | None:
+        return None
+
+    def fail_if_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("raw-only no-data mode must not bootstrap data")
+
+    script._download_bytes = fake_download_bytes
+    script.bootstrap_history_cli = fail_if_called
+    monkeypatch.chdir(tmp_path)
+
+    result = script.download_dukascopy_ticks_cli(
+        symbol="EURUSD",
+        start_date=date(2026, 5, 2),
+        end_date=date(2026, 5, 3),
+        vendor_output_dir=tmp_path / "vendor",
+        bootstrap_output_dir=tmp_path / "history",
+        summary_output_path=tmp_path / "range-summary.json",
+        download_archives_only=True,
+        day_workers=2,
+        hour_workers=2,
+    )
+
+    assert result["processing_mode"] == "download_archives_only"
+    assert result["completed_date_count"] == 0
+    assert result["skipped_date_count"] == 2
+    assert {daily["reason"] for daily in result["daily"]} == {"no_data_available"}
+    assert (tmp_path / "range-summary.json").exists()
+    assert (
+        tmp_path
+        / "data"
+        / "artifacts"
+        / "dukascopy"
+        / "EURUSD"
+        / "2026-05-02"
+        / "raw-archive-summary.json"
+    ).exists()
 
 
 def test_defer_incomplete_repair_skips_failed_hour_day(

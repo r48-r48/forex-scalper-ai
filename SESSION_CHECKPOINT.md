@@ -19,15 +19,16 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
 - Current branch/worktree note: local Git repository is initialized on `main`, tracking `origin/main` at `git@github.com:r48-r48/forex-scalper-ai.git`.
-- Active data job: detached screen `dukascopy_eurusd_coverage_then_repair_2016_2026`
+- Active data job: detached screen `dukascopy_eurusd_raw_archives_2016_2026`
   is running the EURUSD Dukascopy `2016-01-01` through `2026-05-04`
-  coverage-first pass and will automatically start the repair-only pass if coverage
-  exits successfully. Coverage log:
-  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-coverage-2016-01-01-to-2026-05-04.log`.
-  Repair log:
-  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-repair-2016-01-01-to-2026-05-04.log`.
-  The downloader now treats `RemoteDisconnected` as retryable after the first
-  coverage attempt stopped on a transient Dukascopy connection close around 2022.
+  archive-cache-first pass with `--download-archives-only`, `--day-workers 16`,
+  and `--hour-workers 4`. The earlier coverage/decode pass reached early 2024 but
+  stayed too slow for the full range and hit another transient remote disconnect,
+  so it was stopped in favor of raw archive download first and local processing
+  afterward. Active log:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-raw-archives-2016-01-01-to-2026-05-04.log`.
+  Range summary target:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/download-summary-raw-archives-2016-01-01-to-2026-05-04.json`.
 
 ## What Was Just Finished
 
@@ -54,6 +55,18 @@ If a later assistant turn needs to recover the full working state quickly, it sh
   - the long EURUSD range `2016-01-01` through `2026-05-04` is resumable under
     ignored `data/`; at checkpoint time more than 100 daily tick parquet artifacts
     had already been materialized
+- 2026-05-04 added fast raw-only Dukascopy archive caching:
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/download_dukascopy_ticks.py`
+    now accepts `--download-archives-only`
+  - raw-only mode downloads/reuses hourly `.bi5` files, writes
+    `raw-archive-summary.json` evidence for multi-day runs, and intentionally skips
+    tick parsing, QA bootstrap, and bar derivation so a broad first pass can finish
+    faster
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/production-cli.md`
+    documents the archive-cache-first workflow
+  - focused validation passed: targeted Ruff, compileall, `git diff --check`, and
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_download_dukascopy_ticks.py`
+    with `11 passed`
 - 2026-05-04 completed historical CSV/Parquet data bootstrap with QA evidence:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/bootstrap_history.py`
     for broker/vendor historical exports
