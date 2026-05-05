@@ -9,6 +9,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pandas as pd
+import pytest
 
 
 def test_build_dataset_cli_writes_flat_dataset_and_summary(tmp_path: Path) -> None:
@@ -89,6 +90,22 @@ def test_run_backtest_cli_writes_explicit_cost_baseline_report(tmp_path: Path) -
     assert summary[0]["strategy_name"] == "spread_mean_reversion"
     assert summary[0]["spread_bps"] == 0.4
     assert summary[0]["trade_count"] >= 1
+
+
+def test_run_backtest_help_formats_margin_percent(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    script = _load_script_module("run_backtest")
+    monkeypatch.setattr("sys.argv", ["run_backtest.py", "--help"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        script.parse_args()
+
+    assert exc_info.value.code == 0
+    output = capsys.readouterr().out
+    assert "100%" in output
+    assert "margin level" in output
 
 
 def test_run_walk_forward_cli_writes_summary_and_fold_metrics(tmp_path: Path) -> None:

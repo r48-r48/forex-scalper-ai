@@ -7,15 +7,73 @@
 - Goal: production-grade AI Forex scalping agent with tick/M1/L2 support, Transformer forecasting, DRL policy layer, execution adapters, validation, and deployment.
 - Persistent same-window checkpoint: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/SESSION_CHECKPOINT.md`
 - Latest external audit triage: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-05-03.md`
-- Active long-running data job: detached screen `dukascopy_eurusd_raw_archives_2016_2026`
-  is downloading EURUSD Dukascopy raw hourly `.bi5` archives from `2016-01-01`
-  through `2026-05-04` with `--download-archives-only`, `--day-workers 16`, and
-  `--hour-workers 4`. The previous coverage/decode pass reached early 2024 but
-  remained too slow and hit another transient remote disconnect, so it was stopped
-  in favor of a faster archive-cache-first pass. The active raw-only log is:
-  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-raw-archives-2016-01-01-to-2026-05-04.log`.
-  The range summary target is:
-  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/download-summary-raw-archives-2016-01-01-to-2026-05-04.json`.
+- Active long-running data jobs: none. The EURUSD Dukascopy offline-cache
+  processing screens all finished successfully with `status=0`:
+  - `dukascopy_process_2018_2019`
+  - `dukascopy_process_2020_2022`
+  - `dukascopy_process_2023_2026`
+  They ran `scripts/download_dukascopy_ticks.py --offline-cache-only` against the
+  already cached EURUSD Dukascopy `.bi5` archives and wrote normalized TICK parquet
+  plus M1-D1 bar artifacts under ignored `data/`.
+  Final logs:
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-offline-process-2018-2019.log`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-offline-process-2020-2022.log`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-offline-process-2023-2026.log`
+  Range summaries:
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/download-summary-offline-process-2016-2017.json`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/download-summary-offline-process-2018-2019.json`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/download-summary-offline-process-2020-2022.json`
+  - `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/download-summary-offline-process-2023-2026.json`
+  Consolidated offline processing report:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-coverage-2016-01-01-to-2026-05-04.json`.
+  Full failed-day repair list:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-failed-days-2016-01-01-to-2026-05-04.json`.
+  Session coverage classification:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-session-coverage-2016-01-01-to-2026-05-04.json`.
+  Final processed coverage: `2452` completed dates from `3777` calendar dates,
+  `185162841` tick rows, `3233` daily TICK parquet files, and `3233` files for
+  each derived timeframe (`M1` through `D1`). The `544` failed/no-data calendar
+  dates classify as expected market-closed/holiday dates (`540` Saturdays, two
+  New Year Fridays, and two year-end Sundays), leaving `0` unexpected failed
+  session days and a session coverage ratio of `1.0`.
+  Raw archive repair had already completed before these jobs; coverage evidence is
+  in `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/raw-archive-coverage-after-repair.json`
+  with `83734` hourly `.bi5` files from `90648` calendar hours.
+- First verified EURUSD 2024 M1 production pilot completed after the data pass:
+  - tick-like M1 input:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/training/eurusd-m1-ticklike-2024.parquet`
+    with `366847` rows; M1 close bid/ask values are timestamped at
+    `available_timestamp` for no same-bar lookahead.
+  - offline feature frame:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/features/eurusd-m1-features-2024-with-price.parquet`
+    with `366847` rows.
+  - leakage-safe supervised dataset:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/datasets/eurusd-m1-supervised-2024-h32-h5-s5.parquet`
+    with history length `32`, horizon `5`, stride `5`, `73363` rows, and `608`
+    lagged features.
+  - baseline backtests:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/backtests/eurusd-m1-baseline-2024.json`
+    and FX micro-position report
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/backtests/eurusd-m1-baseline-2024-fx-micro.json`.
+    The FX micro report used EURUSD pip size `0.0001`, contract size `100000`,
+    margin rate `0.0333333333`, and `max_abs_position=1000`; spread
+    mean-reversion ended at `98642.59` equity and OFI imbalance at `89650.24`
+    after explicit `0.5` bps spread plus `0.2` bps slippage costs.
+  - supervised filter walk-forward:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-supervised-filter-wf-2024.json`
+    with `3` folds, mean accuracy `0.4993693383786263`, and coverage `1.0`.
+  - runtime-loadable supervised filter bundle:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-filter-2024-h32-h5-s5/`
+    trained on `61516` rows through `2024-10-31T23:57:00Z`; runtime loader
+    scored a 5-row sample successfully.
+  - compact runtime-loadable transformer smoke bundle:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-transformer-2024-h32-h5-s5-smoke/`
+    trained for `3` epochs with `56516` fit rows and `5000` validation rows;
+    validation directional accuracy was `0.4972994598919784`, and the runtime
+    loader scored a 5-row sample successfully.
+  - a small CLI regression was fixed: `scripts/run_backtest.py --help` no longer
+    crashes on the `%` in the margin-level help text, and
+    `tests/unit/test_scripts_production_cli.py` now covers it.
 
 ## Completed Phases
 

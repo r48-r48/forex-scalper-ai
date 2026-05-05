@@ -14,24 +14,125 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Current Snapshot
 
-- Date: `2026-05-04`
+- Date: `2026-05-05`
 - Repo phase status: `PHASE 1-12 complete`
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
 - Current branch/worktree note: local Git repository is initialized on `main`, tracking `origin/main` at `git@github.com:r48-r48/forex-scalper-ai.git`.
-- Active data job: detached screen `dukascopy_eurusd_raw_archives_2016_2026`
-  is running the EURUSD Dukascopy `2016-01-01` through `2026-05-04`
-  archive-cache-first pass with `--download-archives-only`, `--day-workers 16`,
-  and `--hour-workers 4`. The earlier coverage/decode pass reached early 2024 but
-  stayed too slow for the full range and hit another transient remote disconnect,
-  so it was stopped in favor of raw archive download first and local processing
-  afterward. Active log:
-  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/full-raw-archives-2016-01-01-to-2026-05-04.log`.
-  Range summary target:
-  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/download-summary-raw-archives-2016-01-01-to-2026-05-04.json`.
+- Active data jobs: none. The detached EURUSD Dukascopy offline-cache processing
+  jobs (`dukascopy_process_2018_2019`, `dukascopy_process_2020_2022`, and
+  `dukascopy_process_2023_2026`) all completed with `status=0`.
+- Final offline processing coverage for `2016-01-01` through `2026-05-04`:
+  - consolidated report:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-coverage-2016-01-01-to-2026-05-04.json`
+  - full failed-day repair list:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-failed-days-2016-01-01-to-2026-05-04.json`
+  - session coverage classification:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-session-coverage-2016-01-01-to-2026-05-04.json`
+  - range summaries:
+    `download-summary-offline-process-2016-2017.json`,
+    `download-summary-offline-process-2018-2019.json`,
+    `download-summary-offline-process-2020-2022.json`,
+    and `download-summary-offline-process-2023-2026.json`
+  - totals from range summaries: `3777` calendar dates, `2452` completed dates,
+    `1325` skipped dates, `185162841` tick rows, and `933357334` output bytes
+  - produced artifacts: `3233` daily TICK parquet files and `3233` files for each
+    derived timeframe (`M1`, `M2`, `M3`, `M4`, `M5`, `M6`, `M10`, `M12`, `M15`,
+    `M20`, `M30`, `H1`, `H2`, `H3`, `H4`, `H6`, `H8`, `H12`, `D1`)
+  - the `544` failed/no-data calendar dates classify as expected market-closed or
+    holiday dates (`540` Saturdays, `2016-01-01`, `2021-01-01`, `2017-12-31`,
+    and `2023-12-31`), leaving `0` unexpected failed session days and session
+    coverage ratio `1.0`
+- Raw archive repair completed before local processing. Coverage report:
+  `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/raw-archive-coverage-after-repair.json`
+  with `83734` hourly `.bi5` files from `90648` calendar hours and all `3777`
+  daily raw summaries present.
+- First verified EURUSD 2024 M1 production pilot completed from this cache:
+  - M1 tick-like input:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/training/eurusd-m1-ticklike-2024.parquet`
+    with `366847` rows
+  - feature frame with price columns:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/features/eurusd-m1-features-2024-with-price.parquet`
+    with `366847` rows
+  - supervised dataset:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/datasets/eurusd-m1-supervised-2024-h32-h5-s5.parquet`
+    with history length `32`, horizon `5`, stride `5`, `73363` rows, and `608`
+    features
+  - reports/bundles:
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/backtests/eurusd-m1-baseline-2024.json`,
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/backtests/eurusd-m1-baseline-2024-fx-micro.json`,
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-supervised-filter-wf-2024.json`,
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-filter-2024-h32-h5-s5/`,
+    and
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-transformer-2024-h32-h5-s5-smoke/`
+  - headline metrics: FX micro spread mean-reversion final equity `98642.59`,
+    OFI imbalance final equity `89650.24`, supervised filter walk-forward mean
+    accuracy `0.4993693383786263`, transformer smoke validation directional
+    accuracy `0.4972994598919784`
+  - both runtime inference package loaders scored 5-row samples successfully.
 
 ## What Was Just Finished
 
+- 2026-05-05 completed the first verified EURUSD 2024 M1 training/backtest pilot:
+  - generated M1 tick-like input from daily Dukascopy M1 bars while timestamping
+    completed-bar close bid/ask values at `available_timestamp` to avoid same-bar
+    lookahead
+  - wrote
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/training/eurusd-m1-ticklike-2024.parquet`
+    and
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/training/eurusd-m1-ticklike-2024-summary.json`
+    with `366847` rows from `314` source M1 files
+  - built offline features into
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/features/eurusd-m1-features-2024.parquet`
+    and augmented them with same-row bid/ask/mid price into
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/features/eurusd-m1-features-2024-with-price.parquet`
+  - built supervised dataset
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/processed/datasets/eurusd-m1-supervised-2024-h32-h5-s5.parquet`
+    with history length `32`, target horizon `5`, stride `5`, `73363` rows, and
+    `608` features; a dense stride-1 build was intentionally killed because it was
+    too heavy for this first pilot pass
+  - ran baseline backtest
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/backtests/eurusd-m1-baseline-2024.json`
+    and FX micro-position backtest
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/backtests/eurusd-m1-baseline-2024-fx-micro.json`
+    using explicit `0.5` bps spread and `0.2` bps slippage costs
+  - FX micro-position headline: spread mean-reversion final equity `98642.59`,
+    total PnL `-1357.41`, `13253` trades; OFI imbalance final equity `89650.24`,
+    total PnL `-10349.76`, `57604` trades; volatility breakout took `0` trades
+  - ran supervised filter walk-forward
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-supervised-filter-wf-2024.json`
+    with `3` folds, mean accuracy `0.4993693383786263`, coverage `1.0`, and
+    `26163` evaluated rows
+  - exported runtime-loadable supervised filter bundle
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-filter-2024-h32-h5-s5/`
+    trained on `61516` rows through `2024-10-31T23:57:00Z`
+  - exported compact runtime-loadable transformer smoke bundle
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/models/eurusd-m1-transformer-2024-h32-h5-s5-smoke/`
+    with `56516` fit rows, `5000` validation rows, `3` epochs, and validation
+    directional accuracy `0.4972994598919784`
+  - verified both runtime loaders against the exported bundles on 5-row samples
+  - fixed `scripts/run_backtest.py --help` percent-format regression and added a
+    focused test in
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/tests/unit/test_scripts_production_cli.py`
+  - validation passed: targeted Ruff, compileall, `git diff --check`, and focused
+    pytest with `16 passed`
+- 2026-05-05 completed the EURUSD Dukascopy offline-cache processing pass:
+  - all detached `screen` jobs finished with `status=0`
+  - processed ranges:
+    `2016-01-01..2017-12-31`, `2018-01-01..2019-12-31`,
+    `2020-01-01..2022-12-31`, and `2023-01-01..2026-05-04`
+  - consolidated evidence was written to
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-coverage-2016-01-01-to-2026-05-04.json`
+  - full failed-day evidence was written to
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-failed-days-2016-01-01-to-2026-05-04.json`
+  - session coverage evidence was written to
+    `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/data/artifacts/dukascopy/EURUSD/offline-processing-session-coverage-2016-01-01-to-2026-05-04.json`
+  - output now includes `3233` daily TICK parquet files and matching `3233`
+    files for every derived M1-D1 timeframe
+  - total processed rows across range summaries: `185162841`
+  - the `527` `day_download_failed` days and `17` `no_data_available` days were
+    classified as expected market-closed/holiday dates, leaving `0` unexpected
+    failed session days and session coverage ratio `1.0`
 - 2026-05-04 added direct Dukascopy historical tick download and timeframe derivation:
   - added `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/scripts/download_dukascopy_ticks.py`
     for public hourly `.bi5` vendor archive download from Dukascopy, UTC bid/ask

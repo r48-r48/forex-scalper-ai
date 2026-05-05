@@ -270,7 +270,7 @@ def _add_backtest_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help=(
             "Optional forced-liquidation threshold expressed as "
-            "equity / margin_required. Example: 1.0 means 100% margin level."
+            "equity / margin_required. Example: 1.0 means 100%% margin level."
         ),
     )
     parser.add_argument("--stop-loss-price-column", default=None)
