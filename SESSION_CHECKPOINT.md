@@ -14,11 +14,14 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 
 ## Current Snapshot
 
-- Date: `2026-05-05`
+- Date: `2026-05-07`
 - Repo phase status: `PHASE 1-12 complete`
 - Active roadmap: `POST-PHASE — Hardening, live integration refinement, and operational stabilization`
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
-- Current branch/worktree note: local Git repository is initialized on `main`, tracking `origin/main` at `git@github.com:r48-r48/forex-scalper-ai.git`.
+- Current branch/worktree note: local Git repository is initialized on `main`,
+  tracking `origin/main` at `git@github.com:r48-r48/forex-scalper-ai.git`.
+  Latest pushed commit before archiving the old thread: `c3d43e5` (`Record
+  EURUSD pilot and fix backtest help`).
 - Active data jobs: none. The detached EURUSD Dukascopy offline-cache processing
   jobs (`dukascopy_process_2018_2019`, `dukascopy_process_2020_2022`, and
   `dukascopy_process_2023_2026`) all completed with `status=0`.
@@ -70,6 +73,57 @@ If a later assistant turn needs to recover the full working state quickly, it sh
     accuracy `0.4993693383786263`, transformer smoke validation directional
     accuracy `0.4972994598919784`
   - both runtime inference package loaders scored 5-row samples successfully.
+
+## Next Dialog Resume Prompt
+
+Use this compact prompt in a new Codex/ChatGPT window:
+
+```text
+Продолжаем проект forex-scalper-ai в /Users/dzhabrailtalkanov/Desktop/forex-scalper-ai.
+
+Сначала обязательно прочитай:
+- AGENTS.md
+- AGENT_HANDOFF.md
+- docs/current-state.md
+- docs/todo-next.md
+- SESSION_CHECKPOINT.md
+
+Текущее состояние:
+- PHASE 1-12 завершены.
+- main/origin/main запушен на GitHub, последний известный commit: c3d43e5 Record EURUSD pilot and fix backtest help.
+- EURUSD Dukascopy raw/offline cache за 2016-01-01..2026-05-04 завершен: 185162841 tick rows, 3233 дневных TICK parquet и 3233 файлов для каждого M1-D1 таймфрейма, session coverage ratio 1.0, неожиданных пропусков 0.
+- Первый verified EURUSD 2024 M1 pilot завершен: M1 tick-like 366847 rows, features 366847 rows, supervised dataset history=32/horizon=5/stride=5 с 73363 rows и 608 features.
+- Backtests/модели лежат под data/artifacts: baseline, FX micro backtest, supervised filter walk-forward, supervised filter bundle, transformer smoke bundle.
+- Метрики pilot честные, но не боевые: supervised WF mean accuracy около 0.49937, transformer validation directional accuracy около 0.49730, FX micro backtest отрицательный PnL. Это pipeline validation, не live edge.
+- run_backtest.py --help bug с % уже исправлен и покрыт тестом.
+
+Новые планы:
+1. Подготовить workflow для VPS с RTX 4070 16GB: clone repo, install deps, получить/перенести данные, запустить тяжелое multi-year Transformer/DRL обучение, скачать обратно только model bundle artifacts.
+2. Масштабировать обучение/backtest с 2024 M1 pilot на 2016-2026 rolling/walk-forward окна, аккуратно по годам/chunks.
+3. Добавить model registry / promotion report: какие модели проходят, какие отклоняются, почему.
+4. Углубить FX realism: broker spread/slippage calibration, session/regime reports, risk limits.
+5. Только после устойчивой модели подключать paper/shadow runtime; live credentials и order_send на VPS не использовать.
+
+Начни с проверки git status, затем предложи/реализуй следующий безопасный шаг: VPS training job script/config или локальный multi-year dataset workflow.
+```
+
+## Forward Plan
+
+- Preferred next step: build a reproducible VPS/GPU training job for RTX 4070
+  16 GB. The VPS should be used for heavy research training only, not for live
+  trading or MT5 credentials.
+- Data strategy for VPS:
+  - best if the VPS has fast internet/SSD: clone the repo and redownload/process
+    Dukascopy data there using existing scripts;
+  - otherwise transfer selected local `data/processed/...` parquet subsets from
+    the Mac, not the whole raw cache unless needed.
+- Training strategy:
+  - supervised filter is mostly CPU and should stay lightweight;
+  - GPU is mainly useful for larger Transformer training and later DRL/policy
+    experiments;
+  - export bundles back to this workspace and validate them with runtime loaders,
+    backtests, walk-forward reports, and promotion gates before any paper/shadow
+    deployment.
 
 ## What Was Just Finished
 

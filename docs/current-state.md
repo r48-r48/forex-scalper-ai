@@ -194,6 +194,10 @@
 - PHASE 1-12 are now implemented.
 - The repository now has research, validation, baseline strategies, execution, deployment, early reconciliation hardening, MT5 pre-send safety, unified journal, OMS/RiskEngine layers, validation gates, shadow reports, supervised baseline filtering, and operational runbooks.
 - The next work should continue from the completed runtime Risk/OMS gate, durable recovery, broker-source MT5 hedging, deal-accounting/per-deal attribution slices, protective-order slices, position-protection fail-safe, first risk-config guard slice, first MT5 symbol-spec quantization/enforcement slices, first MT5 reconnect supervision slice, approved protection-flatten workflow, first broker-side startup recovery/fault-injection slice, first MT5 protective repair/modify slice, real history/deal validation, supervisor alert routing, controlled pending-order modify validation, richer runtime health provider contracts, concrete provider trackers, provider event-loop wiring, MT5 partial-fill and post-send fallback fault-injection coverage, Docker/Compose paper-runtime validation, bounded, 30-iteration, and wall-clock local paper supervisor validation, fresh-checkout Parallels MT5 validation, full Ruff cleanup, full mypy cleanup, CI/local gate promotion, historical CSV/Parquet data bootstrap with QA evidence, direct Dukascopy EURUSD cache processing, and first verified EURUSD 2024 model/backtest pilot.
+- The next operational direction is to prepare a reproducible VPS/GPU training
+  workflow for a RTX 4070 16 GB machine, use it for heavier multi-year
+  Transformer/DRL research training, download exported model bundles back into
+  this Mac workspace, and validate them locally before paper/shadow deployment.
 
 ## Important Constraints
 
