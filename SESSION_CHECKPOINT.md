@@ -20,8 +20,10 @@ If a later assistant turn needs to recover the full working state quickly, it sh
 - Current workspace path: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai`
 - Current branch/worktree note: local Git repository is initialized on `main`,
   tracking `origin/main` at `git@github.com:r48-r48/forex-scalper-ai.git`.
-  Latest pushed commit before archiving the old thread: `c3d43e5` (`Record
-  EURUSD pilot and fix backtest help`).
+  Latest project-result commit before the final handoff refresh: `c3d43e5`
+  (`Record EURUSD pilot and fix backtest help`). Later commits may be
+  memory-only handoff updates; use `git log -1 --oneline` for the current
+  `origin/main` HEAD.
 - Active data jobs: none. The detached EURUSD Dukascopy offline-cache processing
   jobs (`dukascopy_process_2018_2019`, `dukascopy_process_2020_2022`, and
   `dukascopy_process_2023_2026`) all completed with `status=0`.
@@ -90,7 +92,7 @@ Use this compact prompt in a new Codex/ChatGPT window:
 
 Текущее состояние:
 - PHASE 1-12 завершены.
-- main/origin/main запушен на GitHub, последний известный commit: c3d43e5 Record EURUSD pilot and fix backtest help.
+- Project-result commit c3d43e5 Record EURUSD pilot and fix backtest help уже запушен; после него могут быть memory-only handoff commits, поэтому для точного HEAD проверь git log -1 --oneline.
 - EURUSD Dukascopy raw/offline cache за 2016-01-01..2026-05-04 завершен: 185162841 tick rows, 3233 дневных TICK parquet и 3233 файлов для каждого M1-D1 таймфрейма, session coverage ratio 1.0, неожиданных пропусков 0.
 - Первый verified EURUSD 2024 M1 pilot завершен: M1 tick-like 366847 rows, features 366847 rows, supervised dataset history=32/horizon=5/stride=5 с 73363 rows и 608 features.
 - Backtests/модели лежат под data/artifacts: baseline, FX micro backtest, supervised filter walk-forward, supervised filter bundle, transformer smoke bundle.

@@ -7,9 +7,11 @@
 - Goal: production-grade AI Forex scalping agent with tick/M1/L2 support, Transformer forecasting, DRL policy layer, execution adapters, validation, and deployment.
 - Persistent same-window checkpoint: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/SESSION_CHECKPOINT.md`
 - Latest external audit triage: `/Users/dzhabrailtalkanov/Desktop/forex-scalper-ai/docs/external-audit-2026-05-03.md`
-- Latest pushed GitHub state: `main` / `origin/main` at commit `c3d43e5`
+- Latest project-result commit before the final handoff refresh: `c3d43e5`
   (`Record EURUSD pilot and fix backtest help`). That commit contains the first
   EURUSD 2024 M1 pilot memory, the `run_backtest.py --help` fix, and its test.
+  Later commits may be memory-only handoff updates; use `git log -1 --oneline`
+  for the current `origin/main` HEAD.
 - Next intended work after this archived thread: prepare a VPS/GPU training
   workflow for a machine with RTX 4070 16 GB VRAM, train heavier multi-year
   Transformer/DRL candidates there, and download only the exported model bundles
